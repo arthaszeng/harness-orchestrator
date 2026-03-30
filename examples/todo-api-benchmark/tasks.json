@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "requirement": "初始化 FastAPI 项目，添加健康检查端点和基础项目结构",
+    "complexity": "simple",
+    "expected_files": ["main.py", "requirements.txt"]
+  },
+  {
+    "id": 2,
+    "requirement": "实现 TODO CRUD API（创建、读取、更新、删除）+ SQLite 存储",
+    "complexity": "medium",
+    "expected_files": ["main.py", "models.py", "database.py"]
+  },
+  {
+    "id": 3,
+    "requirement": "添加输入验证、错误处理和 Pydantic 模型",
+    "complexity": "medium",
+    "expected_files": ["schemas.py", "main.py"]
+  },
+  {
+    "id": 4,
+    "requirement": "实现分页、过滤（按状态）和排序功能",
+    "complexity": "medium",
+    "expected_files": ["main.py"]
+  },
+  {
+    "id": 5,
+    "requirement": "添加完整的 pytest 测试套件，覆盖所有端点和边界情况",
+    "complexity": "complex",
+    "expected_files": ["tests/test_api.py", "conftest.py"]
+  }
+]

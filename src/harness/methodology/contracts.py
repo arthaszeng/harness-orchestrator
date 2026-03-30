@@ -1,9 +1,12 @@
-"""迭代合同引擎 — 解析、验证、交付物检查"""
+"""迭代合同引擎 — 解析、验证、交付物检查、JSON sidecar"""
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -19,6 +22,15 @@ class Contract:
     acceptance_criteria: list[str] = field(default_factory=list)
     technical_summary: str = ""
     complexity: str = "medium"  # simple / medium / complex
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "iteration": self.iteration,
+            "deliverables": [{"text": d.description, "done": d.done} for d in self.deliverables],
+            "acceptance_criteria": self.acceptance_criteria,
+            "technical_summary": self.technical_summary,
+            "complexity": self.complexity,
+        }
 
 
 def parse_contract(markdown: str) -> Contract:
@@ -64,6 +76,16 @@ def parse_contract(markdown: str) -> Contract:
         contract.complexity = m.group(1).lower()
 
     return contract
+
+
+def write_contract_sidecar(contract: Contract, md_path: Path) -> Path:
+    """Write a JSON sidecar alongside the markdown contract file."""
+    json_path = md_path.with_suffix(".json")
+    json_path.write_text(
+        json.dumps(contract.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return json_path
 
 
 def verify_deliverables(contract: Contract) -> tuple[int, int]:

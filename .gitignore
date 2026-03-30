@@ -18,10 +18,9 @@ htmlcov/
 .coverage
 *.log
 .DS_Store
-.idea/*
-.agents/
+.idea/
 
-# harness — 不跟踪运行时状态
-.agents/state.json
-.agents/.stop
-/.idea/
+# harness — .agents/ 是本地运行时目录，不纳入版本控制
+# 包含 state.json、.stop、tasks/、archive/ 等运行时产物
+# config.toml 和 vision.md 如需团队共享，可通过 git add -f 手动添加
+.agents/

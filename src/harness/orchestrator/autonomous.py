@@ -4,37 +4,17 @@ from __future__ import annotations
 
 import re
 import time
-from pathlib import Path
 
 from harness import __version__
 from harness.core.config import HarnessConfig
+from harness.core.events import EventEmitter, NullEventEmitter
 from harness.core.progress import update_progress
-from harness.core.state import SessionState, StateMachine
+from harness.core.state import StateMachine
 from harness.core.ui import get_ui
-from harness.drivers.base import AgentResult
 from harness.drivers.resolver import DriverResolver
 from harness.integrations.memverse import create_memverse
 from harness.orchestrator.safety import check_safety
 from harness.orchestrator.workflow import WorkflowResult, run_single_task
-
-
-def _resolve_memverse_driver(
-    config: HarnessConfig,
-    resolver: DriverResolver,
-) -> object | None:
-    """根据 memverse.driver 配置解析实际使用的 driver"""
-    mv_cfg = config.integrations.memverse
-    if not mv_cfg.enabled:
-        return None
-
-    driver_name = mv_cfg.driver
-    if driver_name == "auto":
-        driver_name = config.drivers.default
-
-    if driver_name == "auto":
-        return resolver.first_available_driver()
-
-    return resolver.get_driver_by_name(driver_name) or resolver.first_available_driver()
 
 
 def run_autonomous(
@@ -46,16 +26,18 @@ def run_autonomous(
 ) -> list[WorkflowResult]:
     """自治循环：Strategist 产出任务 → 执行 → Reflector 总结"""
     ui = get_ui()
-    agents_dir = sm.agents_dir
     results: list[WorkflowResult] = []
     consecutive_blocked = 0
     completed_count = len(sm.state.completed)
 
-    memverse_driver = _resolve_memverse_driver(config, resolver)
-    memverse = create_memverse(
-        config.integrations.memverse.enabled,
-        driver=memverse_driver,
-    )
+    memverse = create_memverse(config.integrations.memverse.enabled)
+
+    session_id = sm.state.session_id or "unknown"
+    ev: EventEmitter | NullEventEmitter
+    try:
+        ev = EventEmitter(sm.agents_dir, session_id)
+    except OSError:
+        ev = NullEventEmitter()
 
     ui.banner("auto", __version__)
     ui.system_status(resolver.available_drivers)
@@ -79,7 +61,7 @@ def run_autonomous(
         ui.strategist_result(task_requirement, elapsed)
 
         # 执行单任务
-        result = run_single_task(config, sm, resolver, task_requirement)
+        result = run_single_task(config, sm, resolver, task_requirement, events=ev)
         results.append(result)
 
         if result.verdict == "PASS":

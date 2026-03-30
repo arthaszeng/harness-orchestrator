@@ -1,0 +1,10 @@
+{"type":"tool_call","subtype":"started","tool_call":{"fileReadToolCall":{"filePath":"src/main.py"}}}
+{"type":"tool_call","subtype":"completed","tool_call":{"fileReadToolCall":{"filePath":"src/main.py"}}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"I'll implement the feature now."}]}}
+{"type":"tool_call","subtype":"started","tool_call":{"fileEditToolCall":{"filePath":"src/main.py"}}}
+{"type":"tool_call","subtype":"completed","tool_call":{"fileEditToolCall":{"filePath":"src/main.py"}}}
+{"type":"tool_call","subtype":"started","tool_call":{"shellToolCall":{"command":"pytest tests/"}}}
+{"type":"tool_call","subtype":"completed","tool_call":{"shellToolCall":{"command":"pytest tests/"}}}
+{"type":"tool_call","subtype":"started","tool_call":{"mcpToolCall":{"toolName":"search_memory","result":{}}}}
+{"type":"tool_call","subtype":"completed","tool_call":{"mcpToolCall":{"toolName":"search_memory","result":{"rejected":{"reason":"not configured"}}}}}
+{"type":"result","result":"Feature implemented and tests pass.","is_error":false,"duration_ms":45200}

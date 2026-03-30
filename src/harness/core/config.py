@@ -24,6 +24,7 @@ class DriversRolesConfig(BaseModel):
     planner: str = ""
     builder: str = ""
     evaluator: str = ""
+    alignment_evaluator: str = ""
     strategist: str = ""
     reflector: str = ""
 
@@ -38,10 +39,12 @@ class ModelsConfig(BaseModel):
 
 
 class WorkflowConfig(BaseModel):
+    profile: str = "standard"  # lite / standard / autonomous
     max_iterations: int = 3
     pass_threshold: float = 3.5
     auto_merge: bool = True
     branch_prefix: str = "agent"
+    dual_evaluation: bool = False
 
 
 class AutonomousConfig(BaseModel):

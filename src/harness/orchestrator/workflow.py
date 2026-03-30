@@ -10,14 +10,16 @@ from pathlib import Path
 
 from harness.core.archive import archive_task, ensure_task_dir
 from harness.core.config import HarnessConfig
+from harness.core.events import EventEmitter, NullEventEmitter
 from harness.core.index import update_index
 from harness.core.progress import update_progress
 from harness.core.state import StateMachine, TaskState
 from harness.core.ui import get_ui
-from harness.drivers.base import AgentDriver, AgentResult
+from harness.drivers.base import AgentResult
 from harness.drivers.resolver import DriverResolver
-from harness.methodology.evaluation import EvalResult, parse_evaluation, run_ci_check
-from harness.methodology.scoring import Scores
+from harness.methodology.contracts import parse_contract, write_contract_sidecar
+from harness.methodology.evaluation import parse_evaluation, run_ci_check
+from harness.methodology.scoring import write_evaluation_sidecar
 
 
 @dataclass
@@ -30,6 +32,17 @@ class WorkflowResult:
     feedback: str = ""
 
 
+def _resolve_profile(config: HarnessConfig) -> tuple[int, float]:
+    """Return (max_iterations, pass_threshold) adjusted for the active profile."""
+    profile = config.workflow.profile
+    if profile == "lite":
+        return (
+            min(config.workflow.max_iterations, 2),
+            min(config.workflow.pass_threshold, 3.0),
+        )
+    return config.workflow.max_iterations, config.workflow.pass_threshold
+
+
 def run_single_task(
     config: HarnessConfig,
     sm: StateMachine,
@@ -38,13 +51,16 @@ def run_single_task(
     task_id: str | None = None,
     *,
     resume: bool = False,
+    events: EventEmitter | None = None,
 ) -> WorkflowResult:
     """执行完整的 plan→contract→build→eval 循环"""
     from harness.integrations import git_ops
 
     ui = get_ui()
+    ev = events or NullEventEmitter()
     project_root = config.project_root
     agents_dir = sm.agents_dir
+    is_lite = config.workflow.profile == "lite"
 
     if not task_id:
         seq = len(sm.state.completed) + len(sm.state.blocked) + 1
@@ -63,13 +79,19 @@ def run_single_task(
         sm.start_task(task_id, requirement, branch)
 
     ui.task_panel(task_id, requirement, branch)
+    ev.task_start(task_id=task_id, requirement=requirement, branch=branch)
 
-    max_iter = config.workflow.max_iterations
+    max_iter, pass_threshold = _resolve_profile(config)
     last_feedback = ""
     task_start = time.monotonic()
     abort_reason = ""
 
-    for iteration in range(1, max_iter + 1):
+    # On resume, continue from the last recorded iteration to avoid overwriting artifacts
+    start_iteration = 1
+    if resume and sm.state.current_task and sm.state.current_task.iteration > 0:
+        start_iteration = sm.state.current_task.iteration
+
+    for iteration in range(start_iteration, start_iteration + max_iter):
         if sm.stop_requested():
             ui.warn("stop signal detected, saving progress...")
             break
@@ -89,6 +111,7 @@ def run_single_task(
             else:
                 plan_prompt = _build_iterate_prompt(requirement, last_feedback, project_root)
 
+            ev.agent_start(role="planner", driver=planner.name, agent_name=planner_name, iteration=iteration)
             t0 = time.monotonic()
             with ui.agent_step("[1/3 planner] generating spec + contract", planner.name) as on_out:
                 plan_result = planner.invoke(
@@ -96,6 +119,12 @@ def run_single_task(
                     readonly=True, on_output=on_out,
                 )
             elapsed = time.monotonic() - t0
+            ev.agent_end(
+                role="planner", driver=planner.name, agent_name=planner_name,
+                iteration=iteration, exit_code=plan_result.exit_code,
+                success=plan_result.success, output_len=len(plan_result.output),
+                elapsed_ms=int(elapsed * 1000),
+            )
 
             if plan_result.success:
                 ui.step_done("[1/3 planner]", elapsed, True, "locked")
@@ -108,11 +137,21 @@ def run_single_task(
                 ui.error(f"[abort] {abort_reason}")
                 break
 
-            spec_text, contract_text = _split_spec_contract(plan_result.output)
-            (task_dir / f"spec-r{iteration}.md").write_text(spec_text, encoding="utf-8")
-            (task_dir / f"contract-r{iteration}.md").write_text(contract_text, encoding="utf-8")
+            if is_lite:
+                combined = plan_result.output.strip()
+                (task_dir / f"spec-r{iteration}.md").write_text(combined, encoding="utf-8")
+                (task_dir / f"contract-r{iteration}.md").write_text(combined, encoding="utf-8")
+            else:
+                spec_text, contract_text = _split_spec_contract(plan_result.output)
+                (task_dir / f"spec-r{iteration}.md").write_text(spec_text, encoding="utf-8")
+                (task_dir / f"contract-r{iteration}.md").write_text(contract_text, encoding="utf-8")
             sm.state.current_task.artifacts.spec = str(task_dir / f"spec-r{iteration}.md")
             sm.state.current_task.artifacts.contract = str(task_dir / f"contract-r{iteration}.md")
+
+            contract_md_path = task_dir / f"contract-r{iteration}.md"
+            parsed_contract = parse_contract(contract_md_path.read_text(encoding="utf-8"))
+            parsed_contract.iteration = iteration
+            write_contract_sidecar(parsed_contract, contract_md_path)
 
         # === Phase 2: Contracted → Building ===
         if sm.state.current_task.state == TaskState.PLANNING:
@@ -125,6 +164,7 @@ def run_single_task(
             builder_name = resolver.agent_name("builder")
             build_prompt = _build_builder_prompt(requirement, task_dir, iteration, project_root)
 
+            ev.agent_start(role="builder", driver=builder.name, agent_name=builder_name, iteration=iteration)
             t0 = time.monotonic()
             with ui.agent_step("[2/3 builder] executing contract", builder.name) as on_out:
                 build_result = builder.invoke(
@@ -132,6 +172,12 @@ def run_single_task(
                     on_output=on_out,
                 )
             elapsed = time.monotonic() - t0
+            ev.agent_end(
+                role="builder", driver=builder.name, agent_name=builder_name,
+                iteration=iteration, exit_code=build_result.exit_code,
+                success=build_result.success, output_len=len(build_result.output),
+                elapsed_ms=int(elapsed * 1000),
+            )
 
             (task_dir / f"build-r{iteration}.log").write_text(
                 build_result.output, encoding="utf-8"
@@ -162,6 +208,12 @@ def run_single_task(
             with ui.agent_step("[3/3 eval] CI gate", "local") as on_out:
                 ci_result = run_ci_check(config.ci.command, project_root, on_output=on_out)
             elapsed = time.monotonic() - t0
+            ev.ci_result(
+                command=config.ci.command,
+                exit_code=0 if ci_result.verdict != "CI_FAIL" else 1,
+                verdict=ci_result.verdict,
+                elapsed_ms=int(elapsed * 1000),
+            )
 
             if ci_result.verdict == "CI_FAIL":
                 ui.step_done(
@@ -179,45 +231,96 @@ def run_single_task(
             else:
                 ui.step_done("[3/3 eval] CI gate", elapsed, True, "clear")
 
-            # Stage 2: 深度审查
+            # Stage 2: Quality review (primary evaluator)
             evaluator = resolver.resolve("evaluator")
             eval_name = resolver.agent_name("evaluator")
             eval_prompt = _build_eval_prompt(
                 requirement, task_dir, iteration, project_root, branch=branch,
             )
 
+            ev.agent_start(role="evaluator", driver=evaluator.name, agent_name=eval_name, iteration=iteration)
             t0 = time.monotonic()
-            with ui.agent_step("[3/3 eval] deep review", evaluator.name) as on_out:
+            with ui.agent_step("[3/3 eval] quality review", evaluator.name) as on_out:
                 eval_result = evaluator.invoke(
                     eval_name, eval_prompt, project_root,
                     readonly=True, on_output=on_out,
                 )
             elapsed = time.monotonic() - t0
+            ev.agent_end(
+                role="evaluator", driver=evaluator.name, agent_name=eval_name,
+                iteration=iteration, exit_code=eval_result.exit_code,
+                success=eval_result.success, output_len=len(eval_result.output),
+                elapsed_ms=int(elapsed * 1000),
+            )
 
             if not eval_result.success:
                 ui.step_done(
-                    "[3/3 eval] review", elapsed, False, "evaluator failed",
+                    "[3/3 eval] quality review", elapsed, False, "evaluator failed",
                     fail_tail=eval_result.output.split("\n"),
                 )
                 abort_reason = f"evaluator failed (exit {eval_result.exit_code})"
                 ui.error(f"[abort] {abort_reason}")
                 break
 
-            parsed = parse_evaluation(eval_result.output, config.workflow.pass_threshold)
-            (task_dir / f"evaluation-r{iteration}.md").write_text(
-                eval_result.output, encoding="utf-8"
-            )
-            sm.state.current_task.artifacts.evaluation = str(
-                task_dir / f"evaluation-r{iteration}.md"
-            )
+            parsed = parse_evaluation(eval_result.output, pass_threshold)
+            eval_md_path = task_dir / f"evaluation-r{iteration}.md"
+            eval_md_path.write_text(eval_result.output, encoding="utf-8")
+            sm.state.current_task.artifacts.evaluation = str(eval_md_path)
+
+            if parsed.scores:
+                write_evaluation_sidecar(
+                    parsed.scores, parsed.verdict, parsed.feedback,
+                    iteration, eval_md_path,
+                )
 
             score = parsed.scores.weighted if parsed.scores else 0.0
             verdict_detail = f"score {score:.1f} → {parsed.verdict}"
-            ui.step_done("[3/3 eval] review", elapsed, parsed.verdict == "PASS", verdict_detail)
+            ui.step_done("[3/3 eval] quality review", elapsed, parsed.verdict == "PASS", verdict_detail)
+
+            # Stage 3 (optional): Alignment review
+            alignment_feedback = ""
+            if config.workflow.dual_evaluation and parsed.verdict == "PASS":
+                align_eval = resolver.resolve("alignment_evaluator")
+                align_name = resolver.agent_name("alignment_evaluator")
+                align_prompt = _build_alignment_eval_prompt(
+                    requirement, task_dir, iteration, project_root, branch=branch,
+                )
+                ev.agent_start(
+                    role="alignment_evaluator", driver=align_eval.name,
+                    agent_name=align_name, iteration=iteration,
+                )
+                t0 = time.monotonic()
+                with ui.agent_step("[3/3 eval] alignment review", align_eval.name) as on_out:
+                    align_result = align_eval.invoke(
+                        align_name, align_prompt, project_root,
+                        readonly=True, on_output=on_out,
+                    )
+                a_elapsed = time.monotonic() - t0
+                ev.agent_end(
+                    role="alignment_evaluator", driver=align_eval.name,
+                    agent_name=align_name, iteration=iteration,
+                    exit_code=align_result.exit_code, success=align_result.success,
+                    output_len=len(align_result.output), elapsed_ms=int(a_elapsed * 1000),
+                )
+
+                align_md = task_dir / f"alignment-r{iteration}.md"
+                align_md.write_text(align_result.output, encoding="utf-8")
+
+                if align_result.success and "MISALIGNED" in align_result.output:
+                    parsed.verdict = "ITERATE"
+                    alignment_feedback = align_result.output
+                    ui.step_done("[3/3 eval] alignment", a_elapsed, False, "MISALIGNED → iterate")
+                elif align_result.success and "CONTRACT_ISSUE" in align_result.output:
+                    parsed.verdict = "ITERATE"
+                    alignment_feedback = f"[CONTRACT_ISSUE] {align_result.output}"
+                    ui.step_done("[3/3 eval] alignment", a_elapsed, False, "CONTRACT_ISSUE → replan")
+                else:
+                    ui.step_done("[3/3 eval] alignment", a_elapsed, True, "ALIGNED")
 
             if parsed.verdict == "PASS":
                 sm.transition(TaskState.DONE)
                 sm.complete_task(score=score, verdict="PASS")
+                ev.task_end(task_id=task_id, verdict="PASS", score=score, iterations=iteration)
 
                 if config.workflow.auto_merge:
                     ui.info("[git] merging to main...")
@@ -234,12 +337,14 @@ def run_single_task(
                     verdict="PASS", score=score, iterations=iteration,
                 )
 
-            last_feedback = parsed.feedback
+            last_feedback = alignment_feedback if alignment_feedback else parsed.feedback
 
     # 达到最大迭代、被中断或 abort
     final_score = 0.0
+    total_iterations = iteration - start_iteration + 1
     sm.transition(TaskState.BLOCKED)
     sm.complete_task(score=final_score, verdict="BLOCKED")
+    ev.task_end(task_id=task_id, verdict="BLOCKED", score=final_score, iterations=total_iterations)
     update_progress(agents_dir, sm.state)
     update_index(agents_dir, sm.state)
 
@@ -248,7 +353,7 @@ def run_single_task(
     return WorkflowResult(
         task_id=task_id, requirement=requirement,
         verdict="BLOCKED", score=final_score,
-        iterations=iteration if abort_reason else max_iter,
+        iterations=total_iterations if not abort_reason else total_iterations,
         feedback=abort_reason or last_feedback,
     )
 
@@ -463,7 +568,7 @@ def _extract_file_refs(contract: str, project_root: Path) -> str:
 
         chunk = f"#### {ref}\n```\n{content}\n```"
         if total_len + len(chunk) > _FILE_REF_MAX_TOTAL:
-            parts.append(f"... (更多文件已省略，请自行读取)")
+            parts.append("... (更多文件已省略，请自行读取)")
             break
         parts.append(chunk)
         total_len += len(chunk)
@@ -471,6 +576,46 @@ def _extract_file_refs(contract: str, project_root: Path) -> str:
     if not parts:
         return ""
     return "### 合同引用的关键文件\n" + "\n\n".join(parts)
+
+
+def _build_alignment_eval_prompt(
+    requirement: str,
+    task_dir: Path,
+    iteration: int,
+    project_root: Path,
+    *,
+    branch: str = "",
+) -> str:
+    contract = ""
+    contract_file = task_dir / f"contract-r{iteration}.md"
+    if contract_file.exists():
+        contract = contract_file.read_text(encoding="utf-8")[:5000]
+
+    branch_summary = _git_branch_summary(project_root, branch)
+
+    return f"""\
+项目根目录: {project_root}
+
+## 原始需求
+{requirement}
+
+## 合同
+{contract}
+
+## Builder 分支变更
+分支: {branch}
+
+{branch_summary}
+
+## 对齐评估指引
+请评估实现是否与原始需求和合同对齐。关注：
+1. 需求中的每个要点是否被覆盖
+2. 合同的每个交付物和验收标准是否被满足
+3. 实现是否偏离需求的核心意图
+4. 合同本身是否遗漏了需求中的关键点
+
+严格按照你的 agent 指令中定义的格式输出。
+"""
 
 
 def _build_eval_prompt(

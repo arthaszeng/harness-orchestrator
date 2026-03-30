@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
@@ -17,12 +18,20 @@ from harness.drivers.base import AgentResult
 _ROLE_FILES = {
     "harness-planner": "planner.toml",
     "harness-evaluator": "evaluator.toml",
+    "harness-alignment-evaluator": "alignment_evaluator.toml",
     "harness-strategist": "strategist.toml",
     "harness-reflector": "reflector.toml",
 }
 
 _STREAM_PREFIX = "    │ "
 _HEARTBEAT_INTERVAL = 15
+
+
+@dataclass
+class DriverProbe:
+    available: bool
+    version: str = ""
+    warnings: list[str] = field(default_factory=list)
 
 
 class CodexDriver:
@@ -32,12 +41,51 @@ class CodexDriver:
     解析角色定义并将 developer instructions 拼接进 prompt。
     """
 
+    def __init__(self) -> None:
+        self._probe_result: DriverProbe | None = None
+
     @property
     def name(self) -> str:
         return "codex"
 
     def is_available(self) -> bool:
         return shutil.which("codex") is not None
+
+    def probe(self) -> DriverProbe:
+        """Detect CLI version and validate required flags."""
+        if self._probe_result is not None:
+            return self._probe_result
+
+        if not self.is_available():
+            self._probe_result = DriverProbe(available=False)
+            return self._probe_result
+
+        warnings: list[str] = []
+        version = ""
+        try:
+            result = subprocess.run(
+                ["codex", "--version"],
+                capture_output=True, text=True, timeout=10,
+            )
+            version = result.stdout.strip() or result.stderr.strip()
+        except Exception:
+            warnings.append("could not detect codex version")
+
+        # Verify help text contains the flags we depend on
+        try:
+            help_result = subprocess.run(
+                ["codex", "exec", "--help"],
+                capture_output=True, text=True, timeout=10,
+            )
+            help_text = help_result.stdout + help_result.stderr
+            for flag in ("--full-auto", "--output-last-message"):
+                if flag not in help_text:
+                    warnings.append(f"codex exec may not support {flag}")
+        except Exception:
+            warnings.append("could not probe codex exec flags")
+
+        self._probe_result = DriverProbe(available=True, version=version, warnings=warnings)
+        return self._probe_result
 
     def invoke(
         self,

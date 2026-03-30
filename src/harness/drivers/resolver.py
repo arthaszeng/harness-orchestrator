@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from harness.core.config import HarnessConfig
 from harness.drivers.base import AgentDriver
 from harness.drivers.codex import CodexDriver
@@ -12,6 +14,7 @@ ROLE_AGENT_MAP = {
     "planner": "harness-planner",
     "builder": "harness-builder",
     "evaluator": "harness-evaluator",
+    "alignment_evaluator": "harness-alignment-evaluator",
     "strategist": "harness-strategist",
     "reflector": "harness-reflector",
     "advisor": "harness-advisor",
@@ -27,6 +30,22 @@ class DriverResolver:
         self._codex = CodexDriver()
         self._cursor_ok = self._cursor.is_available()
         self._codex_ok = self._codex.is_available()
+
+        self._probe_results: dict[str, object] = {}
+        self._run_probes()
+
+    def _run_probes(self) -> None:
+        """Probe available drivers at startup and emit warnings."""
+        for label, driver, ok in [
+            ("codex", self._codex, self._codex_ok),
+            ("cursor", self._cursor, self._cursor_ok),
+        ]:
+            if not ok:
+                continue
+            probe = driver.probe()
+            self._probe_results[label] = probe
+            for w in probe.warnings:
+                sys.stderr.write(f"[harness] warning ({label}): {w}\n")
 
     def resolve(self, role: str) -> AgentDriver:
         """为指定角色返回合适的驱动"""

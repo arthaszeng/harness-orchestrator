@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
@@ -87,8 +88,18 @@ def _compose_full_output(event_log: list[str], final_result: str) -> str:
     return "\n".join(parts)
 
 
+@dataclass
+class DriverProbe:
+    available: bool
+    version: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
 class CursorDriver:
     """通过 Cursor CLI (stream-json) 调用 agent"""
+
+    def __init__(self) -> None:
+        self._probe_result: DriverProbe | None = None
 
     @property
     def name(self) -> str:
@@ -96,6 +107,41 @@ class CursorDriver:
 
     def is_available(self) -> bool:
         return shutil.which("cursor") is not None
+
+    def probe(self) -> DriverProbe:
+        """Detect CLI version and validate required flags."""
+        if self._probe_result is not None:
+            return self._probe_result
+
+        if not self.is_available():
+            self._probe_result = DriverProbe(available=False)
+            return self._probe_result
+
+        warnings: list[str] = []
+        version = ""
+        try:
+            result = subprocess.run(
+                ["cursor", "--version"],
+                capture_output=True, text=True, timeout=10,
+            )
+            version = result.stdout.strip() or result.stderr.strip()
+        except Exception:
+            warnings.append("could not detect cursor version")
+
+        try:
+            help_result = subprocess.run(
+                ["cursor", "agent", "--help"],
+                capture_output=True, text=True, timeout=10,
+            )
+            help_text = help_result.stdout + help_result.stderr
+            for flag in ("--print", "--output-format", "--stream-partial-output"):
+                if flag not in help_text:
+                    warnings.append(f"cursor agent may not support {flag}")
+        except Exception:
+            warnings.append("could not probe cursor agent flags")
+
+        self._probe_result = DriverProbe(available=True, version=version, warnings=warnings)
+        return self._probe_result
 
     def invoke(
         self,
