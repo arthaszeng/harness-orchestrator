@@ -232,7 +232,7 @@ def _step_memverse(
     typer.echo(t("init.memverse_desc"))
     typer.echo(t("init.opt_enable"))
     typer.echo(t("init.opt_disable"))
-    choice = _prompt_choice(t("init.choose"), 2, default=1)
+    choice = _prompt_choice(t("init.choose"), 2, default=2)
 
     if choice == 2:
         return False, "auto", ""
