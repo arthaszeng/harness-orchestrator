@@ -210,29 +210,31 @@ Read .agents/vision.md
 | `autonomous.max_tasks_per_session` | 10 | 每自主会话最大任务数 |
 | `autonomous.consecutive_block_limit` | 2 | 连续阻塞达到此次数后停止 |
 
-### 模型配置
+### 模型（可选，默认静默）
 
-模型按角色解析，遵循四级 fallback 链：
+可在 `[models]` 中为不同角色配置模型。仅当解析结果**非空**时，Harness 才会向 CLI 追加 `--model`；全部留空则继续沿用 IDE/CLI 的默认模型。
 
-1. **`models.role_overrides.<role>`** — 角色级覆盖（最高优先级）
-2. **`models.role_configs.<role>.model`** — 角色扩展配置中的模型
-3. **`models.driver_defaults.<driver>`** — 驱动级默认（`cursor` / `codex`）
-4. **`models.default`** — 全局默认（最低优先级）
+**解析优先级**（先命中者生效）：`role_overrides.<角色>` → `driver_defaults.<实际驱动名>` → `models.default` → 空字符串。
 
-空字符串（默认值）表示"使用 IDE/CLI 自身的默认模型"——driver 不会附加 `--model` 参数，保持现有行为不变。只有在需要显式控制时才需要配置模型。
+其中「实际驱动名」由 `[drivers]` / `[drivers.roles]` 在当前角色上解析得到，因此 `driver_defaults` 总是针对真实使用的 Codex 或 Cursor，而不会出现“配了 codex 默认值却实际走 cursor”的错配。
+
+支持的角色名：`planner`、`builder`、`evaluator`、`alignment_evaluator`、`strategist`、`reflector`、`advisor`。
+
+示例（注释项按需启用；推荐将 `default` 留空）：
 
 ```toml
 [models]
-default = ""  # 留空 = 使用 IDE 默认模型
+default = ""
 
 [models.driver_defaults]
-codex = "o3"
+# codex = "o3"
+# cursor = "claude-4-opus"
 
 [models.role_overrides]
-planner = "o3-pro"
+# planner = "o3-pro"
+# alignment_evaluator = "o3"
+# builder = ""  # 显式指定该角色始终不传模型参数
 ```
-
-支持的角色名：`planner`、`builder`、`evaluator`、`alignment_evaluator`、`strategist`、`reflector`、`advisor`。
 
 ### 工作流配置
 

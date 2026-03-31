@@ -210,29 +210,31 @@ Project settings live in `.agents/config.toml`. Important keys:
 | `autonomous.max_tasks_per_session` | 10 | Max tasks per autonomous session |
 | `autonomous.consecutive_block_limit` | 2 | Stop after this many consecutive blocks |
 
-### Model configuration
+### Models (optional, silent by default)
 
-Models are resolved per-role using a four-level fallback chain:
+Per-role model selection uses `.agents/config.toml` under `[models]`. Harness only passes `--model` to the IDE CLI when the resolved value is non-empty, so leaving everything unset preserves IDE default model behavior.
 
-1. **`models.role_overrides.<role>`** — Per-role override (highest priority)
-2. **`models.role_configs.<role>.model`** — Per-role extended config
-3. **`models.driver_defaults.<driver>`** — Per-driver default (`cursor` / `codex`)
-4. **`models.default`** — Global default (lowest priority)
+**Resolution order** (first match wins): `role_overrides.<role>` → `driver_defaults.<resolved_driver>` → `models.default` → empty.
 
-An empty string (the default) means "use the IDE/CLI's own default model" — the driver will not append `--model`, preserving existing behavior. You only need to configure models when you want explicit control.
+The resolved driver for the role (from `[drivers]` / `[drivers.roles]`) is determined *before* looking up `driver_defaults`, so defaults always apply to the actual backend (Codex vs Cursor) in use.
+
+Supported role names: `planner`, `builder`, `evaluator`, `alignment_evaluator`, `strategist`, `reflector`, `advisor`.
+
+Example (commented keys are optional; empty `default` is the recommended baseline):
 
 ```toml
 [models]
-default = ""  # empty = IDE default model
+default = ""  # empty: never force --model unless a more specific rule sets one
 
 [models.driver_defaults]
-codex = "o3"
+# codex = "o3"
+# cursor = "claude-4-opus"
 
 [models.role_overrides]
-planner = "o3-pro"
+# planner = "o3-pro"
+# alignment_evaluator = "o3"
+# builder = ""  # explicit: this role always uses IDE default, even if global/driver default is set
 ```
-
-Supported role names: `planner`, `builder`, `evaluator`, `alignment_evaluator`, `strategist`, `reflector`, `advisor`.
 
 ### Workflow profiles
 

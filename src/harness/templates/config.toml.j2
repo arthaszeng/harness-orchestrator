@@ -22,18 +22,15 @@ default = "{{ driver_mode }}"  # auto / cursor / codex
 # evaluator = "codex"
 {% endif %}
 [models]
-default = ""  # 留空 = 使用 IDE/CLI 默认模型
+default = ""  # 留空 = 不向 CLI 传 --model，使用 IDE 默认模型
 
-# 按驱动设置默认模型（cursor / codex）
-# [models.driver_defaults]
+[models.driver_defaults]
 # codex = "o3"
-# cursor = "claude-sonnet-4-20250514"
+# cursor = "claude-4-opus"
 
-# 按角色覆盖模型（优先级高于 driver_defaults 和 default）
-# 支持角色: planner / builder / evaluator / alignment_evaluator / strategist / reflector / advisor
-# [models.role_overrides]
+[models.role_overrides]
 # planner = "o3-pro"
-# builder = "claude-sonnet-4-20250514"
+# builder = ""
 
 [workflow]
 max_iterations = 3
