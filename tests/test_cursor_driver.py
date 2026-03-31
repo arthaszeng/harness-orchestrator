@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-from harness.drivers.cursor import CursorDriver, DriverProbe, _format_event, _compose_full_output
+from harness.drivers.cursor import CursorDriver, DriverProbe, _format_event, _compose_full_output, _ThinkingTracker
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -71,6 +71,25 @@ def test_format_event_result_error() -> None:
 def test_format_event_ignores_completed_tool_calls() -> None:
     evt = {"type": "tool_call", "subtype": "completed", "tool_call": {"fileEditToolCall": {}}}
     assert _format_event(evt) is None
+
+
+def test_format_event_thinking_without_tracker() -> None:
+    evt = {"type": "thinking", "subtype": "delta"}
+    assert _format_event(evt) is None
+
+
+def test_format_event_thinking_with_tracker() -> None:
+    tracker = _ThinkingTracker()
+    evt = {"type": "thinking", "subtype": "delta"}
+    first = _format_event(evt, tracker)
+    assert first is not None
+    assert "thinking" in first
+
+    for _ in range(18):
+        _format_event(evt, tracker)
+    progress = _format_event(evt, tracker)
+    assert progress is not None
+    assert "20" in progress
 
 
 def test_compose_full_output() -> None:

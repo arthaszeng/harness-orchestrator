@@ -39,15 +39,41 @@ _ROLE_FILES = {
 
 _STREAM_PREFIX = "    │ "
 _HEARTBEAT_INTERVAL = 10
+_THINKING_REPORT_INTERVAL = 20  # show thinking progress every N deltas
 
 # Time without any stdout activity before we consider the process hung
 _IDLE_TIMEOUT = 300  # 5 minutes
 
 
-def _format_event(evt: dict) -> str | None:
+class _ThinkingTracker:
+    """Track extended-thinking deltas and emit periodic progress lines."""
+
+    __slots__ = ("count", "_next_report")
+
+    def __init__(self) -> None:
+        self.count = 0
+        self._next_report = _THINKING_REPORT_INTERVAL
+
+    def tick(self) -> str | None:
+        """Register one thinking/delta; return a progress string at intervals."""
+        self.count += 1
+        if self.count >= self._next_report:
+            self._next_report += _THINKING_REPORT_INTERVAL
+            return f"🧠 thinking… ({self.count} tokens)"
+        if self.count == 1:
+            return "🧠 thinking…"
+        return None
+
+
+def _format_event(evt: dict, thinking: _ThinkingTracker | None = None) -> str | None:
     """Turn a cursor stream-json event into one readable line; unrelated -> None."""
     evt_type = evt.get("type", "")
     sub = evt.get("subtype", "")
+
+    if evt_type == "thinking":
+        if thinking is not None:
+            return thinking.tick()
+        return None
 
     if evt_type == "tool_call" and sub == "started":
         tc = evt.get("tool_call", {})
@@ -292,10 +318,12 @@ class CursorDriver:
         event_log: list[str] = []
         stderr_chunks: list[str] = []
 
-        got_first_event = threading.Event()
+        got_first_visible = threading.Event()  # set on first user-visible output
+        got_any_event = threading.Event()       # set on any stdout line (for idle detection)
         heartbeat_stop = threading.Event()
         last_activity = time.monotonic()
         activity_lock = threading.Lock()
+        thinking = _ThinkingTracker()
 
         log.debug("spawn: %s (cwd=%s, timeout=%ds, stdin=%d bytes)",
                   cmd, cwd, timeout, len(stdin_data) if stdin_data else 0)
@@ -316,11 +344,12 @@ class CursorDriver:
 
         # ── heartbeat thread ──────────────────────────────────────
         def _heartbeat() -> None:
+            """Keep printing until a visible event arrives (not just system/init)."""
             while not heartbeat_stop.is_set():
                 heartbeat_stop.wait(_HEARTBEAT_INTERVAL)
                 if heartbeat_stop.is_set():
                     break
-                if not got_first_event.is_set():
+                if not got_first_visible.is_set():
                     elapsed = time.monotonic() - start
                     _emit(t("driver.heartbeat", elapsed=elapsed))
 
@@ -337,20 +366,22 @@ class CursorDriver:
                     continue
 
                 _touch_activity()
-                if not got_first_event.is_set():
-                    got_first_event.set()
+                if not got_any_event.is_set():
+                    got_any_event.set()
 
                 try:
                     evt = json.loads(raw_line)
                 except json.JSONDecodeError:
                     _emit(raw_line)
                     event_log.append(raw_line)
+                    got_first_visible.set()
                     continue
 
-                msg = _format_event(evt)
+                msg = _format_event(evt, thinking)
                 if msg:
                     _emit(msg)
                     event_log.append(msg)
+                    got_first_visible.set()
 
                 if evt.get("type") == "result":
                     final_result = evt.get("result", "")
@@ -383,7 +414,7 @@ class CursorDriver:
                 with activity_lock:
                     idle_secs = time.monotonic() - last_activity
 
-                if got_first_event.is_set() and idle_secs > _IDLE_TIMEOUT:
+                if got_any_event.is_set() and idle_secs > _IDLE_TIMEOUT:
                     idle_hung = True
                     break
 
