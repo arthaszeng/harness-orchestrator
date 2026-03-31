@@ -24,6 +24,7 @@ _SKILL_TEMPLATES = [
     ("skill-build.md.j2", "harness-build"),
     ("skill-eval.md.j2", "harness-eval"),
     ("skill-ship.md.j2", "harness-ship"),
+    ("skill-investigate.md.j2", "harness-investigate"),
 ]
 
 _AGENT_TEMPLATES = [

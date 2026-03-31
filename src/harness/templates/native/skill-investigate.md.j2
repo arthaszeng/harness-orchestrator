@@ -1,0 +1,184 @@
+---
+name: harness-investigate
+description: >-
+  Systematic debugging workflow with root cause analysis, hypothesis testing,
+  scope lock, and 3-strike escalation. Use when encountering bugs, test failures,
+  or unexpected behavior. Invoke before proposing any fixes. (harness)
+---
+
+# Harness Investigate — Systematic Debugging
+
+You are running the `/harness-investigate` workflow. This is a **disciplined debugging process**.
+Do NOT jump to fixes. Investigate first.
+
+```
+IRON LAW: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.
+
+You are a detective, not a repairman.
+Understand the crime before you touch anything.
+```
+
+**Red flags — if you catch yourself thinking these, STOP:**
+- "Quick fix for now" → You don't understand the problem yet.
+- "Let me just try this fix" → That's a guess, not an investigation.
+- "Fix before trace" → Backwards. Trace first.
+- "Each fix reveals a new problem" → You're chasing symptoms, not the root cause.
+
+---
+
+## Phase 1: Root Cause Investigation
+
+### 1.1 Collect Symptoms
+1. Gather all error messages, stack traces, and logs
+2. Note the exact sequence of steps that triggers the issue
+3. Record what the expected behavior should be
+4. Record what actually happens
+5. Note when this last worked (if known)
+
+### 1.2 Read the Code
+1. Read the specific code path involved (don't skim — read line by line)
+2. Trace the data flow from input to the failure point
+3. Check types at every boundary crossing
+4. Note any assumptions the code makes about its inputs
+
+### 1.3 Check Recent Changes
+1. Run `git log --oneline -20` to see recent commits
+2. Run `git diff HEAD~5..HEAD -- <affected-files>` to see recent changes to affected files
+3. Identify if the issue was introduced by a specific commit
+4. If so: `git show <commit>` to understand the full change
+
+### 1.4 Reproduce
+1. Write the minimal reproduction steps
+2. Confirm you can trigger the bug on demand
+3. If you cannot reproduce: note this and proceed with code analysis
+
+### 1.5 Scope Lock
+Once the affected area is identified, **lock your editing scope**:
+- Only modify files in the affected directories
+- Do NOT "while I'm here" fix unrelated things
+- Any out-of-scope observation goes into a separate note, not a code change
+
+---
+
+## Phase 2: Pattern Analysis
+
+Check the symptoms against common failure patterns:
+
+| Pattern | Symptoms | Investigation |
+|---------|----------|--------------|
+| **Race Condition** | Intermittent failure, works sometimes, fails under load | Check for shared mutable state, missing locks, non-atomic operations |
+| **Null Propagation** | TypeError/NoneType/undefined at unexpected location | Trace the None/null value backwards to find where it should have been set |
+| **State Corruption** | Wrong behavior after specific sequence of operations | Check state machine transitions, look for partial updates |
+| **Integration Mismatch** | Works in isolation, fails when combined | Check data format assumptions at service boundaries |
+| **Configuration Drift** | Works in one environment, fails in another | Compare configs, env vars, dependency versions |
+| **Cache Staleness** | Returns stale data, or correct data intermittently | Check TTLs, invalidation logic, cache key construction |
+| **Resource Exhaustion** | Gradual degradation, then sudden failure | Check for connection leaks, memory leaks, file handle leaks |
+
+---
+
+## Phase 3: Hypothesis Testing
+
+Form hypotheses based on Phase 1-2 analysis. Test them systematically.
+
+**3-Strike Rule:** If 3 consecutive hypotheses are wrong, **STOP**.
+- Output what you've learned so far
+- Describe the failed hypotheses and why they were wrong
+- Ask the user for additional context before continuing
+
+For each hypothesis:
+1. State the hypothesis clearly: "I believe the bug is caused by X because Y"
+2. Predict: "If this hypothesis is correct, then Z should be observable"
+3. Test: Run a specific check that would confirm or refute
+4. Record result: CONFIRMED / REFUTED / INCONCLUSIVE
+
+```
+HYPOTHESIS LOG:
+═══════════════════════════════════════
+  #1: [hypothesis] → [CONFIRMED/REFUTED/INCONCLUSIVE]
+      Evidence: [what you observed]
+  #2: [hypothesis] → [CONFIRMED/REFUTED/INCONCLUSIVE]
+      Evidence: [what you observed]
+═══════════════════════════════════════
+```
+
+---
+
+## Phase 4: Implementation
+
+Once root cause is confirmed (not guessed):
+
+### 4.1 Minimal Fix
+- Apply the **smallest possible change** that fixes the root cause
+- Do NOT refactor surrounding code
+- Do NOT add features
+- Do NOT "improve" things you noticed during investigation
+
+### 4.2 Regression Test
+Write a test that:
+1. **Fails** before the fix (verify the test actually catches the bug)
+2. **Passes** after the fix
+3. Describes the bug scenario in the test name
+
+```bash
+# Verify: test fails before fix
+git stash && {{ ci_command }} 2>&1 | grep -i "fail\|error"; git stash pop
+# Verify: test passes after fix
+{{ ci_command }}
+```
+
+### 4.3 Full Test Suite
+Run the complete test suite to verify no regressions:
+```bash
+{{ ci_command }}
+```
+
+---
+
+## Phase 5: Verification & Report
+
+### 5.1 Structured Debug Report
+
+Output a structured report:
+
+```
+INVESTIGATION REPORT
+═══════════════════════════════════════════════════════════
+
+SYMPTOMS:
+  [What was observed]
+
+ROOT CAUSE:
+  [What actually caused it, citing specific file:line]
+
+FIX:
+  [What was changed and why]
+
+EVIDENCE:
+  [Commands run, outputs observed, test results]
+
+REGRESSION TEST:
+  [Test name and what it covers]
+
+RELATED RISKS:
+  [Other places where the same pattern might exist]
+
+STATUS: [DONE / DONE_WITH_CONCERNS / BLOCKED]
+═══════════════════════════════════════════════════════════
+```
+
+### 5.2 Status Codes
+
+- **DONE**: Root cause found, fix applied, tests pass, regression test added
+- **DONE_WITH_CONCERNS**: Fixed but there may be similar issues elsewhere (list them)
+- **BLOCKED**: Could not identify root cause after 3-strike rule. Need human input.
+
+---
+
+## Important Rules
+
+- **Investigate before fixing.** Always.
+- **Scope lock.** Only modify affected code.
+- **3-strike rule.** 3 failed hypotheses → stop and escalate.
+- **Regression test required.** Every fix needs a test that would have caught it.
+- **No drive-by fixes.** Note them for later, don't do them now.
+- **Minimal diff.** The fix should be as small as possible.
