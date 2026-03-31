@@ -1,0 +1,279 @@
+---
+name: harness-retro
+description: >-
+  Engineering retrospective with commit analytics, session detection, hotspot analysis,
+  and trend tracking. Generates structured reports for reflection and improvement.
+  Use with /harness-retro [7d|14d|30d|compare]. (harness)
+---
+
+# Harness Retro — Engineering Retrospective
+
+You are running the `/harness-retro` workflow. Analyze recent engineering activity
+and generate a structured retrospective.
+
+**Parameters:**
+- `/harness-retro` — default 7-day window
+- `/harness-retro 14d` — 14-day window
+- `/harness-retro 30d` — 30-day window
+- `/harness-retro compare` — compare current window vs previous same-length window
+
+---
+
+## Step 1: Gather Raw Data
+
+Run these commands in parallel:
+
+```bash
+# Commit history
+git log --oneline --since="N days ago" --format="%H|%ai|%an|%s"
+
+# Shortlog for per-author summary
+git shortlog --since="N days ago" -sne
+
+# File change stats
+git log --since="N days ago" --numstat --format=""
+
+# Diff stats
+git diff HEAD~$(git rev-list --count --since="N days ago" HEAD)..HEAD --stat
+```
+
+---
+
+## Step 2: Core Metrics
+
+Calculate and display:
+
+```
+ENGINEERING METRICS (last N days)
+═══════════════════════════════════════════════════
+  Commits:           X
+  Lines added:       +X
+  Lines removed:     -X
+  Net LOC:           +/-X
+  Test ratio:        X% (test LOC / total LOC)
+  Active days:       X / N
+  Sessions:          X (estimated)
+  LOC per session:   X
+═══════════════════════════════════════════════════
+```
+
+---
+
+## Step 3: Commit Time Distribution
+
+Build an hourly histogram from commit timestamps:
+
+```
+COMMIT TIME DISTRIBUTION
+═══════════════════════════════════════
+  00-03  ░
+  04-07  ░░
+  08-11  ░░░░░░░░░░░░░
+  12-15  ░░░░░░░░░░
+  16-19  ░░░░░░░░░░░░░░░
+  20-23  ░░░░░░░
+═══════════════════════════════════════
+  Peak hours: 08-11, 16-19
+```
+
+---
+
+## Step 4: Session Detection
+
+Detect work sessions using a 45-minute gap threshold between commits:
+
+- **Deep session** (>2h): Extended focused work
+- **Medium session** (30min-2h): Standard development
+- **Micro session** (< 30min): Quick fixes, config changes
+
+```
+SESSIONS DETECTED: X
+═══════════════════════════════════════
+  Deep (>2h):      X sessions, avg Xh
+  Medium (30m-2h): X sessions, avg Xm
+  Micro (<30m):    X sessions, avg Xm
+═══════════════════════════════════════
+```
+
+---
+
+## Step 5: Commit Type Breakdown
+
+Classify commits by conventional commit type prefix:
+
+```
+COMMIT TYPES
+═══════════════════════════════════════
+  feat:     ████████░░  40%
+  fix:      ███░░░░░░░  15%
+  refactor: ██░░░░░░░░  10%
+  test:     ████░░░░░░  20%
+  docs:     █░░░░░░░░░   5%
+  chore:    ██░░░░░░░░  10%
+═══════════════════════════════════════
+```
+
+---
+
+## Step 6: Hotspot Analysis
+
+Identify the top 10 most frequently changed files:
+
+```
+HOTSPOTS (most changed files)
+═══════════════════════════════════════
+  #  File                          Changes  LOC+/-
+  1  src/harness/templates/ship.j2    12    +450
+  2  src/harness/native/skill_gen.py   8    +120
+  3  ...
+═══════════════════════════════════════
+```
+
+Flag files with >5 changes — they may need refactoring or stabilization.
+
+---
+
+## Step 7: PR Size Distribution
+
+Analyze commit groups (branches merged) by size:
+
+```
+PR SIZES
+═══════════════════════════════════════
+  Small (<50 lines):   X (X%)
+  Medium (50-200):     X (X%)
+  Large (200-500):     X (X%)
+  XL (>500):           X (X%)
+═══════════════════════════════════════
+```
+
+If XL PRs exist, flag for attention — smaller PRs are easier to review.
+
+---
+
+## Step 8: Focus Score + Ship of the Week
+
+**Focus Score**: Percentage of commits that directly advance the stated goal (features + fixes)
+vs overhead (chore, docs, refactor without visible output).
+
+```
+FOCUS SCORE: X%
+```
+
+**Ship of the Week**: The single most impactful commit or PR in the period.
+Pick based on: lines changed × user-facing impact × test coverage.
+
+---
+
+## Step 9: Team/Author Analysis
+
+If multiple contributors:
+
+```
+CONTRIBUTOR ANALYSIS
+═══════════════════════════════════════
+  Author          Commits  LOC+/-  Focus%
+  Alice           15       +820    85%
+  Bob             8        +340    70%
+═══════════════════════════════════════
+```
+
+For each contributor: one line of genuine praise, one growth opportunity.
+
+---
+
+## Step 10: Streak Tracking
+
+Track consecutive days with commits:
+
+```
+STREAK: X consecutive days (current)
+BEST STREAK: Y consecutive days (date range)
+```
+
+---
+
+## Step 11: Load & Compare (if previous retro exists)
+
+Check for previous retro snapshot at `.agents/retros/`:
+
+If exists, compare:
+```
+TREND vs LAST RETRO
+═══════════════════════════════════════
+  Metric          Last    Current  Trend
+  Commits         25      32       ↑ +28%
+  LOC/session     180     220      ↑ +22%
+  Test ratio      35%     42%      ↑ +7pp
+  Focus score     70%     85%      ↑ +15pp
+═══════════════════════════════════════
+```
+
+---
+
+## Step 12: Save Snapshot
+
+Save the retro data to `.agents/retros/{YYYY-MM-DD}.json`:
+
+```json
+{
+  "date": "YYYY-MM-DD",
+  "window_days": 7,
+  "commits": N,
+  "loc_added": N,
+  "loc_removed": N,
+  "test_ratio": 0.42,
+  "active_days": N,
+  "sessions": N,
+  "focus_score": 0.85,
+  "streak_current": N,
+  "streak_best": N,
+  "hotspots": ["file1", "file2"],
+  "pr_sizes": {"small": N, "medium": N, "large": N, "xl": N}
+}
+```
+
+---
+
+## Step 13: Narrative Summary
+
+End with a human-readable narrative:
+
+```
+RETRO NARRATIVE
+═══════════════════════════════════════════════════
+
+📊 Tweetable: "Shipped X features in Y sessions over Z days.
+   Focus score: W%. Test ratio up to V%."
+
+🏆 3 Wins:
+  1. ...
+  2. ...
+  3. ...
+
+📈 3 Improvements:
+  1. ...
+  2. ...
+  3. ...
+
+🔄 3 Habits to Build:
+  1. ...
+  2. ...
+  3. ...
+═══════════════════════════════════════════════════
+```
+
+The narrative should be specific to the data — not generic advice.
+Reference actual commits, files, and metrics.
+
+---
+
+## Compare Mode
+
+When invoked with `/harness-retro compare`:
+
+1. Load current window retro data
+2. Load previous window retro data (same length, immediately preceding)
+3. Generate comparison for all metrics
+4. Highlight: biggest improvement, biggest decline, most consistent metric
+5. One-sentence verdict: "This was a [better/worse/similar] period because..."
