@@ -183,6 +183,7 @@ MESSAGES: dict[str, str] = {
     ),
     "driver.heartbeat": "⏳ running {elapsed:.0f}s...",
     "driver.done": "✓ done ({elapsed:.0f}s)",
+    "driver.retry": "⟳ transient error, retrying in {delay}s ({attempt}/{max})...",
     "driver.no_ide": "Neither Cursor nor Codex CLI detected",
     "driver.readonly_block": (
         "\n\n## Execution Constraints\n"
@@ -277,6 +278,7 @@ MESSAGES: dict[str, str] = {
     "prompt.ci_fail_heading": "# CI Failed",
     "prompt.ci_fail_feedback": "CI failed:\n{feedback}",
     "prompt.builder_fail_feedback": "Builder execution failed:\n{output}",
+    "prompt.builder_noop_feedback": "Builder returned success but produced no code changes (tool calls may have been aborted). Builder output:\n{output}",
     "prompt.driver_error": "driver-level error, retrying is pointless",
 
     # ── autonomous prompts ────────────────────────────────────────

@@ -182,6 +182,7 @@ MESSAGES: dict[str, str] = {
     ),
     "driver.heartbeat": "⏳ 运行中 {elapsed:.0f}s...",
     "driver.done": "✓ 完成 ({elapsed:.0f}s)",
+    "driver.retry": "⟳ 瞬时错误，{delay}s 后重试 ({attempt}/{max})...",
     "driver.no_ide": "未检测到 Cursor 或 Codex CLI",
     "driver.readonly_block": (
         "\n\n## 执行约束\n"
@@ -274,6 +275,7 @@ MESSAGES: dict[str, str] = {
     "prompt.ci_fail_heading": "# CI 失败",
     "prompt.ci_fail_feedback": "CI 失败:\n{feedback}",
     "prompt.builder_fail_feedback": "Builder 执行失败:\n{output}",
+    "prompt.builder_noop_feedback": "Builder 返回成功但未产生任何代码变更（可能工具调用全部被中断）。Builder 输出:\n{output}",
     "prompt.driver_error": "驱动级错误，重试无意义",
 
     # ── autonomous prompts ────────────────────────────────────────

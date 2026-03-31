@@ -184,8 +184,13 @@ def run_single_task(
                 build_result.output, encoding="utf-8"
             )
 
-            if build_result.success:
+            if build_result.success and _has_build_changes(project_root):
                 ui.step_done("[2/3 builder]", elapsed, True, "deployed")
+            elif build_result.success:
+                ui.step_done("[2/3 builder]", elapsed, False, "no changes")
+                last_feedback = t("prompt.builder_noop_feedback", output=build_result.output[-2000:])
+                sm.transition(TaskState.EVALUATING)
+                continue
             else:
                 ui.step_done(
                     "[2/3 builder]", elapsed, False, "build failed",
@@ -381,6 +386,24 @@ def run_single_task(
 
 _DRIVER_ERROR_THRESHOLD_SECS = 10
 _DRIVER_ERROR_OUTPUT_LEN = 200
+
+
+def _has_build_changes(project_root: Path) -> bool:
+    """Check if the builder produced any code changes (uncommitted or new commits vs main)."""
+    try:
+        uncommitted = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=5,
+        )
+        if uncommitted.stdout.strip():
+            return True
+        diff = subprocess.run(
+            ["git", "diff", "main..HEAD", "--stat"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=5,
+        )
+        return bool(diff.stdout.strip())
+    except Exception:
+        return True  # assume changes on error to avoid false negatives
 
 _CONTRACT_MARKERS = [
     re.compile(r"^#\s+Contract\b", re.IGNORECASE | re.MULTILINE),

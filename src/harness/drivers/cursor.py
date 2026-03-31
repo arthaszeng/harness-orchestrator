@@ -2,11 +2,18 @@
 
 Uses `cursor agent --print --output-format stream-json --stream-partial-output`
 for streaming JSON events and live progress.
+
+Key design decisions (borrowed from CodeMachine-CLI):
+- stdout and stderr are consumed in parallel threads to avoid pipe deadlock
+- Wall-clock timeout is enforced on the *overall* run, not just proc.wait()
+- Process-group kill ensures no orphan node/LSP children survive
+- Success is determined by combining returncode AND stream result.is_error
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import subprocess
 import sys
@@ -17,7 +24,10 @@ from pathlib import Path
 from typing import Callable
 
 from harness.drivers.base import AgentResult
+from harness.drivers import process as proc_mgr
 from harness.i18n import get_lang, t
+
+log = logging.getLogger("harness.drivers.cursor")
 
 _ROLE_FILES = {
     "harness-builder": "builder.md",
@@ -27,6 +37,9 @@ _ROLE_FILES = {
 _STREAM_PREFIX = "    │ "
 _HEARTBEAT_INTERVAL = 10
 
+# Time without any stdout activity before we consider the process hung
+_IDLE_TIMEOUT = 300  # 5 minutes
+
 
 def _format_event(evt: dict) -> str | None:
     """Turn a cursor stream-json event into one readable line; unrelated -> None."""
@@ -35,11 +48,9 @@ def _format_event(evt: dict) -> str | None:
 
     if evt_type == "tool_call" and sub == "started":
         tc = evt.get("tool_call", {})
-        # MCP tool call
         mcp = tc.get("mcpToolCall", {})
         if mcp:
             return f"[tool] {mcp.get('toolName', '?')}"
-        # Shell / file tool
         shell = tc.get("shellToolCall", {})
         if shell:
             cmd_str = shell.get("command", "")[:80]
@@ -89,10 +100,29 @@ def _compose_full_output(event_log: list[str], final_result: str) -> str:
     return "\n".join(parts)
 
 
+# ── Transient / not-ready error detection ────────────────────────────
+
 _NOT_READY_PATTERNS = (
     "cursor-agent not found",
     "not found, installing",
 )
+
+_TRANSIENT_ERROR_PATTERNS = (
+    "socket hang up",
+    "econnreset",
+    "econnrefused",
+    "etimedout",
+    "epipe",
+    "rate limit",
+    "429",
+    "502",
+    "503",
+    "service unavailable",
+    "internal server error",
+)
+
+_MAX_RETRIES = 2
+_INITIAL_RETRY_DELAY = 3  # seconds; doubles each attempt (exponential backoff)
 
 _PROBE_TIMEOUT = 8
 
@@ -164,6 +194,8 @@ class CursorDriver:
         )
         return self._probe_result
 
+    # ── public entry point ────────────────────────────────────────
+
     def invoke(
         self,
         agent_name: str,
@@ -193,10 +225,47 @@ class CursorDriver:
 
         cmd.append(full_prompt)
 
-        try:
-            return self._run_stream_json(cmd, cwd, timeout, on_output)
-        except FileNotFoundError:
-            return AgentResult(success=False, output=t("driver.cursor_not_found"), exit_code=-1)
+        delay = _INITIAL_RETRY_DELAY
+        result: AgentResult | None = None
+
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                result = self._run_stream_json(cmd, cwd, timeout, on_output)
+            except FileNotFoundError:
+                return AgentResult(success=False, output=t("driver.cursor_not_found"), exit_code=-1)
+
+            if result.success or attempt >= _MAX_RETRIES:
+                return result
+
+            if not self._is_retryable(result):
+                return result
+
+            sys.stderr.write(
+                f"{_STREAM_PREFIX}{t('driver.retry', attempt=attempt + 1, max=_MAX_RETRIES, delay=delay)}\n"
+            )
+            sys.stderr.flush()
+            time.sleep(delay)
+            delay = min(delay * 2, 30)  # exponential backoff capped at 30s
+
+        return result  # type: ignore[return-value]  # unreachable
+
+    # ── retryable error detection ─────────────────────────────────
+
+    @staticmethod
+    def _is_retryable(result: AgentResult) -> bool:
+        """Return True if the failure is a known transient/not-ready error."""
+        output_lower = result.output.lower()
+        for pattern in _TRANSIENT_ERROR_PATTERNS:
+            if pattern in output_lower:
+                return True
+        for pattern in _NOT_READY_PATTERNS:
+            if pattern in output_lower:
+                return True
+        if result.exit_code == -1 and "timed out" in output_lower:
+            return True
+        return False
+
+    # ── core streaming implementation ─────────────────────────────
 
     def _run_stream_json(
         self,
@@ -205,21 +274,30 @@ class CursorDriver:
         timeout: int,
         on_output: Callable[[str], None] | None = None,
     ) -> AgentResult:
-        """Parse stream-json, stream progress, and keep a full event log."""
+        """Parse stream-json with parallel stdout/stderr and wall-clock timeout.
+
+        Key improvements over the naive approach:
+        1. stdout and stderr are consumed in separate threads (no pipe deadlock)
+        2. A wall-clock deadline aborts the *entire* run, not just proc.wait()
+        3. Idle detection: if stdout goes silent for _IDLE_TIMEOUT, treat as hung
+        4. Process-group kill ensures clean teardown of child trees
+        """
         start = time.monotonic()
+        deadline = start + timeout
+
         final_result = ""
+        stream_is_error: bool | None = None  # from stream-json "result" event
         event_log: list[str] = []
+        stderr_chunks: list[str] = []
+
         got_first_event = threading.Event()
         heartbeat_stop = threading.Event()
+        last_activity = time.monotonic()
+        activity_lock = threading.Lock()
 
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=str(cwd),
-        )
+        log.debug("spawn: %s (cwd=%s, timeout=%ds)", cmd[:-1], cwd, timeout)
+
+        proc = proc_mgr.spawn_cursor(cmd, str(cwd))
 
         def _emit(text: str) -> None:
             if on_output:
@@ -228,7 +306,12 @@ class CursorDriver:
                 sys.stderr.write(f"{_STREAM_PREFIX}{text}\n")
                 sys.stderr.flush()
 
-        # Heartbeat: Cursor cold start may emit no events for a while
+        def _touch_activity() -> None:
+            nonlocal last_activity
+            with activity_lock:
+                last_activity = time.monotonic()
+
+        # ── heartbeat thread ──────────────────────────────────────
         def _heartbeat() -> None:
             while not heartbeat_stop.is_set():
                 heartbeat_stop.wait(_HEARTBEAT_INTERVAL)
@@ -241,13 +324,16 @@ class CursorDriver:
         heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
         heartbeat_thread.start()
 
-        try:
+        # ── stdout consumer thread ────────────────────────────────
+        def _consume_stdout() -> None:
+            nonlocal final_result, stream_is_error
             assert proc.stdout is not None
             for raw_line in proc.stdout:
                 raw_line = raw_line.strip()
                 if not raw_line:
                     continue
 
+                _touch_activity()
                 if not got_first_event.is_set():
                     got_first_event.set()
 
@@ -265,31 +351,100 @@ class CursorDriver:
 
                 if evt.get("type") == "result":
                     final_result = evt.get("result", "")
-                    if evt.get("is_error"):
+                    stream_is_error = bool(evt.get("is_error"))
+                    if stream_is_error:
                         final_result = f"ERROR: {final_result}"
 
-            proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            return AgentResult(success=False, output=t("driver.cursor_timeout"), exit_code=-1)
+        # ── stderr consumer thread ────────────────────────────────
+        def _consume_stderr() -> None:
+            assert proc.stderr is not None
+            for line in proc.stderr:
+                stderr_chunks.append(line)
+                _touch_activity()
+
+        stdout_thread = threading.Thread(target=_consume_stdout, daemon=True)
+        stderr_thread = threading.Thread(target=_consume_stderr, daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+
+        # ── wait with wall-clock timeout + idle detection ─────────
+        timed_out = False
+        idle_hung = False
+        try:
+            while stdout_thread.is_alive():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                    break
+
+                with activity_lock:
+                    idle_secs = time.monotonic() - last_activity
+
+                if got_first_event.is_set() and idle_secs > _IDLE_TIMEOUT:
+                    idle_hung = True
+                    break
+
+                stdout_thread.join(timeout=min(remaining, 2.0))
+
+            if timed_out or idle_hung:
+                reason = "wall-clock timeout" if timed_out else f"idle {_IDLE_TIMEOUT}s"
+                log.warning("killing cursor process (pid=%s): %s", proc.pid, reason)
+                proc_mgr.kill_process_tree(proc)
+                proc.wait(timeout=5)
+                proc_mgr.unregister(proc)
+                return AgentResult(
+                    success=False,
+                    output=t("driver.cursor_timeout"),
+                    exit_code=-1,
+                )
+
+            # stdout done — wait for stderr + process exit
+            stderr_thread.join(timeout=10)
+            proc.wait(timeout=30)
+        except Exception:
+            proc_mgr.kill_process_tree(proc)
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                pass
+            raise
         finally:
             heartbeat_stop.set()
             heartbeat_thread.join(timeout=2)
+            proc_mgr.unregister(proc)
 
         if not on_output:
             elapsed = time.monotonic() - start
             sys.stderr.write(f"{_STREAM_PREFIX}{t('driver.done', elapsed=elapsed)}\n")
             sys.stderr.flush()
 
-        is_error = proc.returncode != 0
+        stderr_text = "".join(stderr_chunks)
+
+        # ── determine success ─────────────────────────────────────
+        # Combine returncode with stream-json is_error for reliable detection.
+        # If they disagree, use the stricter (failure) interpretation.
+        rc_ok = proc.returncode == 0
+        stream_ok = stream_is_error is not True  # None (no result event) treated as ok
+
+        if rc_ok != stream_ok:
+            log.warning(
+                "success mismatch: returncode=%s stream_is_error=%s — treating as failure",
+                proc.returncode, stream_is_error,
+            )
+
+        is_error = not rc_ok or not stream_ok
         full_output = _compose_full_output(event_log, final_result)
+
+        if is_error and stderr_text:
+            full_output += f"\n\n== STDERR ==\n{stderr_text.strip()}"
 
         return AgentResult(
             success=not is_error,
             output=full_output,
             exit_code=proc.returncode or 0,
         )
+
+    # ── prompt composition ────────────────────────────────────────
 
     def _compose_prompt(self, agent_name: str, prompt: str, *, readonly: bool) -> str:
         developer_instructions = self._load_developer_instructions(agent_name)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -221,10 +222,43 @@ class StateMachine:
         self._state.stats.avg_score = sum(scores) / len(scores) if scores else 0.0
 
     def _register_sigint(self) -> None:
-        """Register SIGINT handler to checkpoint before exit."""
+        """Two-stage SIGINT handler (inspired by CodeMachine-CLI cleanup.ts).
+
+        First Ctrl+C  : checkpoint + warn — workflow continues to next safe point
+        Second Ctrl+C : kill all child processes + checkpoint + exit(130)
+        """
+        from harness.drivers.process import kill_all_active
+
+        first_press_time: float = 0.0
+        _DEBOUNCE_MS = 500
+
         def _handler(sig: int, frame: Any) -> None:
+            nonlocal first_press_time
+
+            now = time.monotonic()
+            if first_press_time == 0.0:
+                first_press_time = now
+                sys.stderr.write(
+                    "\n    │ Ctrl+C received — finishing current phase. "
+                    "Press Ctrl+C again to force quit.\n"
+                )
+                sys.stderr.flush()
+                self._checkpoint()
+                # Write stop signal so workflow loop breaks at next check
+                stop_file = self._agents_dir / ".stop"
+                stop_file.parent.mkdir(parents=True, exist_ok=True)
+                stop_file.write_text("sigint", encoding="utf-8")
+                return
+
+            if (now - first_press_time) * 1000 < _DEBOUNCE_MS:
+                return  # ignore rapid double-press
+
+            sys.stderr.write("\n    │ Force quit — killing child processes...\n")
+            sys.stderr.flush()
+            kill_all_active()
             self._checkpoint()
             sys.exit(130)
+
         signal.signal(signal.SIGINT, _handler)
 
 
