@@ -101,13 +101,13 @@ MESSAGES: dict[str, str] = {
     "install.codex_auth_timeout": "  ⚠ Codex 认证超时，请稍后手动运行 `codex auth`。",
     "install.codex_auth_fail": "  ⚠ Codex 认证失败，请稍后手动运行 `codex auth`。",
     "install.reload_hint": (
-        "\n╭──────────────────────────────────────────╮\n"
-        "│  在当前终端激活 PATH，请运行:              │\n"
-        "│                                            │\n"
-        "│    source ~/{rc}                       │\n"
-        "│                                            │\n"
-        "│  或者直接打开一个新的终端窗口。             │\n"
-        "╰──────────────────────────────────────────╯"
+        "\n  ┌─────────────────────────────────────────────┐\n"
+        "  │  在当前终端激活 PATH，请运行:                │\n"
+        "  │                                               │\n"
+        "  │    source ~/{rc:<30s}│\n"
+        "  │                                               │\n"
+        "  │  或者直接打开一个新的终端窗口。               │\n"
+        "  └─────────────────────────────────────────────┘"
     ),
     "install.no_ide": "\n[error] 未检测到 Cursor 或 Codex CLI，至少需要安装一个。",
     "install.no_source": "\n[error] agent 源文件目录不存在: {path}",

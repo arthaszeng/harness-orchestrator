@@ -111,10 +111,18 @@ def _install_codex_agents(source_dir: Path, *, force: bool, lang: str) -> int:
 
 _AGENT_BIN_DIR = Path.home() / ".local" / "bin"
 
-_SHELL_RC_MAP = {
-    "zsh": ".zshrc",
-    "bash": ".bash_profile",
-}
+def _detect_shell_rc() -> str:
+    """Return the appropriate shell rc filename for the current user."""
+    import os
+
+    shell_name = Path(os.environ.get("SHELL", "/bin/bash")).name
+    if shell_name == "zsh":
+        return ".zshrc"
+    if shell_name == "bash":
+        if (Path.home() / ".bash_profile").exists():
+            return ".bash_profile"
+        return ".bashrc"
+    return ".profile"
 
 
 def _run_cli_install(cmd: list[str], label: str) -> bool:
@@ -150,8 +158,7 @@ def _ensure_path(bin_dir: Path) -> bool:
     bin_str = str(bin_dir)
     modified_rc = False
 
-    shell_name = Path(os.environ.get("SHELL", "/bin/bash")).name
-    rc_name = _SHELL_RC_MAP.get(shell_name, ".profile")
+    rc_name = _detect_shell_rc()
     rc_path = Path.home() / rc_name
 
     already_in_rc = False
@@ -320,9 +327,5 @@ def run_install(*, force: bool = False, lang: str | None = None) -> None:
     typer.echo(t("install.done", count=total))
 
     if _needs_shell_reload:
-        import os
-
-        shell_name = Path(os.environ.get("SHELL", "/bin/bash")).name
-        rc_name = _SHELL_RC_MAP.get(shell_name, ".profile")
-        typer.echo(t("install.reload_hint", rc=rc_name))
+        typer.echo(t("install.reload_hint", rc=_detect_shell_rc()))
         _needs_shell_reload = False

@@ -101,13 +101,13 @@ MESSAGES: dict[str, str] = {
     "install.codex_auth_timeout": "  ⚠ Codex auth timed out. Run `codex auth` manually later.",
     "install.codex_auth_fail": "  ⚠ Codex auth failed. Run `codex auth` manually later.",
     "install.reload_hint": (
-        "\n╭─────────────────────────────────────────────────╮\n"
-        "│  Run this to activate PATH in current terminal:  │\n"
-        "│                                                   │\n"
-        "│    source ~/{rc}                              │\n"
-        "│                                                   │\n"
-        "│  Or simply open a new terminal window.            │\n"
-        "╰─────────────────────────────────────────────────╯"
+        "\n  ┌─────────────────────────────────────────────┐\n"
+        "  │  To activate PATH in current terminal, run:  │\n"
+        "  │                                               │\n"
+        "  │    source ~/{rc:<30s}│\n"
+        "  │                                               │\n"
+        "  │  Or simply open a new terminal window.        │\n"
+        "  └─────────────────────────────────────────────┘"
     ),
     "install.no_ide": "\n[error] Neither Cursor nor Codex CLI detected. At least one is required.",
     "install.no_source": "\n[error] Agent source directory not found: {path}",
