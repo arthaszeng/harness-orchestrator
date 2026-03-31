@@ -1,0 +1,145 @@
+---
+name: harness-doc-release
+description: >-
+  Automated documentation synchronization after shipping. Compares diff against
+  all .md files, updates stale documentation, and ensures cross-doc consistency.
+  Auto-invoked after ship, or use manually with /harness-doc-release. (harness)
+---
+
+# Harness Doc-Release — Automated Documentation Sync
+
+You are running the `/harness-doc-release` workflow. This ensures documentation
+stays in sync with code changes.
+
+---
+
+## Step 1: Diff Analysis
+
+1. Run `git diff {{ trunk_branch }}..HEAD --stat` to identify all changed files
+2. Run `git diff {{ trunk_branch }}..HEAD --name-only -- '*.md'` to find changed docs
+3. Find ALL `.md` files in the project: `find . -name '*.md' -not -path './node_modules/*' -not -path './.git/*'`
+4. Categorize:
+   - **Changed docs**: .md files that are in the diff (already updated)
+   - **Potentially stale docs**: .md files NOT in the diff that may reference changed code
+
+---
+
+## Step 2: Per-File Audit
+
+For each `.md` file found, cross-reference against the code changes:
+
+### README.md
+- Feature list: does it match what's actually in the codebase?
+- Installation instructions: are they still accurate?
+- Usage examples: do they still work with the changed code?
+- Version numbers: do they match pyproject.toml / package.json?
+- Badges/links: are they still valid?
+
+### ARCHITECTURE.md / DESIGN.md
+- Component descriptions: do they match the current module structure?
+- Data flow diagrams: do they reflect actual data flow?
+- API boundaries: are they consistent with actual interfaces?
+
+### CHANGELOG.md
+- Does the latest entry describe the current changes accurately?
+- Is the version number consistent with pyproject.toml?
+- Are the change descriptions honest (not exaggerated or minimized)?
+
+### Other .md files
+- Do code references (file paths, function names, class names) still exist?
+- Do configuration examples match actual config format?
+- Do API examples match actual API signatures?
+
+---
+
+## Step 3: Auto-Update (factual corrections)
+
+For documentation that is **factually incorrect** (not a matter of opinion):
+
+1. Fix file paths that have changed
+2. Fix function/class names that have been renamed
+3. Fix version numbers that don't match pyproject.toml
+4. Fix CLI command examples that have changed
+5. Fix configuration format examples that have changed
+
+Apply these changes directly — they are mechanical corrections.
+
+Commit: `git add '*.md' && git commit -m "docs: auto-sync documentation with code changes"`
+
+---
+
+## Step 4: Ask for Risky Changes
+
+For documentation changes that involve **judgment or opinion**, present to the user:
+
+- Narrative changes (changing the project's description or philosophy)
+- Security model documentation (could mislead about security guarantees)
+- Architecture descriptions (could lock in design decisions)
+- Removing documentation sections (information loss)
+
+Present ALL risky changes in ONE batch with per-item A) Apply / B) Skip.
+
+---
+
+## Step 5: Cross-Document Consistency
+
+Check for consistency across all documentation:
+
+1. **Version consistency**: same version number in README, pyproject.toml, CHANGELOG
+2. **Feature parity**: features listed in README exist in the codebase
+3. **Link validity**: internal document links point to existing files
+4. **Terminology**: consistent naming across documents
+5. **Discoverability**: are new features documented somewhere discoverable?
+
+Output:
+
+```
+DOCUMENTATION HEALTH
+═══════════════════════════════════════════════════
+  Files audited:       N
+  Auto-updated:        M files
+  Needs user input:    K items
+  Cross-doc issues:    J
+  Overall health:      GOOD / NEEDS ATTENTION / STALE
+═══════════════════════════════════════════════════
+```
+
+---
+
+## Step 6: Commit & Output
+
+1. If any auto-updates were made, commit them:
+   ```bash
+   git add '*.md' && git commit -m "docs: sync documentation with latest changes"
+   ```
+
+2. Output structured summary:
+
+```
+DOC-RELEASE SUMMARY
+═══════════════════════════════════════════════════
+  Auto-updated:
+    - README.md: updated version number, fixed CLI example
+    - ARCHITECTURE.md: updated module list
+
+  Skipped (no changes needed):
+    - CONTRIBUTING.md
+    - LICENSE
+
+  Flagged for user:
+    - README.md line 15: project description may need updating
+
+  Cross-doc issues:
+    - None found
+═══════════════════════════════════════════════════
+```
+
+---
+
+## Important Rules
+
+- **Factual corrections are AUTO-FIX** — file paths, version numbers, function names
+- **Narrative/opinion changes are ASK** — descriptions, philosophy, architecture vision
+- **Never delete documentation** without asking — even if it seems stale
+- **Check ALL .md files**, not just ones in the diff
+- **Accuracy over brevity** — documentation should be correct, even if longer

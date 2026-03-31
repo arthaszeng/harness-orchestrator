@@ -393,7 +393,23 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 
 ---
 
-## Step 8.5: Ship Metrics Persistence
+## Step 8.5: Doc-Release (auto-invoke)
+
+After the PR is created/updated, run the `/harness-doc-release` workflow:
+
+1. Compare the diff against all `.md` files in the project
+2. Auto-fix factual inaccuracies (file paths, version numbers, function names)
+3. Flag narrative/opinion changes for user review
+4. If any docs were updated, amend the last commit or create a new commit:
+   ```bash
+   git add '*.md' && git commit -m "docs: sync documentation with latest changes" && git push
+   ```
+
+If no documentation issues are found: skip silently.
+
+---
+
+## Step 8.75: Ship Metrics Persistence
 
 Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospective consumption:
 
