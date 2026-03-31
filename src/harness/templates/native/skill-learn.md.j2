@@ -1,0 +1,176 @@
+---
+name: harness-learn
+description: >-
+  Structured learning memory management using Memverse MCP as storage backend.
+  Search, add, prune, and export learnings across sessions. Integrates with
+  review and ship workflows for prior knowledge retrieval. (harness)
+---
+
+# Harness Learn — Structured Learning Memory
+
+Manage project learnings that persist across sessions. Uses Memverse MCP for
+semantic storage and retrieval.
+
+## Commands
+
+### `/harness-learn` — Show Recent Learnings
+Display the 20 most recent learnings for this project.
+
+1. Call Memverse `search_memory` with query: "learnings for {{ project_name }}"
+2. Display in table format:
+
+```
+RECENT LEARNINGS ({{ project_name }})
+═══════════════════════════════════════════════════
+  #  Type         Key                    Confidence
+  1  pattern      retry-with-backoff      9/10
+  2  pitfall      async-in-sync-context   8/10
+  3  preference   pytest-over-unittest    7/10
+═══════════════════════════════════════════════════
+```
+
+### `/harness-learn search <query>` — Semantic Search
+Search learnings by meaning.
+
+1. Call Memverse `search_memory` with the user's query and domain: "{{ project_name }}"
+2. Display matching learnings with relevance scores
+3. Show full insight text for each match
+
+### `/harness-learn add` — Add a Learning
+Manually record a new learning.
+
+Prompt for (or extract from context):
+- **type**: pattern / pitfall / preference / architecture / tool
+- **key**: short identifier (kebab-case)
+- **insight**: the actual learning (1-3 sentences)
+- **confidence**: 1-10 (how certain is this learning?)
+- **files**: related files (optional)
+
+Store via Memverse `add_memories` with structured format:
+```
+[{type}] {key}: {insight} (confidence: {confidence}/10, files: {files}, branch: {branch}, commit: {commit})
+```
+
+Domain: "{{ project_name }}"
+
+### `/harness-learn prune` — Check Staleness
+Review existing learnings for staleness.
+
+1. Fetch all learnings for this project via `search_memory`
+2. For each learning that references specific files:
+   - Check if the file still exists
+   - If deleted: flag as potentially stale
+3. Check for contradictions:
+   - Two learnings that say opposite things about the same topic
+   - A learning that contradicts current code patterns
+4. Output report:
+
+```
+LEARNING HEALTH CHECK
+═══════════════════════════════════════
+  Stale (file deleted):  N learnings
+  Contradictions found:  M pairs
+  Healthy:               K learnings
+═══════════════════════════════════════
+```
+
+5. For stale/contradicting learnings: suggest deletions via Memverse `delete_memories`
+
+### `/harness-learn export` — Export as Markdown
+Export all learnings grouped by type.
+
+```markdown
+# Project Learnings: {{ project_name }}
+
+## Patterns
+- **retry-with-backoff** (9/10): Always use exponential backoff for external API retries...
+
+## Pitfalls
+- **async-in-sync-context** (8/10): Never call sync DB operations inside async handlers...
+
+## Preferences
+- **pytest-over-unittest** (7/10): Project uses pytest exclusively, never unittest...
+
+## Architecture
+- **event-driven-processing** (9/10): All background jobs use the event queue...
+
+## Tool
+- **ruff-over-flake8** (8/10): Project uses ruff for linting, not flake8...
+```
+
+### `/harness-learn stats` — Statistics
+Show learning statistics.
+
+```
+LEARNING STATISTICS
+═══════════════════════════════════════
+  Total:           N
+  By type:
+    pattern:       X
+    pitfall:       Y
+    preference:    Z
+    architecture:  W
+    tool:          V
+  Avg confidence:  X.X/10
+  By source:
+    observed:      A
+    user-stated:   B
+    inferred:      C
+═══════════════════════════════════════
+```
+
+---
+
+## Memory Schema
+
+Each learning stored in Memverse follows this structure:
+- **type**: pattern / pitfall / preference / architecture / tool
+- **key**: short kebab-case identifier
+- **insight**: the learning content (1-3 sentences)
+- **confidence**: 1-10
+- **source**: observed / user-stated / inferred / cross-model
+- **files**: list of related file paths (optional)
+- **branch**: git branch where learned (optional)
+- **commit**: commit hash where learned (optional)
+
+---
+
+## Integration with Review/Ship Workflows
+
+### Prior Learnings Search (automatic)
+
+At the start of `/harness-eval` and `/harness-ship` workflows:
+
+1. Extract key topics from the diff (file names, module names, patterns used)
+2. Call Memverse `search_memory` with these topics and domain "{{ project_name }}"
+3. If relevant learnings are found, display:
+
+```
+PRIOR LEARNINGS (relevant to this diff):
+  - [pitfall] async-in-sync-context: Never call sync DB operations inside async handlers.
+    Relevant because: diff modifies async endpoint handlers.
+```
+
+4. Factor prior learnings into the review — known pitfalls should be checked against the diff.
+
+### Capture Learnings (automatic)
+
+At the end of `/harness-eval` and `/harness-ship` workflows:
+
+1. Review all findings from the evaluation
+2. For any non-obvious finding (confidence >= 7) that reveals a pattern or pitfall:
+   - Auto-capture as a learning via Memverse `add_memories`
+   - Type: pattern (if good practice) or pitfall (if common mistake)
+   - Source: "observed"
+   - Confidence: same as the finding's confidence
+3. Log: "Captured N new learnings from this review"
+
+---
+
+## Important Rules
+
+- **Always use Memverse MCP** as the storage backend — do not create local files for learnings
+- **Domain isolation** — always scope to "{{ project_name }}" domain
+- **Deduplication** — before adding, search for existing learnings with similar keys
+- **Confidence decay** — learnings that are contradicted by new evidence should be updated, not just added alongside
+- **Privacy** — never store secrets, credentials, or PII as learnings

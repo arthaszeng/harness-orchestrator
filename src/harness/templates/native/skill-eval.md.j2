@@ -30,6 +30,9 @@ which means DO IT. Run straight through and output the evaluation result at the 
 2. Read `.agents/tasks/task-NNN/plan.md` (the contract)
 3. Read `.agents/tasks/task-NNN/build-rN.log` (the latest build log)
 4. Run `git diff {{ trunk_branch }}..HEAD --stat` to understand the scope
+5. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
+   If Memverse MCP is available, call `search_memory` with key topics from the diff.
+   Display any relevant prior learnings (especially pitfalls) before starting the review.
 
 ---
 
@@ -290,6 +293,21 @@ Also write machine-readable JSON to `.agents/tasks/task-NNN/evaluation-rN.json`:
   "ask_items": 0
 }
 ```
+
+---
+
+## Step 7: Capture Learnings
+
+After the evaluation is complete, capture non-obvious insights as learnings:
+
+1. Review all findings with confidence >= 7
+2. For patterns or pitfalls that aren't already known:
+   - Call Memverse `add_memories` with domain "{{ project_name }}"
+   - Type: "pattern" (good practice found) or "pitfall" (common mistake found)
+   - Source: "observed"
+3. Log: "Captured N new learnings from this review"
+
+If Memverse MCP is not available: skip silently.
 
 ---
 
