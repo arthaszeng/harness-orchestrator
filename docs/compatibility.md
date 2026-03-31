@@ -49,7 +49,7 @@ Use `harness status` to inspect probe results.
 
 | Dependency | Minimum version |
 |------|----------|
-| Python | >= 3.11 |
+| Python | >= 3.9 |
 | typer | >= 0.12 |
 | pydantic | >= 2.0 |
 | jinja2 | >= 3.1 |

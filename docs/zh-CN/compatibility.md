@@ -47,7 +47,7 @@ Harness 在启动时自动执行 capability probe：
 
 | 依赖 | 最低版本 |
 |------|----------|
-| Python | >= 3.11 |
+| Python | >= 3.9 |
 | typer | >= 0.12 |
 | pydantic | >= 2.0 |
 | jinja2 | >= 3.1 |

@@ -4,9 +4,8 @@
 
 > Contract-driven multi-agent autonomous development orchestration framework for Cursor and Codex.
 
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/harness-orchestrator)](https://pypi.org/project/harness-orchestrator/)
 
 Today's AI coding tools excel at single-shot tasks, but continuous development often suffers from goal drift, broken context, missing quality gates, and opaque processes. harness-orchestrator organizes multiple agent capabilities into a contract-driven, auditable, recoverable engineering loop:
 
@@ -24,7 +23,7 @@ Today's AI coding tools excel at single-shot tasks, but continuous development o
 
 | Dependency | Requirement | Notes |
 |------------|-------------|-------|
-| **Python** | >= 3.11 | Runs the Harness CLI |
+| **Python** | >= 3.9 | Runs the Harness CLI |
 | **Cursor CLI and/or Codex CLI** | At least one | Provides actual agent capability |
 | **Git** | Any version | Project must be a Git repo; Harness relies on Git for branches and change tracking |
 
@@ -36,14 +35,6 @@ IDE CLI setup:
 > Default routing in `auto` mode is a **replaceable empirical default** (Builder→Cursor, other roles→Codex). That is not Harness's core value — the core assets are the contract protocol, evaluation rubric, state machine, artifact chain, and interrupt recovery. You can configure a driver per role in `.agents/config.toml`. With only one CLI installed, all roles run through that driver.
 
 ### Install
-
-From PyPI:
-
-```bash
-pip install harness-orchestrator
-```
-
-Or from source (development):
 
 ```bash
 git clone https://github.com/arthaszeng/harness-orchestrator.git
@@ -452,7 +443,7 @@ ruff check src/ tests/
 ruff format src/ tests/
 ```
 
-Ruff targets Python 3.11 with line length 100.
+Ruff targets Python 3.9 with line length 100.
 
 ---
 

@@ -1,5 +1,9 @@
 """Harness CLI entry point."""
 
+from __future__ import annotations
+
+from typing import Optional
+
 import typer
 
 from harness import __version__
@@ -30,7 +34,7 @@ def main(
 @app.command()
 def install(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing agent definitions"),
-    lang: str | None = typer.Option(
+    lang: Optional[str] = typer.Option(
         None,
         "--lang",
         "-l",

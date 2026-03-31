@@ -8,7 +8,11 @@ import sys
 import tempfile
 import threading
 import time
-import tomllib
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable

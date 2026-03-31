@@ -4,9 +4,8 @@
 
 > 面向 Cursor 与 Codex 的契约驱动多智能体自主开发编排框架。
 
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/harness-orchestrator)](https://pypi.org/project/harness-orchestrator/)
 
 今天的 AI 编程工具擅长单次任务，但持续开发往往受目标漂移、上下文断裂、质量门禁缺失与过程不透明所困。harness-orchestrator 将多种 agent 能力组织成契约驱动、可审计、可恢复的工程闭环：
 
@@ -24,7 +23,7 @@
 
 | 依赖 | 要求 | 说明 |
 |------------|-------------|-------|
-| **Python** | >= 3.11 | 运行 Harness CLI |
+| **Python** | >= 3.9 | 运行 Harness CLI |
 | **Cursor CLI 和/或 Codex CLI** | 至少其一 | 提供实际 agent 能力 |
 | **Git** | 任意版本 | 项目须为 Git 仓库；Harness 依赖 Git 做分支与变更跟踪 |
 
@@ -36,14 +35,6 @@ IDE CLI 配置：
 > `auto` 模式下的默认路由是**可替换的经验默认**（Builder→Cursor，其余角色→Codex）。这不是 Harness 的核心价值 — 核心资产是契约协议、评审量表、状态机、工件链与中断恢复。可在 `.agents/config.toml` 中为每个角色配置驱动。若只安装一种 CLI，所有角色都会经由该驱动执行。
 
 ### 安装
-
-从 PyPI：
-
-```bash
-pip install harness-orchestrator
-```
-
-或从源码（开发）：
 
 ```bash
 git clone https://github.com/arthaszeng/harness-orchestrator.git
@@ -452,7 +443,7 @@ ruff check src/ tests/
 ruff format src/ tests/
 ```
 
-Ruff 面向 Python 3.11，行宽 100。
+Ruff 面向 Python 3.9，行宽 100。
 
 ---
 
