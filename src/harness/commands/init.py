@@ -232,17 +232,21 @@ def _ai_suggest_ci(
     roles: dict[str, str],
 ) -> str:
     """Use an AI agent to analyze the project and suggest a CI command."""
-    from harness.core.config import HarnessConfig
+    from harness.core.config import DriversRolesConfig, HarnessConfig
     from harness.drivers.codex import CodexDriver
     from harness.drivers.cursor import CursorDriver
     from harness.drivers.resolver import DriverResolver
 
-    drivers_payload: dict = {"default": driver_mode}
+    cfg = HarnessConfig.load(project_root)
+    cfg.drivers.default = driver_mode
     if roles:
-        drivers_payload["roles"] = roles
-
-    cfg = HarnessConfig.model_validate({"drivers": drivers_payload})
-    cfg.project_root = project_root
+        update = {
+            k: v
+            for k, v in roles.items()
+            if k in DriversRolesConfig.model_fields
+        }
+        if update:
+            cfg.drivers.roles = cfg.drivers.roles.model_copy(update=update)
 
     resolver = DriverResolver(cfg)
     try:
