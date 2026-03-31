@@ -91,6 +91,7 @@ def run_single_task(
 
     max_iter, pass_threshold = _resolve_profile(config)
     last_feedback = ""
+    last_contract = ""
     task_start = time.monotonic()
     abort_reason = ""
 
@@ -118,7 +119,10 @@ def run_single_task(
             if iteration == 1:
                 plan_prompt = _build_plan_prompt(requirement, project_root)
             else:
-                plan_prompt = _build_iterate_prompt(requirement, last_feedback, project_root)
+                plan_prompt = _build_iterate_prompt(
+                    requirement, last_feedback, project_root,
+                    previous_contract=last_contract,
+                )
 
             t0 = time.monotonic()
             with tracker.track("planner", planner.name, planner_name, iteration, readonly=True, prompt=plan_prompt) as run:
@@ -155,7 +159,8 @@ def run_single_task(
             sm.state.current_task.artifacts.contract = str(task_dir / f"contract-r{iteration}.md")
 
             contract_md_path = task_dir / f"contract-r{iteration}.md"
-            parsed_contract = parse_contract(contract_md_path.read_text(encoding="utf-8"))
+            last_contract = contract_md_path.read_text(encoding="utf-8")
+            parsed_contract = parse_contract(last_contract)
             parsed_contract.iteration = iteration
             write_contract_sidecar(parsed_contract, contract_md_path)
 
@@ -165,6 +170,8 @@ def run_single_task(
 
         if sm.state.current_task.state == TaskState.CONTRACTED:
             sm.transition(TaskState.BUILDING)
+
+            pre_build_commit = _git_head_commit(project_root)
 
             builder = resolver.resolve("builder")
             builder_name = resolver.agent_name("builder")
@@ -250,7 +257,9 @@ def run_single_task(
             eval_name = resolver.agent_name("evaluator")
             eval_model = resolver.resolve_model("evaluator")
             eval_prompt = _build_eval_prompt(
-                requirement, task_dir, iteration, project_root, branch=branch,
+                requirement, task_dir, iteration, project_root,
+                branch=branch,
+                pre_build_commit=pre_build_commit,
             )
 
             t0 = time.monotonic()
@@ -431,6 +440,18 @@ def _split_spec_contract(text: str) -> tuple[str, str]:
     return text.strip(), text.strip()
 
 
+def _git_head_commit(project_root: Path) -> str:
+    """Return the current HEAD commit hash (short), or empty string on failure."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=5,
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
 def _git_branch_summary(project_root: Path, branch: str) -> str:
     """Summarize diff stat and commit log for the branch vs main."""
     parts: list[str] = []
@@ -457,6 +478,34 @@ def _git_branch_summary(project_root: Path, branch: str) -> str:
     return "\n\n".join(parts) if parts else t("prompt.git_diff_unavailable")
 
 
+def _git_incremental_summary(project_root: Path, since_commit: str) -> str:
+    """Summarize changes since a specific commit (this iteration only)."""
+    if not since_commit:
+        return ""
+    parts: list[str] = []
+    try:
+        stat = subprocess.run(
+            ["git", "diff", f"{since_commit}..HEAD", "--stat"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=10,
+        )
+        if stat.stdout.strip():
+            parts.append(f"### git diff {since_commit}..HEAD --stat\n```\n{stat.stdout.strip()}\n```")
+    except Exception:
+        pass
+
+    try:
+        log = subprocess.run(
+            ["git", "log", "--oneline", f"{since_commit}..HEAD"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=10,
+        )
+        if log.stdout.strip():
+            parts.append(f"### git log --oneline {since_commit}..HEAD\n```\n{log.stdout.strip()}\n```")
+    except Exception:
+        pass
+
+    return "\n\n".join(parts) if parts else ""
+
+
 def _build_plan_prompt(requirement: str, project_root: Path) -> str:
     agents_md = ""
     agents_file = project_root / "AGENTS.md"
@@ -475,12 +524,19 @@ def _build_plan_prompt(requirement: str, project_root: Path) -> str:
     )
 
 
-def _build_iterate_prompt(requirement: str, feedback: str, project_root: Path) -> str:
+def _build_iterate_prompt(
+    requirement: str,
+    feedback: str,
+    project_root: Path,
+    *,
+    previous_contract: str = "",
+) -> str:
     return t(
         "prompt.iterate",
         project_root=project_root,
         requirement=requirement,
         feedback=feedback,
+        previous_contract=previous_contract if previous_contract else "(none)",
     )
 
 
@@ -630,6 +686,7 @@ def _build_eval_prompt(
     project_root: Path,
     *,
     branch: str = "",
+    pre_build_commit: str = "",
 ) -> str:
     contract = ""
     contract_file = task_dir / f"contract-r{iteration}.md"
@@ -637,6 +694,7 @@ def _build_eval_prompt(
         contract = contract_file.read_text(encoding="utf-8")[:5000]
 
     branch_summary = _git_branch_summary(project_root, branch)
+    iteration_summary = _git_incremental_summary(project_root, pre_build_commit)
 
     build_log = ""
     build_log_file = task_dir / f"build-r{iteration}.log"
@@ -651,5 +709,6 @@ def _build_eval_prompt(
         contract=contract,
         branch=branch,
         branch_summary=branch_summary,
+        iteration_summary=iteration_summary if iteration_summary else "(same as cumulative)",
         build_log=build_log if build_log else t("prompt.eval_no_log"),
     )

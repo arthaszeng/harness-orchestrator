@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 import subprocess
 import sys
@@ -89,15 +90,35 @@ def run_ci_check(
     return EvalResult(verdict="PASS", stage=1, feedback=t("eval.ci_pass"))
 
 
+_FEEDBACK_SECTION_RE = re.compile(
+    r"^##\s*(?:反馈|Feedback)\s*\n(.*)",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
+)
+
+
+def _extract_feedback_section(raw_output: str) -> str:
+    """Extract the ## Feedback / ## 反馈 section from evaluator markdown.
+
+    Returns only the actionable feedback items, not the full scoring table.
+    Falls back to the complete output if no section marker is found.
+    """
+    m = _FEEDBACK_SECTION_RE.search(raw_output)
+    if not m:
+        return raw_output
+    body = m.group(1).strip()
+    return body if body else raw_output
+
+
 def parse_evaluation(raw_output: str, threshold: float = 3.5) -> EvalResult:
     """Stage 2: parse evaluator agent output."""
     scores = parse_scores(raw_output)
     verdict = scores.verdict(threshold)
+    feedback = _extract_feedback_section(raw_output)
 
     return EvalResult(
         verdict=verdict,
         stage=2,
         scores=scores,
-        feedback=raw_output,
+        feedback=feedback,
         raw_output=raw_output,
     )

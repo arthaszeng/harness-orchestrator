@@ -219,9 +219,14 @@ MESSAGES: dict[str, str] = {
     "prompt.iterate": (
         "项目根目录: {project_root}\n\n"
         "## 原始需求\n{requirement}\n\n"
-        "## Evaluator 反馈\n{feedback}\n\n"
-        "请根据反馈调整合同，只关注反馈中提到的问题。\n"
-        "严格按照 Contract 格式输出。"
+        "## 上轮合同（已有成果 — 保持正确的部分）\n"
+        "{previous_contract}\n\n"
+        "## Evaluator 反馈（需修复的问题）\n{feedback}\n\n"
+        "请根据反馈，输出更新后的 Spec 和 Contract。\n"
+        "- **保持**上轮合同中已正确完成的交付物\n"
+        "- **新增或修改**交付物以解决 Evaluator 指出的问题\n"
+        "- 包含一条交付物，明确禁止合同范围外的改动\n"
+        "严格按照你的 agent 指令中定义的 Spec + Contract 格式输出。"
     ),
     "prompt.builder": (
         "## 任务\n{requirement}\n\n"
@@ -234,7 +239,13 @@ MESSAGES: dict[str, str] = {
         "- 按合同交付物逐项实现，完成后提交代码\n"
         "- 上方已提供项目规范和关键文件内容，**跳过探索阶段，直接开始编码**\n"
         "- 只在需要查看 prompt 未包含的文件时才调用 read/glob\n"
-        "- 遵守项目的编码规范和架构约束"
+        "- 遵守项目的编码规范和架构约束\n\n"
+        "## 变更边界约束（强制执行）\n"
+        "- **只修改合同交付物直接涉及的文件**\n"
+        "- **禁止删除现有测试** — 可以新增测试，但不得移除已有测试\n"
+        "- **禁止修改交付物列表未涉及的文件**\n"
+        "- 如果发现合同范围外的相关问题，在输出中记录但不要修改代码\n"
+        "- 不要改动版本号、无关配置或合同未提及的文件"
     ),
     "prompt.builder_no_spec": "（无）",
     "prompt.builder_no_context": "（无预读上下文）",
@@ -247,13 +258,17 @@ MESSAGES: dict[str, str] = {
         "项目根目录: {project_root}\n\n"
         "## 原始需求\n{requirement}\n\n"
         "## 合同\n{contract}\n\n"
-        "## Builder 分支变更（重要：请用此数据评估，不要依赖 working tree diff）\n"
+        "## 本轮变更（核心 — 根据合同评估 Builder 的工作）\n"
+        "{iteration_summary}\n\n"
+        "## 累积分支变更（上下文 — 所有迭代的合并变更）\n"
         "分支: {branch}\n\n"
         "{branch_summary}\n\n"
         "## Builder 工作日志（摘要）\n{build_log}\n\n"
         "## 评估指引\n"
         "- **关键**：Builder 会 commit 代码，因此 `git diff`（working tree）可能为空。\n"
-        "  请使用上方的分支变更摘要，或执行 `git diff main..HEAD` 来查看实际变更。\n"
+        "  请使用上方的变更摘要，或执行 `git diff main..HEAD` 来查看实际变更。\n"
+        "- **请基于本轮合同和本轮变更打分。**\n"
+        "  不要因为前轮遗留的问题扣分，除非 Builder 使之恶化。\n"
         "- 检查测试状态，按四维标准打分。\n"
         "- 严格按照你的 agent 指令中定义的 Evaluation 格式输出。"
     ),
