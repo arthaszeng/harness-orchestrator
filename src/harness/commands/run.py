@@ -8,6 +8,7 @@ import typer
 
 from harness import __version__
 from harness.core.config import HarnessConfig
+from harness.core.registry import Registry
 from harness.core.state import SessionState, StateMachine
 from harness.core.ui import get_ui, init_ui
 from harness.drivers.resolver import DriverResolver
@@ -54,9 +55,11 @@ def run_task(*, requirement: str, resume: bool = False, verbose: bool = False) -
 
     sm.clear_stop_signal()
 
+    registry = Registry(agents_dir)
     result = run_single_task(
         config, sm, resolver, requirement,
         resume=resume,
+        registry=registry,
     )
 
     sm.end_session()

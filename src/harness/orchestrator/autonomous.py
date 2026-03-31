@@ -8,7 +8,9 @@ import time
 from harness import __version__
 from harness.core.config import HarnessConfig
 from harness.core.events import EventEmitter, NullEventEmitter
+from harness.core.registry import Registry
 from harness.core.state import StateMachine
+from harness.core.tracker import RunTracker
 from harness.core.ui import get_ui
 from harness.drivers.resolver import DriverResolver
 from harness.i18n import t
@@ -23,6 +25,7 @@ def run_autonomous(
     resolver: DriverResolver,
     *,
     resume: bool = False,
+    registry: Registry | None = None,
 ) -> list[WorkflowResult]:
     """Autonomous loop: Strategist proposes tasks → execute → Reflector summarizes."""
     ui = get_ui()
@@ -39,6 +42,10 @@ def run_autonomous(
     except OSError:
         ev = NullEventEmitter()
 
+    if registry is None:
+        registry = Registry(sm.agents_dir)
+    tracker = RunTracker(registry=registry, events=ev)
+
     ui.banner("auto", __version__)
     ui.system_status(resolver.available_drivers)
 
@@ -50,8 +57,11 @@ def run_autonomous(
 
         # Strategist: pick the next task
         t0 = time.monotonic()
-        with ui.agent_step("[strategist] scanning project state", "codex") as on_out:
-            task_requirement = _invoke_strategist(config, sm, resolver, on_output=on_out)
+        with tracker.track("strategist", "codex", resolver.agent_name("strategist")) as run:
+            with ui.agent_step("[strategist] scanning project state", "codex") as on_out:
+                task_requirement = _invoke_strategist(config, sm, resolver, on_output=on_out)
+            run.success = task_requirement is not None
+            run.exit_code = 0 if task_requirement else 1
         elapsed = time.monotonic() - t0
 
         if not task_requirement:
@@ -61,7 +71,7 @@ def run_autonomous(
         ui.strategist_result(task_requirement, elapsed)
 
         # Run single-task workflow
-        result = run_single_task(config, sm, resolver, task_requirement, events=ev)
+        result = run_single_task(config, sm, resolver, task_requirement, events=ev, registry=registry)
         results.append(result)
 
         if result.verdict == "PASS":
@@ -73,8 +83,11 @@ def run_autonomous(
         # Reflector: periodic summary
         if completed_count > 0 and completed_count % config.autonomous.progress_report_interval == 0:
             t0 = time.monotonic()
-            with ui.agent_step("[reflector] generating summary", "codex") as on_out:
-                _invoke_reflector(config, sm, resolver, memverse, on_output=on_out)
+            with tracker.track("reflector", "codex", resolver.agent_name("reflector")) as run:
+                with ui.agent_step("[reflector] generating summary", "codex") as on_out:
+                    _invoke_reflector(config, sm, resolver, memverse, on_output=on_out)
+                run.success = True
+                run.exit_code = 0
             elapsed = time.monotonic() - t0
             ui.step_done("[reflector]", elapsed, True, "synced")
 

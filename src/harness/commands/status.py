@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from rich.panel import Panel
+from rich.table import Table
 
 from harness.core.progress import (
     get_recent_blocked,
@@ -14,6 +16,8 @@ from harness.core.progress import (
 )
 from harness.core.state import SessionState
 from harness.core.ui import get_ui
+
+log = logging.getLogger("harness.commands.status")
 
 
 def run_status() -> None:
@@ -30,6 +34,7 @@ def run_status() -> None:
 
     _render_header(console, state)
     _render_current(console, state)
+    _render_agents(console, state, agents_dir)
     _render_recent_result(console, state)
     _render_resume(console, state)
     _render_next_action(console, state)
@@ -91,6 +96,69 @@ def _render_resume(console, state: SessionState) -> None:
 def _render_next_action(console, state: SessionState) -> None:
     action = suggest_next_action(state)
     console.print(f"\n[cyber.magenta]Next Action:[/] {action}")
+
+
+def _render_agents(console, state: SessionState, agents_dir: Path) -> None:
+    """Show agent-level runs for the current task from the SQLite registry."""
+    if not state.current_task:
+        return
+
+    task_id = state.current_task.id
+    db_path = agents_dir / "registry.db"
+    if not db_path.exists():
+        return
+
+    try:
+        from harness.core.registry import Registry
+        registry = Registry(agents_dir)
+        runs = registry.get_by_task(task_id)
+        registry.close()
+    except Exception:
+        log.debug("could not read registry for status", exc_info=True)
+        return
+
+    if not runs:
+        return
+
+    table = Table(
+        title=f"Agents ({task_id})",
+        show_header=True,
+        header_style="bold",
+        border_style="cyber.border",
+        padding=(0, 1),
+    )
+    table.add_column("#", style="dim", width=5)
+    table.add_column("Role", min_width=10)
+    table.add_column("Driver", min_width=6)
+    table.add_column("Status", min_width=9)
+    table.add_column("Elapsed", justify="right", min_width=7)
+    table.add_column("Detail", style="dim")
+
+    for r in runs:
+        status_style = {
+            "completed": "cyber.ok",
+            "failed": "cyber.red",
+            "running": "cyber.warn",
+        }.get(r.status, "")
+
+        elapsed_str = f"{r.elapsed_ms / 1000:.1f}s" if r.elapsed_ms else "..."
+        detail = ""
+        if r.status == "failed" and r.exit_code is not None:
+            detail = f"exit={r.exit_code}"
+        if r.error:
+            detail = r.error[:60]
+
+        table.add_row(
+            f"#{r.id}",
+            r.role,
+            r.driver,
+            f"[{status_style}]{r.status}[/{status_style}]" if status_style else r.status,
+            elapsed_str,
+            detail,
+        )
+
+    console.print()
+    console.print(table)
 
 
 def _render_stats(console, state: SessionState) -> None:

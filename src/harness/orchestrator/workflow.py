@@ -12,7 +12,9 @@ from harness.core.archive import archive_task, ensure_task_dir
 from harness.core.config import HarnessConfig
 from harness.core.events import EventEmitter, NullEventEmitter
 from harness.core.index import update_index
+from harness.core.registry import Registry
 from harness.core.state import StateMachine, TaskState
+from harness.core.tracker import RunTracker
 from harness.core.ui import get_ui
 from harness.drivers.base import AgentResult
 from harness.drivers.resolver import DriverResolver
@@ -53,6 +55,7 @@ def run_single_task(
     *,
     resume: bool = False,
     events: EventEmitter | None = None,
+    registry: Registry | None = None,
 ) -> WorkflowResult:
     """Run the full plan → contract → build → eval loop."""
     from harness.integrations import git_ops
@@ -78,6 +81,10 @@ def run_single_task(
         main_branch = git_ops.current_branch(project_root)
         git_ops.create_branch(branch, project_root)
         sm.start_task(task_id, requirement, branch)
+
+    if registry is None:
+        registry = Registry(agents_dir)
+    tracker = RunTracker(registry=registry, events=ev, task_id=task_id)
 
     ui.task_panel(task_id, requirement, branch)
     ev.task_start(task_id=task_id, requirement=requirement, branch=branch)
@@ -112,20 +119,17 @@ def run_single_task(
             else:
                 plan_prompt = _build_iterate_prompt(requirement, last_feedback, project_root)
 
-            ev.agent_start(role="planner", driver=planner.name, agent_name=planner_name, iteration=iteration)
             t0 = time.monotonic()
-            with ui.agent_step("[1/3 planner] generating spec + contract", planner.name) as on_out:
-                plan_result = planner.invoke(
-                    planner_name, plan_prompt, project_root,
-                    readonly=True, on_output=on_out,
-                )
+            with tracker.track("planner", planner.name, planner_name, iteration, readonly=True, prompt=plan_prompt) as run:
+                with ui.agent_step("[1/3 planner] generating spec + contract", planner.name) as on_out:
+                    plan_result = planner.invoke(
+                        planner_name, plan_prompt, project_root,
+                        readonly=True, on_output=on_out,
+                    )
+                run.exit_code = plan_result.exit_code
+                run.output_len = len(plan_result.output)
+                run.success = plan_result.success
             elapsed = time.monotonic() - t0
-            ev.agent_end(
-                role="planner", driver=planner.name, agent_name=planner_name,
-                iteration=iteration, exit_code=plan_result.exit_code,
-                success=plan_result.success, output_len=len(plan_result.output),
-                elapsed_ms=int(elapsed * 1000),
-            )
 
             if plan_result.success:
                 ui.step_done("[1/3 planner]", elapsed, True, "locked")
@@ -165,20 +169,17 @@ def run_single_task(
             builder_name = resolver.agent_name("builder")
             build_prompt = _build_builder_prompt(requirement, task_dir, iteration, project_root)
 
-            ev.agent_start(role="builder", driver=builder.name, agent_name=builder_name, iteration=iteration)
             t0 = time.monotonic()
-            with ui.agent_step("[2/3 builder] executing contract", builder.name) as on_out:
-                build_result = builder.invoke(
-                    builder_name, build_prompt, project_root,
-                    on_output=on_out,
-                )
+            with tracker.track("builder", builder.name, builder_name, iteration, prompt=build_prompt) as run:
+                with ui.agent_step("[2/3 builder] executing contract", builder.name) as on_out:
+                    build_result = builder.invoke(
+                        builder_name, build_prompt, project_root,
+                        on_output=on_out,
+                    )
+                run.exit_code = build_result.exit_code
+                run.output_len = len(build_result.output)
+                run.success = build_result.success
             elapsed = time.monotonic() - t0
-            ev.agent_end(
-                role="builder", driver=builder.name, agent_name=builder_name,
-                iteration=iteration, exit_code=build_result.exit_code,
-                success=build_result.success, output_len=len(build_result.output),
-                elapsed_ms=int(elapsed * 1000),
-            )
 
             (task_dir / f"build-r{iteration}.log").write_text(
                 build_result.output, encoding="utf-8"
@@ -211,12 +212,17 @@ def run_single_task(
 
             # Stage 1: CI gate
             t0 = time.monotonic()
-            with ui.agent_step("[3/3 eval] CI gate", "local") as on_out:
-                ci_result = run_ci_check(config.ci.command, project_root, on_output=on_out)
+            ci_exit = 0
+            with tracker.track("ci", "local", "ci-gate", iteration) as ci_run:
+                with ui.agent_step("[3/3 eval] CI gate", "local") as on_out:
+                    ci_result = run_ci_check(config.ci.command, project_root, on_output=on_out)
+                ci_exit = 0 if ci_result.verdict != "CI_FAIL" else 1
+                ci_run.exit_code = ci_exit
+                ci_run.success = ci_result.verdict != "CI_FAIL"
             elapsed = time.monotonic() - t0
             ev.ci_result(
                 command=config.ci.command,
-                exit_code=0 if ci_result.verdict != "CI_FAIL" else 1,
+                exit_code=ci_exit,
                 verdict=ci_result.verdict,
                 elapsed_ms=int(elapsed * 1000),
             )
@@ -244,20 +250,17 @@ def run_single_task(
                 requirement, task_dir, iteration, project_root, branch=branch,
             )
 
-            ev.agent_start(role="evaluator", driver=evaluator.name, agent_name=eval_name, iteration=iteration)
             t0 = time.monotonic()
-            with ui.agent_step("[3/3 eval] quality review", evaluator.name) as on_out:
-                eval_result = evaluator.invoke(
-                    eval_name, eval_prompt, project_root,
-                    readonly=True, on_output=on_out,
-                )
+            with tracker.track("evaluator", evaluator.name, eval_name, iteration, readonly=True, prompt=eval_prompt) as run:
+                with ui.agent_step("[3/3 eval] quality review", evaluator.name) as on_out:
+                    eval_result = evaluator.invoke(
+                        eval_name, eval_prompt, project_root,
+                        readonly=True, on_output=on_out,
+                    )
+                run.exit_code = eval_result.exit_code
+                run.output_len = len(eval_result.output)
+                run.success = eval_result.success
             elapsed = time.monotonic() - t0
-            ev.agent_end(
-                role="evaluator", driver=evaluator.name, agent_name=eval_name,
-                iteration=iteration, exit_code=eval_result.exit_code,
-                success=eval_result.success, output_len=len(eval_result.output),
-                elapsed_ms=int(elapsed * 1000),
-            )
 
             if not eval_result.success:
                 ui.step_done(
@@ -291,23 +294,17 @@ def run_single_task(
                 align_prompt = _build_alignment_eval_prompt(
                     requirement, task_dir, iteration, project_root, branch=branch,
                 )
-                ev.agent_start(
-                    role="alignment_evaluator", driver=align_eval.name,
-                    agent_name=align_name, iteration=iteration,
-                )
                 t0 = time.monotonic()
-                with ui.agent_step("[3/3 eval] alignment review", align_eval.name) as on_out:
-                    align_result = align_eval.invoke(
-                        align_name, align_prompt, project_root,
-                        readonly=True, on_output=on_out,
-                    )
+                with tracker.track("alignment_evaluator", align_eval.name, align_name, iteration, readonly=True, prompt=align_prompt) as run:
+                    with ui.agent_step("[3/3 eval] alignment review", align_eval.name) as on_out:
+                        align_result = align_eval.invoke(
+                            align_name, align_prompt, project_root,
+                            readonly=True, on_output=on_out,
+                        )
+                    run.exit_code = align_result.exit_code
+                    run.output_len = len(align_result.output)
+                    run.success = align_result.success
                 a_elapsed = time.monotonic() - t0
-                ev.agent_end(
-                    role="alignment_evaluator", driver=align_eval.name,
-                    agent_name=align_name, iteration=iteration,
-                    exit_code=align_result.exit_code, success=align_result.success,
-                    output_len=len(align_result.output), elapsed_ms=int(a_elapsed * 1000),
-                )
 
                 align_md = task_dir / f"alignment-r{iteration}.md"
                 align_md.write_text(align_result.output, encoding="utf-8")

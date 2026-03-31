@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from harness.core.config import HarnessConfig
+from harness.core.registry import Registry
 from harness.core.state import SessionState, StateMachine
 from harness.core.ui import get_ui, init_ui
 from harness.drivers.resolver import DriverResolver
@@ -57,7 +58,8 @@ def run_auto(*, resume: bool = False, verbose: bool = False) -> None:
 
     sm.clear_stop_signal()
 
-    results = run_autonomous(config, sm, resolver, resume=resume)
+    registry = Registry(agents_dir)
+    results = run_autonomous(config, sm, resolver, resume=resume, registry=registry)
 
     sm.end_session()
 
