@@ -89,7 +89,10 @@ def _compose_full_output(event_log: list[str], final_result: str) -> str:
     return "\n".join(parts)
 
 
-_NOT_READY_PATTERNS = ("not found", "installing", "install ")
+_NOT_READY_PATTERNS = (
+    "cursor-agent not found",
+    "not found, installing",
+)
 
 _PROBE_TIMEOUT = 8
 
@@ -145,9 +148,6 @@ class CursorDriver:
             if any(p in help_text for p in _NOT_READY_PATTERNS):
                 functional = False
                 warnings.append(t("driver.cursor_not_ready"))
-            elif help_result.returncode != 0:
-                functional = False
-                warnings.append(t("driver.cursor_not_ready"))
             else:
                 for flag in ("--print", "--output-format", "--stream-partial-output"):
                     if flag not in help_text:
@@ -156,8 +156,7 @@ class CursorDriver:
             functional = False
             warnings.append(t("driver.cursor_not_ready"))
         except Exception:
-            functional = False
-            warnings.append(t("driver.cursor_not_ready"))
+            warnings.append("could not probe cursor agent flags")
 
         self._probe_result = DriverProbe(
             available=functional, version=version, warnings=warnings,

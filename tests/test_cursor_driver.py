@@ -235,7 +235,8 @@ def test_probe_not_available_on_timeout(mock_which: Mock, mock_run: Mock) -> Non
 
 @patch("harness.drivers.cursor.subprocess.run")
 @patch("harness.drivers.cursor.shutil.which", return_value="/usr/bin/cursor")
-def test_probe_not_available_on_nonzero_exit(mock_which: Mock, mock_run: Mock) -> None:
+def test_probe_still_available_on_nonzero_exit_without_failure_pattern(mock_which: Mock, mock_run: Mock) -> None:
+    """Non-zero exit from --help alone should NOT mark as unavailable."""
     def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
         r = MagicMock()
         if "agent" in cmd:
@@ -247,4 +248,5 @@ def test_probe_not_available_on_nonzero_exit(mock_which: Mock, mock_run: Mock) -
     mock_run.side_effect = _side_effect
     driver = CursorDriver()
     probe = driver.probe()
-    assert probe.available is False
+    assert probe.available is True
+    assert len(probe.warnings) > 0
