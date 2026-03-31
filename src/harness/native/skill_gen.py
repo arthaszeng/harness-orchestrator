@@ -36,6 +36,7 @@ _RULE_TEMPLATES = [
     ("rule-trust-boundary.mdc.j2", "harness-trust-boundary"),
     ("rule-workflow.mdc.j2", "harness-workflow"),
     ("rule-fix-first.mdc.j2", "harness-fix-first"),
+    ("rule-safety-guardrails.mdc.j2", "harness-safety-guardrails"),
 ]
 
 

@@ -1,0 +1,73 @@
+---
+description: "Harness Safety Guardrails: detect and warn before executing destructive commands"
+alwaysApply: true
+---
+
+# Safety Guardrails — Destructive Command Detection
+
+Before executing any shell command, check it against the patterns below.
+If a match is found, output a warning and explain the risk before proceeding.
+
+## Destructive Command Patterns
+
+### File System Destruction
+- `rm -rf` / `rm -r` / `rm --recursive` — recursive deletion
+- `rm -f` on non-trivial paths — forced deletion without confirmation
+- `find ... -delete` — bulk file deletion
+- `chmod -R 777` — opens all files to all users
+
+### Database Destruction
+- `DROP TABLE` / `DROP DATABASE` / `DROP SCHEMA`
+- `TRUNCATE TABLE` / `DELETE FROM` without WHERE clause
+- `ALTER TABLE ... DROP COLUMN`
+
+### Git Destructive Operations
+- `git push --force` / `git push -f` — rewrites remote history
+- `git reset --hard` — discards uncommitted changes permanently
+- `git checkout .` / `git restore .` — discards all working tree changes
+- `git clean -fd` — removes untracked files and directories
+- `git branch -D` — force-deletes a branch (even unmerged)
+
+### Container / Infrastructure
+- `kubectl delete` — removes Kubernetes resources
+- `docker rm -f` — force-removes running containers
+- `docker system prune` — removes all unused Docker data
+- `terraform destroy` — tears down infrastructure
+
+### Package / Environment
+- `pip install` without virtualenv — modifies global Python
+- `npm install -g` — modifies global Node packages
+
+## Safe Exceptions
+
+These patterns are common cleanup operations and should NOT trigger warnings:
+
+- `rm -rf node_modules` / `rm -rf dist` / `rm -rf build`
+- `rm -rf __pycache__` / `rm -rf .cache` / `rm -rf .pytest_cache`
+- `rm -rf .mypy_cache` / `rm -rf .ruff_cache`
+- `rm -rf *.egg-info` / `rm -rf .eggs`
+- `rm -rf coverage` / `rm -rf htmlcov`
+- `rm -rf .tox` / `rm -rf .nox`
+- `git push --force-with-lease` (safe force push — respects remote state)
+
+## Behavior on Match
+
+When a destructive command is detected:
+
+1. **Output warning:**
+   ```
+   ⚠️  SAFETY GUARDRAIL: Destructive command detected
+   Command: <the command>
+   Risk: <specific risk description>
+   ```
+
+2. **Suggest safer alternative** (if one exists):
+   - `rm -rf` → verify path first with `ls`, or use trash/safe-rm
+   - `git push --force` → `git push --force-with-lease`
+   - `git reset --hard` → `git stash` first
+   - `DELETE FROM` without WHERE → add explicit WHERE clause
+
+3. **Proceed only if:**
+   - The user explicitly confirmed the command
+   - OR the path matches a safe exception above
+   - OR the context makes the intent clear (e.g., CI cleanup step)
