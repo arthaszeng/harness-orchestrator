@@ -189,3 +189,84 @@ def test_resolve_model_empty_when_no_config(
     resolver = DriverResolver(_make_config())
     # 无配置时返回空字符串（使用 IDE 默认模型）
     assert resolver.resolve_model("planner") == ""
+
+
+@patch("harness.drivers.resolver.CursorDriver")
+@patch("harness.drivers.resolver.CodexDriver")
+def test_resolve_model_zero_config_all_known_roles(
+    MockCodex: Mock, MockCursor: Mock,
+) -> None:
+    """零配置时，所有已知角色通过 resolver 均返回空字符串。"""
+    from harness.core.config import KNOWN_MODEL_ROLES
+
+    cursor_inst = MockCursor.return_value
+    cursor_inst.is_available.return_value = True
+    cursor_inst.probe.return_value = CursorProbe(available=True, version="1.0")
+    cursor_inst.name = "cursor"
+
+    codex_inst = MockCodex.return_value
+    codex_inst.is_available.return_value = True
+    codex_inst.probe.return_value = CodexProbe(available=True, version="0.5")
+    codex_inst.name = "codex"
+
+    resolver = DriverResolver(_make_config())
+    for role in KNOWN_MODEL_ROLES:
+        assert resolver.resolve_model(role) == "", f"role={role} should return empty"
+
+
+@patch("harness.drivers.resolver.CursorDriver")
+@patch("harness.drivers.resolver.CodexDriver")
+def test_resolve_model_role_override_with_driver_routing(
+    MockCodex: Mock, MockCursor: Mock,
+) -> None:
+    """role_overrides 正确覆盖，即使 driver 路由将角色分配到不同 driver。"""
+    cursor_inst = MockCursor.return_value
+    cursor_inst.is_available.return_value = True
+    cursor_inst.probe.return_value = CursorProbe(available=True, version="1.0")
+    cursor_inst.name = "cursor"
+
+    codex_inst = MockCodex.return_value
+    codex_inst.is_available.return_value = True
+    codex_inst.probe.return_value = CodexProbe(available=True, version="0.5")
+    codex_inst.name = "codex"
+
+    cfg = _make_config(models={
+        "default": "",
+        "driver_defaults": {"codex": "o3"},
+        "role_overrides": {"builder": "claude-sonnet-4-20250514"},
+    })
+    resolver = DriverResolver(cfg)
+
+    # builder 走 cursor（auto 模式），但 role_overrides 优先
+    assert resolver.resolve_model("builder") == "claude-sonnet-4-20250514"
+    # evaluator 走 codex，命中 driver_defaults
+    assert resolver.resolve_model("evaluator") == "o3"
+    # reflector 走 codex，命中 driver_defaults
+    assert resolver.resolve_model("reflector") == "o3"
+
+
+@patch("harness.drivers.resolver.CursorDriver")
+@patch("harness.drivers.resolver.CodexDriver")
+def test_resolve_model_driver_default_only(
+    MockCodex: Mock, MockCursor: Mock,
+) -> None:
+    """仅配置 driver_defaults 时，按角色实际 driver 正确分流。"""
+    cursor_inst = MockCursor.return_value
+    cursor_inst.is_available.return_value = True
+    cursor_inst.probe.return_value = CursorProbe(available=True, version="1.0")
+    cursor_inst.name = "cursor"
+
+    codex_inst = MockCodex.return_value
+    codex_inst.is_available.return_value = True
+    codex_inst.probe.return_value = CodexProbe(available=True, version="0.5")
+    codex_inst.name = "codex"
+
+    cfg = _make_config(models={
+        "driver_defaults": {"codex": "o3", "cursor": "claude-sonnet-4-20250514"},
+    })
+    resolver = DriverResolver(cfg)
+
+    # auto 模式: builder → cursor, 其他 → codex
+    assert resolver.resolve_model("builder") == "claude-sonnet-4-20250514"
+    assert resolver.resolve_model("planner") == "o3"
+    assert resolver.resolve_model("evaluator") == "o3"
