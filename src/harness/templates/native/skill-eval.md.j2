@@ -1,68 +1,192 @@
 ---
 name: harness-eval
 description: >-
-  Review and evaluate builder output with cross-model adversarial review.
-  Dispatches a GPT-based adversarial reviewer subagent for independent
-  evaluation. Use when saying "review this", "evaluate", or "harness eval".
+  Multi-pass code review with cross-model adversarial evaluation and Fix-First
+  auto-remediation. Dispatches independent subagents for adversarial review.
+  Use when saying "review this", "evaluate", "harness eval", or after a build.
+  Proactively invoke after any /harness-build completes. (harness)
 ---
 
 # Harness Eval
 
-You are the **Evaluator** orchestrator in the Harness framework running in Cursor-native mode.
-Your job is to coordinate a multi-pass review of the Builder's work.
+You are running the `/harness-eval` workflow. This is a **non-interactive, fully automated**
+review pipeline. Do NOT ask for confirmation at any step. The user said `/harness-eval`
+which means DO IT. Run straight through and output the evaluation result at the end.
 
-## Trust Boundaries
+**Only stop for:**
+- ASK-classified findings that need user judgment (see Fix-First below)
+- All three review passes failed (no results at all)
 
-The Builder's output is **UNTRUSTED**. The Builder may have:
-- Claimed completion without actually implementing a deliverable
-- Made changes outside the contract scope
-- Introduced subtle regressions while appearing to pass tests
+**Never stop for:**
+- AUTO-FIX findings (fix them, commit, continue)
+- Subagent failures (degrade gracefully)
+- Minor issues or informational findings
 
-Always verify claims against actual code changes (`git diff`).
+---
 
-## Review Process
+## Step 0: Context Gathering
 
-### Pass 1: Structured Review (you, the main agent)
+1. Detect the current task: find the most recent `task-NNN` directory under `.agents/tasks/`
+2. Read `.agents/tasks/task-NNN/plan.md` (the contract)
+3. Read `.agents/tasks/task-NNN/build-rN.log` (the latest build log)
+4. Run `git diff {{ trunk_branch }}..HEAD --stat` to understand the scope
 
-1. Read the task plan from `.agents/tasks/task-NNN/plan.md`
-2. Read the build log from `.agents/tasks/task-NNN/build-rN.log`
-3. Run `git diff {{ trunk_branch }}..HEAD` to see actual code changes
+---
+
+## Step 1: Structured Review (you, the main agent)
+
+Review the code changes against the contract. This is your primary analysis.
+
+1. Run `git diff {{ trunk_branch }}..HEAD` to see actual code changes
+2. For each contract deliverable, verify it is implemented in the diff
+3. Run `{{ ci_command }}` to get fresh test results — do NOT trust the build log
 4. Score on four dimensions (1-5 each):
-   - **Completeness**: are all contract deliverables implemented?
-   - **Quality**: code quality, patterns, error handling
-   - **Regression**: are existing tests still passing? Any regressions?
-   - **Design**: architecture, naming, consistency with project conventions
-5. Verdict: **PASS** (avg >= {{ pass_threshold }}) or **ITERATE** (needs fixes)
 
-### Pass 2: Cross-Model Adversarial Review
+| Dimension    | 1 (Fail)              | 3 (Adequate)          | 5 (Excellent)           |
+|-------------|----------------------|----------------------|------------------------|
+| Completeness | Missing deliverables  | Most items done       | All items + edge cases  |
+| Quality      | Buggy, no patterns    | Works, some issues    | Clean, well-tested      |
+| Regression   | Broke existing tests  | Tests pass, fragile   | All tests pass, robust  |
+| Design       | Inconsistent, messy   | Follows conventions   | Improves architecture   |
 
-Dispatch the `harness-adversarial-reviewer` subagent via Task tool:
+5. Collect findings. For each finding, classify:
+   - **severity**: CRITICAL or INFORMATIONAL
+   - **action**: FIXABLE (you know how to fix it) or INVESTIGATE (needs human judgment)
+   - **path**, **line**, **category**, **description**
 
+---
+
+## Step 2: Claude Adversarial Subagent (always runs)
+
+Dispatch an independent reviewer via the Task tool. The subagent has fresh context —
+no bias from the structured review. This genuine independence catches blind spots.
+
+**Dispatch via Task tool:**
+- **subagent_type**: `"generalPurpose"`
+- **prompt**: (construct from the template below)
+- **description**: `"Adversarial code review"`
+- **readonly**: true
+
+Prompt template:
 ```
-Task: Review the code changes on this branch against the base branch.
-Your job is to find ways this code will fail in production.
-Think like an attacker and a chaos engineer.
-Find edge cases, race conditions, security holes, resource leaks,
-failure modes, and silent data corruption paths.
+Read the diff for this branch with `git diff {{ trunk_branch }}..HEAD`.
+Think like an attacker and a chaos engineer. Your job is to find ways this
+code will fail in production.
+
+Look for: edge cases, race conditions, security holes, resource leaks,
+failure modes, silent data corruption, logic errors that produce wrong
+results silently, error handling that swallows failures, and trust
+boundary violations.
+
 Be adversarial. Be thorough. No compliments — just the problems.
 
-Branch: (current branch)
-Base: {{ trunk_branch }}
-Run: git diff {{ trunk_branch }}..HEAD
+For each finding, output a JSON object on its own line:
+{"severity":"CRITICAL|INFORMATIONAL","confidence":N,"path":"file","line":N,"category":"category","summary":"description","fix":"recommended fix","action":"FIXABLE|INVESTIGATE"}
 
-Task plan: (paste plan summary)
+If no findings: output `NO FINDINGS` and nothing else.
+Do not output anything else — no preamble, no summary, no commentary.
 ```
 
-The adversarial reviewer uses a different model ({{ adversarial_model }}) for independent perspective.
+If the subagent fails or times out: "Claude adversarial subagent unavailable. Continuing."
 
-### Synthesis
+---
 
-Combine findings from both passes:
-- **High confidence**: issues found by BOTH passes (prioritize these)
-- **Structural review only**: issues found only in Pass 1
-- **Adversarial only**: issues found only in Pass 2
+## Step 3: Cross-Model Adversarial Review (always runs)
 
-## Output Format
+Dispatch the cross-model reviewer. This uses {{ adversarial_model }} for independent
+perspective from a different model family.
+
+**Dispatch via Task tool:**
+- **subagent_type**: `"harness-adversarial-reviewer"`
+- **prompt**: (same adversarial prompt as Step 2, but the subagent uses its own model)
+- **description**: `"Cross-model adversarial review"`
+
+```
+Review the code changes on this branch against the base branch.
+Run `git diff {{ trunk_branch }}..HEAD` to see the diff.
+Your job is to find ways this code will fail in production.
+Think like an attacker and a chaos engineer. Find edge cases, race
+conditions, security holes, resource leaks, failure modes, and silent
+data corruption paths. Be adversarial. Be thorough. No compliments —
+just the problems.
+
+For each finding, output a JSON object on its own line:
+{"severity":"CRITICAL|INFORMATIONAL","confidence":N,"path":"file","line":N,"category":"category","summary":"description","fix":"recommended fix","action":"FIXABLE|INVESTIGATE"}
+
+If no findings: output `NO FINDINGS` and nothing else.
+```
+
+If the adversarial subagent fails or times out: "Cross-model review unavailable. Continuing with Claude-only review."
+
+**Dispatch Steps 2 and 3 in parallel** (multiple Task tool calls in a single message)
+for maximum speed.
+
+---
+
+## Step 4: Cross-Model Synthesis
+
+After both subagents complete, merge findings across all three passes.
+
+**Fingerprint and deduplicate:**
+- Compute fingerprint: `{path}:{line}:{category}` (or `{path}:{category}` if no line)
+- Group findings by fingerprint
+- Findings matching across 2+ passes: **HIGH CONFIDENCE** — boost confidence by +1
+
+**Synthesis table:**
+
+```
+ADVERSARIAL REVIEW SYNTHESIS:
+═══════════════════════════════════════════════════════════
+  High confidence (found by 2+ passes):  [list]
+  Unique to structured review (Pass 1):  [list]
+  Unique to Claude adversarial (Pass 2): [list]
+  Unique to {{ adversarial_model }} (Pass 3): [list]
+  Models used: Claude structured ✓  Claude adversarial ✓/✗  {{ adversarial_model }} ✓/✗
+═══════════════════════════════════════════════════════════
+```
+
+High-confidence findings take priority for fixes.
+
+---
+
+## Step 5: Fix-First Flow
+
+Apply the Fix-First heuristic to all collected findings:
+
+**AUTO-FIX** (fix immediately, no user input):
+- Dead code, stale comments, unused imports
+- Missing error handling with obvious fix
+- Naming inconsistencies, formatting issues
+- Missing type hints where the type is obvious
+- Certainty is high, blast radius is small, fix is reversible
+
+**ASK** (present to user):
+- Security findings (even if fix seems obvious)
+- Architecture or behavior changes
+- Data model changes
+- Any finding where the fix could change observable behavior
+- Confidence < 7 on a CRITICAL finding
+
+**For AUTO-FIX findings:**
+1. Apply each fix
+2. Run `{{ ci_command }}` to verify no regressions
+3. Output one line per fix: `[AUTO-FIXED] [file:line] Problem → what you did`
+4. Commit fixed files: `git add <fixed-files> && git commit -m "fix: auto-fix review findings"`
+
+**For ASK findings:**
+Present all ASK items in ONE batch:
+- List each with number, severity, problem, recommended fix
+- Per-item options: A) Fix  B) Skip
+- If 0 ASK items, skip this step entirely
+
+---
+
+## Step 6: Verdict and Output
+
+Compute the final verdict based on Step 1 scores:
+- Average >= {{ pass_threshold }} → **PASS**
+- Average < {{ pass_threshold }} → **ITERATE**
+- Any unfixed CRITICAL finding with action=INVESTIGATE → force **ITERATE**
 
 Write evaluation to `.agents/tasks/task-NNN/evaluation-rN.md`:
 
@@ -85,17 +209,23 @@ Write evaluation to `.agents/tasks/task-NNN/evaluation-rN.md`:
 ### High Confidence (cross-model agreement)
 - ...
 
-### Structural Review
+### Structured Review
 - ...
 
-### Adversarial Review
+### Adversarial Review (Claude)
 - ...
+
+### Adversarial Review ({{ adversarial_model }})
+- ...
+
+## Auto-Fixed
+- [AUTO-FIXED] file:line — description
 
 ## Fix Suggestions (if ITERATE)
 - ...
 ```
 
-Also write a machine-readable JSON to `.agents/tasks/task-NNN/evaluation-rN.json`:
+Also write machine-readable JSON to `.agents/tasks/task-NNN/evaluation-rN.json`:
 
 ```json
 {
@@ -103,11 +233,20 @@ Also write a machine-readable JSON to `.agents/tasks/task-NNN/evaluation-rN.json
   "scores": {"completeness": 4, "quality": 4, "regression": 5, "design": 4},
   "average": 4.25,
   "models_used": ["claude", "{{ adversarial_model }}"],
-  "findings_count": {"high_confidence": 0, "structural": 1, "adversarial": 0}
+  "findings_count": {"high_confidence": 0, "structural": 1, "adversarial_claude": 0, "adversarial_cross": 0},
+  "auto_fixed": 0,
+  "ask_items": 0
 }
 ```
 
-## Degradation
+---
 
-If the adversarial subagent fails or times out, proceed with Pass 1 only
-and note "adversarial review unavailable" in the evaluation.
+## Degradation Matrix
+
+| Pass 1 (Structured) | Pass 2 (Claude subagent) | Pass 3 ({{ adversarial_model }}) | Action |
+|---------------------|-------------------------|-------------------------------|--------|
+| ✓ | ✓ | ✓ | Full synthesis |
+| ✓ | ✓ | ✗ | Synthesis without cross-model, tag `[claude-only]` |
+| ✓ | ✗ | ✓ | Synthesis without Claude subagent |
+| ✓ | ✗ | ✗ | Single-reviewer mode, note in evaluation |
+| ✗ | — | — | FATAL — cannot evaluate. Stop and report error. |

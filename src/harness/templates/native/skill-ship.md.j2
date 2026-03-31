@@ -1,84 +1,280 @@
 ---
 name: harness-ship
 description: >-
-  End-to-end shipping workflow: plan, build, eval, fix loop, commit, push,
-  and create PR. Composite skill that orchestrates the full harness pipeline.
-  Use when saying "ship this", "harness ship", or "build and deploy".
+  Fully automated shipping pipeline: merge base, test, review, adversarial eval,
+  fix loop, bisectable commits, push, PR. One command — next thing you see is the
+  PR URL. Use when saying "ship this", "harness ship", "push", or "create a PR".
+  Proactively invoke when user says code is ready or asks to deploy. (harness)
 ---
 
-# Harness Ship (Composite)
+# Harness Ship — Fully Automated Pipeline
 
-You are running the full Harness shipping pipeline in Cursor-native mode.
-This is a composite skill that orchestrates plan → build → eval → ship.
+You are running the `/harness-ship` workflow. This is a **non-interactive, fully automated**
+pipeline. Do NOT ask for confirmation at any step. The user said `/harness-ship` which
+means DO IT. Run straight through and output the PR URL at the end.
 
-## Pre-flight Checks
+**Only stop for:**
+- On the trunk branch (abort)
+- Merge conflicts that cannot be auto-resolved (stop, show conflicts)
+- In-branch test failures that survive triage (pre-existing are triaged, not blocking)
+- ASK-classified review findings that need user judgment
+- Evaluation score stays below {{ pass_threshold }} after {{ max_iterations }} iterations
 
-1. Verify you are NOT on the trunk branch (`{{ trunk_branch }}`). If so, create a feature branch first.
-2. Run `git status` to ensure a clean working tree
-3. Check `.agents/config.toml` exists
+**Never stop for:**
+- Uncommitted changes (always include them)
+- Version bump choice (auto-pick PATCH)
+- Commit message approval (auto-commit)
+- PR content (auto-generate)
+- AUTO-FIX review findings (fix and continue)
 
-## Pipeline Steps
+---
 
-### Step 1: Plan
+## Step 1: Pre-flight
 
-If no plan exists for the current task:
-1. Ask the user for the requirement (or read it from context)
-2. Follow the `/harness-plan` workflow to produce Spec + Contract
-3. Write to `.agents/tasks/task-NNN/plan.md`
+1. Check the current branch. If on `{{ trunk_branch }}`, **abort**: "You're on the trunk branch. Ship from a feature branch."
 
-If a plan already exists, confirm with the user whether to use it or re-plan.
+2. Run `git status`. Uncommitted changes are always included — no need to ask.
 
-### Step 2: Build
+3. Run `git diff {{ trunk_branch }}...HEAD --stat` and `git log {{ trunk_branch }}..HEAD --oneline` to understand what's being shipped.
 
-1. Follow the `/harness-build` workflow
-2. Implement all contract deliverables
-3. Run CI: `{{ ci_command }}`
-4. Write build log to `.agents/tasks/task-NNN/build-rN.log`
+4. Check `.agents/config.toml` exists.
 
-### Step 3: Evaluate
+5. Detect the current task: find the most recent `task-NNN` directory under `.agents/tasks/`.
+   If a plan exists at `.agents/tasks/task-NNN/plan.md`, read it for context.
 
-1. Follow the `/harness-eval` workflow
-2. Dispatch adversarial reviewer ({{ adversarial_model }})
-3. Write evaluation to `.agents/tasks/task-NNN/evaluation-rN.md`
+---
 
-### Step 4: Fix Loop (if ITERATE)
+## Step 2: Merge the base branch (BEFORE tests)
+
+Fetch and merge the base branch so tests run against the merged state:
+
+```bash
+git fetch origin {{ trunk_branch }} && git merge origin/{{ trunk_branch }} --no-edit
+```
+
+**If merge conflicts:** Try to auto-resolve simple conflicts (VERSION, CHANGELOG ordering).
+If conflicts are complex or ambiguous, **STOP** and show them.
+
+**If already up to date:** Continue silently.
+
+---
+
+## Step 3: Run Tests (on merged code)
+
+Run the full test suite:
+
+```bash
+{{ ci_command }}
+```
+
+**If any test fails:** Do NOT immediately stop. Apply the Test Failure Ownership Triage:
+
+### Test Failure Triage
+
+For each failing test, determine ownership:
+
+1. Run the same test on the base branch:
+   ```bash
+   git stash && git checkout {{ trunk_branch }} && {{ ci_command }} 2>&1; git checkout - && git stash pop
+   ```
+   (Or use `git diff` to check if the failing test file was modified on this branch)
+
+2. **Pre-existing failure** (fails on base branch too): Note it, continue. Not your problem.
+3. **In-branch failure** (passes on base, fails on HEAD): This IS your problem. Must fix.
+
+**After triage:** If in-branch failures remain, enter the fix loop (Step 5).
+If all failures were pre-existing, continue to Step 3.5.
+
+**If all pass:** Continue silently — note the counts briefly.
+
+---
+
+## Step 3.5: Plan Completion Audit
+
+If a plan file exists at `.agents/tasks/task-NNN/plan.md`:
+
+1. Extract every actionable item (checkboxes, numbered steps, imperative statements)
+2. Cross-reference against `git diff {{ trunk_branch }}...HEAD`
+3. Classify each: **DONE** / **PARTIAL** / **NOT DONE** / **CHANGED**
+4. Output:
+
+```
+PLAN COMPLETION AUDIT
+═══════════════════════════════════
+  [DONE]      Deliverable 1 — file(s) changed
+  [DONE]      Deliverable 2 — file(s) changed
+  [NOT DONE]  Deliverable 3 — no evidence in diff
+═══════════════════════════════════
+COMPLETION: X/Y DONE, M PARTIAL, K NOT DONE
+```
+
+If any NOT DONE items: note them in the PR body. Continue — this is informational, not blocking.
+
+---
+
+## Step 3.8: Pre-Landing Review + Adversarial (always-on)
+
+Run the full `/harness-eval` workflow inline. This includes:
+
+1. **Pass 1**: Structured review — score on 4 dimensions, collect findings
+2. **Pass 2**: Claude adversarial subagent — dispatch via Task tool:
+   - **subagent_type**: `"generalPurpose"`
+   - **prompt**: "Read the diff with `git diff {{ trunk_branch }}..HEAD`. Think like an attacker and chaos engineer. Find ways this code will fail in production. Edge cases, race conditions, security holes, resource leaks, failure modes, silent data corruption. No compliments — just problems. Output JSON findings: {\"severity\":\"CRITICAL|INFORMATIONAL\",\"confidence\":N,\"path\":\"file\",\"line\":N,\"category\":\"cat\",\"summary\":\"desc\",\"fix\":\"fix\",\"action\":\"FIXABLE|INVESTIGATE\"}"
+   - **description**: `"Adversarial code review"`
+   - **readonly**: true
+
+3. **Pass 3**: Cross-model adversarial — dispatch via Task tool:
+   - **subagent_type**: `"harness-adversarial-reviewer"`
+   - **prompt**: (same adversarial prompt — the subagent uses {{ adversarial_model }})
+   - **description**: `"Cross-model adversarial review"`
+
+**Dispatch Passes 2 and 3 in parallel** (multiple Task calls in one message).
+
+4. **Cross-model synthesis**: Merge findings. High confidence = found by 2+ passes.
+
+5. **Fix-First flow**:
+   - **AUTO-FIX** findings: apply fixes, commit: `git commit -m "fix: auto-fix review findings"`
+   - **ASK** findings: present in one batch. Per-item: A) Fix, B) Skip.
+
+6. **Compute scores and verdict**: avg >= {{ pass_threshold }} → PASS, else → ITERATE.
+
+Write evaluation to `.agents/tasks/task-NNN/evaluation-rN.md` and `.json`.
+
+---
+
+## Step 4: Scope Drift Detection
+
+Check: did the diff deliver what was planned — nothing more, nothing less?
+
+1. Read plan (if exists), commit messages, and TODOS.md for stated intent
+2. Run `git diff {{ trunk_branch }}...HEAD --stat` and compare against intent
+3. Output:
+
+```
+Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
+Intent: <1-line summary>
+Delivered: <1-line summary>
+[If drift: list each out-of-scope change]
+[If missing: list each unaddressed requirement]
+```
+
+This is **INFORMATIONAL** — does not block shipping.
+
+---
+
+## Step 5: Fix Loop (if ITERATE)
 
 If evaluation verdict is ITERATE:
-1. Read the evaluation feedback
-2. Go back to Step 2 with the feedback as additional context
-3. Maximum {{ max_iterations }} iterations
 
-### Step 5: Version + Commit
+1. Read the evaluation feedback (specific fix suggestions)
+2. Apply fixes to the code
+3. Run `{{ ci_command }}` to verify
+4. Re-run evaluation (Step 3.8) with incremented round number
+5. Maximum {{ max_iterations }} total iterations
 
-Once evaluation passes:
-1. If `VERSION` file exists, bump the patch version
-2. Stage all changes: `git add -A`
-3. Commit with message format: `<type>(scope): description`
-4. Use conventional commit types: feat, fix, refactor, test, docs, chore
+If still ITERATE after {{ max_iterations }} rounds: **STOP**. Report the scores and
+unresolved findings.
 
-### Step 6: Push + PR
+---
 
-1. Push the branch: `git push -u origin HEAD`
-2. Create a PR using `gh pr create` (if `gh` is available)
-3. Include in PR body:
-   - Summary of changes
-   - Evaluation scores
-   - Test results
+## Step 6: Version + Commit (bisectable chunks)
 
-## Stop Conditions
+Once evaluation PASSES:
 
-Stop the pipeline and ask the user if:
-- On the trunk branch and no feature branch exists
-- CI fails after {{ max_iterations }} iterations
-- Evaluation score stays below {{ pass_threshold }} after all iterations
-- Merge conflicts that cannot be auto-resolved
+1. **Version bump**: If a `VERSION` file exists, bump PATCH (auto-decide).
+   If `pyproject.toml` has a version field, bump it too.
+
+2. **Bisectable commits**: Analyze the diff and group into logical commits:
+   - Infrastructure/config changes first
+   - Core logic + tests together
+   - VERSION/CHANGELOG in the final commit
+   - Each commit must be independently valid
+
+3. **Commit format**: `<type>(scope): description`
+   Types: feat, fix, refactor, test, docs, chore
+
+4. Stage and commit by file groups (not `git add -A`):
+   ```bash
+   git add <specific-files> && git commit -m "<type>(scope): description"
+   ```
+
+---
+
+## Step 7: Verification Gate
+
+**Before pushing, verify if code changed during Steps 4-6:**
+
+1. If ANY code changed after Step 3's test run (review fixes, version bumps don't count),
+   re-run `{{ ci_command }}`. Paste fresh output.
+2. **"Should work now" is not evidence. Run it.**
+3. If tests fail: STOP. Fix and return to Step 3.
+
+---
+
+## Step 8: Push + PR
+
+1. Push with upstream tracking:
+   ```bash
+   git push -u origin HEAD
+   ```
+
+2. Create PR:
+   ```bash
+   gh pr create --base {{ trunk_branch }} --title "<type>: <summary>" --body "$(cat <<'EOF'
+   ## Summary
+   <summarize ALL changes — group by logical section>
+
+   ## Evaluation Scores
+   | Dimension | Score |
+   |-----------|-------|
+   | Completeness | X/5 |
+   | Quality | X/5 |
+   | Regression | X/5 |
+   | Design | X/5 |
+   | **Average** | **X.X/5** |
+
+   ## Review Findings
+   - High confidence: N findings
+   - Auto-fixed: M findings
+   - Models used: Claude structured ✓ Claude adversarial ✓/✗ {{ adversarial_model }} ✓/✗
+
+   ## Plan Completion
+   <completion checklist summary, or "No plan file">
+
+   ## Scope Check
+   <CLEAN or list drift/missing items>
+
+   ## Test Results
+   - [x] All tests pass (N tests)
+
+   EOF
+   )"
+   ```
+
+   If `gh` is not available: print branch name and remote URL for manual PR creation.
+
+3. Output the PR URL.
+
+---
 
 ## State Persistence
 
 All state is persisted in `.agents/tasks/task-NNN/`:
-- `plan.md` — the plan
+- `plan.md` — the plan (if exists)
 - `build-rN.log` — build logs per round
 - `evaluation-rN.md` — evaluations per round
 - `evaluation-rN.json` — machine-readable scores
 
-If interrupted, the pipeline can be resumed by checking which artifacts exist.
+If interrupted, resume by checking which artifacts exist and which round number is latest.
+
+---
+
+## Important Rules
+
+- **Never skip tests.** If tests fail after triage, stop.
+- **Never skip the adversarial review.** At minimum Pass 1 must complete.
+- **Never force push.** Use regular `git push` only.
+- **Never ask for trivial confirmations.** Auto-commit, auto-push, auto-PR.
+- **Split commits for bisectability** — each commit = one logical change.
+- **Never push without fresh verification evidence.** If code changed after tests, re-run.
+- **The goal is: user says `/harness-ship`, next thing they see is the PR URL.**

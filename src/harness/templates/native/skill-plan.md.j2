@@ -1,39 +1,62 @@
 ---
 name: harness-plan
 description: >-
-  Plan and decompose tasks for the harness workflow. Analyzes requirements,
-  produces a technical spec and iterative contract. Use when starting a new
-  task, saying "plan this", "break this down", or "harness plan".
+  Plan and decompose tasks with adversarial spec review. Analyzes requirements,
+  produces a technical spec and iterative contract, then runs an adversarial
+  review loop to harden the plan. Use when starting a new task, saying "plan
+  this", "break this down", or "harness plan". (harness)
 ---
 
 # Harness Plan
 
-You are the **Planner** role in the Harness framework running in Cursor-native mode.
+You are running the `/harness-plan` workflow. This is a **non-interactive** planning
+pipeline. Do NOT ask for confirmation except when the requirement itself is ambiguous.
+Produce the plan, run adversarial review, and output the final hardened plan.
+
+**Only stop for:**
+- Ambiguous requirements (ask for clarification ONCE, then proceed with best interpretation)
+
+**Never stop for:**
+- Plan format approval
+- Confirmation before writing to disk
+- Spec review findings (auto-fix them)
+
+---
 
 ## Core Principles
 
 {{ planner_principles }}
 
-## Workflow
+---
+
+## Step 1: Context Gathering
 
 1. Read the user's requirement carefully
-2. Gather project context: read `.agents/config.toml`, `.agents/vision.md`, and scan the project structure
-3. Produce a **Spec** (technical specification) and **Contract** (delivery checklist)
-4. Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed)
+2. Read `.agents/config.toml` and `.agents/vision.md` (if they exist)
+3. Scan the project structure: key directories, languages, frameworks, existing patterns
+4. Run `git log --oneline -10` for recent activity context
+5. Check existing task directories: `ls .agents/tasks/` to determine the next task number
 
-## Output Format
+---
+
+## Step 2: Produce Spec + Contract
+
+Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed).
 
 ```markdown
 # Spec
 
 ## Analysis
-(Technical analysis of the requirement)
+(Technical analysis of the requirement — what problem is being solved, why it matters)
 
 ## Approach
-(Implementation approach and key decisions)
+(Implementation approach, key decisions, alternatives considered and why rejected)
+
+## Impact
+(Files affected, blast radius, dependencies)
 
 ## Risks
-(Potential risks and mitigations)
+(Potential risks and mitigations — what could go wrong)
 
 ---
 
@@ -47,15 +70,98 @@ You are the **Planner** role in the Harness framework running in Cursor-native m
 ## Acceptance Criteria
 - All tests pass
 - No regressions introduced
+- (specific criteria from the requirement)
+
+## Out of Scope
+- (explicitly list things NOT being done)
 ```
 
-## Task Directory Convention
+**Quality bar**: Every deliverable MUST have acceptance criteria. Vague deliverables
+like "improve the code" are not acceptable — make them specific and testable.
 
-Find the next task number by checking `.agents/tasks/` for existing `task-NNN` directories.
-Create `.agents/tasks/task-NNN/plan.md` with the Spec + Contract.
+---
+
+## Step 3: Spec Review Loop (adversarial)
+
+After writing the plan to disk, dispatch an adversarial reviewer subagent to challenge it.
+
+### Iteration 1: Dispatch reviewer
+
+**Dispatch via Task tool:**
+- **subagent_type**: `"generalPurpose"`
+- **prompt**: (construct from template below)
+- **description**: `"Adversarial plan review"`
+- **readonly**: true
+
+Prompt template:
+```
+Read the plan file at .agents/tasks/task-NNN/plan.md.
+Review it on 5 dimensions. For each dimension, note PASS or list specific
+issues with suggested fixes. At the end, output a quality score (1-10)
+across all dimensions.
+
+Dimensions:
+1. **Completeness** — Are all requirements addressed? Missing edge cases?
+2. **Consistency** — Do parts of the plan agree with each other? Contradictions?
+3. **Clarity** — Could an engineer implement this without asking questions? Ambiguous language?
+4. **Scope** — Does the plan creep beyond the original problem? YAGNI violations?
+5. **Feasibility** — Can this actually be built with the stated approach? Hidden complexity?
+
+Output format:
+- Quality score (1-10)
+- PASS if no issues, or a numbered list of issues with dimension, description, and fix
+```
+
+### Iteration 2+: Fix and re-dispatch
+
+If the reviewer returns issues:
+1. Fix each issue in the plan file on disk
+2. Re-dispatch the reviewer subagent with the updated plan
+3. Maximum 3 iterations total
+
+**Convergence guard:** If the reviewer returns the same issues on consecutive iterations
+(the fix didn't resolve them), stop the loop and persist those issues as a
+"## Reviewer Concerns" section in the plan file.
+
+### Report
+
+After the loop completes (PASS, max iterations, or convergence):
+
+Output: "Plan survived N rounds of adversarial review. M issues caught and fixed.
+Quality score: X/10."
+
+If issues remain after max iterations, add to the plan:
+```markdown
+## Reviewer Concerns
+- [unresolved issue 1]
+- [unresolved issue 2]
+```
+
+---
+
+## Step 4: Cross-Model Review (optional, for complex plans)
+
+If the plan has 5+ deliverables OR touches 10+ files, also dispatch a cross-model reviewer:
+
+**Dispatch via Task tool:**
+- **subagent_type**: `"harness-adversarial-reviewer"`
+- **prompt**: "Read the plan at .agents/tasks/task-NNN/plan.md. You are a brutally honest
+  technical reviewer. Find: logical gaps, unstated assumptions, overcomplexity (is there
+  a fundamentally simpler approach?), feasibility risks, missing dependencies. No
+  compliments. Just the problems."
+- **description**: `"Cross-model plan review"`
+
+Present findings under a `CROSS-MODEL REVIEW:` header. If the cross-model reviewer
+disagrees with the primary reviewer on any point, note it as a tension point.
+
+If the subagent fails: skip silently.
+
+---
 
 ## Constraints
 
 - Do NOT implement code — only plan
 - Do NOT modify existing files outside `.agents/tasks/`
-- If the requirement is ambiguous, ask the user for clarification before producing the plan
+- Write the plan to disk BEFORE running the review loop
+- The plan must be self-contained: an engineer reading only the plan file should be
+  able to implement it without additional context

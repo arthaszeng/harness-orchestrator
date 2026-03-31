@@ -1,55 +1,146 @@
 ---
 name: harness-build
 description: >-
-  Implement code according to a harness plan/contract. Reads the plan from
-  .agents/tasks/, implements deliverables, runs CI. Use when saying "build
-  this", "implement the plan", or "harness build".
+  Implement code according to a harness plan/contract. Reads the plan, implements
+  all deliverables, runs CI, triages failures, and writes a structured build log.
+  Fully autonomous — no confirmations needed. Use when saying "build this",
+  "implement the plan", or "harness build". (harness)
 ---
 
 # Harness Build
 
-You are the **Builder** role in the Harness framework running in Cursor-native mode.
+You are running the `/harness-build` workflow. This is a **non-interactive, fully automated**
+build pipeline. Do NOT ask for confirmation at any step. The user said `/harness-build`
+which means DO IT. Implement everything and output the build result.
+
+**Only stop for:**
+- In-branch test failures that cannot be auto-fixed after triage
+- Contract deliverable that is genuinely impossible (missing dependency, infeasible requirement)
+
+**Never stop for:**
+- Implementation approach confirmation
+- "Should I proceed?" questions
+- Pre-existing test failures
+- Minor implementation decisions (make them, note in build log)
+
+---
 
 ## Core Principles
 
 {{ builder_principles }}
 
-## Workflow
+---
 
-1. Read the current task plan from `.agents/tasks/task-NNN/plan.md`
-2. If no task number is specified, find the most recent task directory
-3. Implement each deliverable in the contract
-4. After implementation, run the CI command: `{{ ci_command }}`
-5. Write a build log to `.agents/tasks/task-NNN/build-rN.log`
+## Step 1: Read the Contract
 
-## Build Log Format
+1. Find the current task: most recent `task-NNN` directory under `.agents/tasks/`
+2. Read `.agents/tasks/task-NNN/plan.md`
+3. Extract the deliverables checklist from the Contract section
+4. If this is a subsequent round (feedback exists from evaluation), also read
+   `.agents/tasks/task-NNN/evaluation-rN.md` for the fix suggestions
+
+---
+
+## Step 2: Search Before Building
+
+Before writing any code:
+
+1. Scan the project for existing patterns, utilities, and conventions
+2. Check if any deliverable can be solved by reusing existing code
+3. Note the project's testing patterns (framework, directory structure, naming)
+
+This prevents reinventing what already exists and ensures consistency.
+
+---
+
+## Step 3: Implement
+
+For each deliverable in the contract:
+
+1. Implement the code changes
+2. Write tests for new behavior (match the project's existing test patterns)
+3. Ensure type hints / type safety where the project uses them
+4. Handle error paths — do not leave bare exceptions or missing error handling
+
+**Constraints:**
+- Only modify files directly required by the contract deliverables
+- Never delete existing tests — add new tests, do not remove old ones
+- Never modify files not listed in or implied by the deliverables
+- If you discover related issues outside contract scope, note them in the build log
+  but do NOT fix them
+
+---
+
+## Step 4: Run CI
+
+Run the full test suite:
+
+```bash
+{{ ci_command }}
+```
+
+### Test Failure Triage
+
+If tests fail, determine ownership:
+
+**Pre-existing failures** (test fails on `{{ trunk_branch }}` too):
+- Note in build log: "Pre-existing failure: test_name — not introduced by this change"
+- Continue — not your problem
+
+**In-branch failures** (test passes on base, fails on HEAD):
+- This IS your problem
+- Read the failure output carefully
+- Fix the issue in your implementation
+- Re-run `{{ ci_command }}`
+- Maximum 3 fix attempts per failing test
+
+**After triage:** If in-branch failures remain after 3 attempts, note them as blockers
+in the build log and stop.
+
+---
+
+## Step 5: Write Build Log
+
+Write a structured build log to `.agents/tasks/task-NNN/build-rN.log`:
 
 ```markdown
 # Build Log — Round N
 
-## Deliverables Completed
-- [x] Deliverable 1: what was done
-- [x] Deliverable 2: what was done
+## Deliverables
+- [x] Deliverable 1: what was done, files changed
+- [x] Deliverable 2: what was done, files changed
+- [ ] Deliverable 3: NOT DONE — reason
+
+## Files Changed
+- `path/to/file1.py` — description of change
+- `path/to/file2.py` — description of change
 
 ## CI Result
-(pass/fail + summary)
+- Command: `{{ ci_command }}`
+- Result: PASS / FAIL
+- Tests: N passed, M failed
+- Pre-existing failures: K (not introduced by this change)
 
-## Notes
-(any issues encountered, decisions made)
+## Decisions Made
+- (implementation decisions you made without asking — explain rationale)
+
+## Out-of-Scope Issues Found
+- (issues discovered but not fixed — outside contract scope)
 ```
 
-## Engineering Principles
+---
 
-- **Search Before Building**: check if the project already has patterns, utilities, or
-  components that solve the problem. Prefer reusing established patterns.
-- **Completeness**: write tests for edge cases, handle error paths, add type hints
-  when the cost is small.
-- **Minimal footprint**: solve the requirement with the smallest set of changes.
+## Step 6: Commit
 
-## Constraints
+Stage and commit the implementation:
 
-- Only modify files directly required by the contract deliverables
-- Never delete existing tests — add new tests, do not remove old ones
-- Never modify files not listed in or implied by the deliverables
-- If you discover related issues outside the contract scope, note them in the build
-  log but do NOT fix them
+```bash
+git add <specific-files-changed>
+git commit -m "<type>(scope): implement task-NNN deliverables
+
+Deliverables: (list what was implemented)
+CI: all tests pass"
+```
+
+Use specific file paths — never `git add -A` or `git add .` to avoid including
+unrelated changes.
