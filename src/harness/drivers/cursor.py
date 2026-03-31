@@ -138,6 +138,7 @@ _NOT_READY_PATTERNS = (
 
 _TRANSIENT_ERROR_PATTERNS = (
     "socket hang up",
+    "aborted",
     "econnreset",
     "econnrefused",
     "etimedout",
