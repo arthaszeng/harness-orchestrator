@@ -11,7 +11,8 @@
 
 - **需求按方法论推进** — Planner 分析需求产出 spec 并协商迭代契约，而不是直接跳到写代码
 - **实现与审查分离** — Builder 按契约实现；Evaluator 独立审查，以四维评分作为质量门禁
-- **跨模型对抗评审** — Cursor 原生模式下，GPT 对抗审查器独立挑战 Claude 的产出，提高发现置信度
+- **三通道对抗评审** — Cursor 原生模式下，Claude 结构化评审 + Claude 对抗子代理 + 跨模型 GPT 审查器，跨通道高置信度综合
+- **Fix-First 自动修复** — 评审发现自动分类为 AUTO-FIX（立即修复）或 ASK（交由人类判断），保持反馈环紧凑
 - **自主但有边界** — Strategist 从 vision 中选任务，受迭代上限、通过阈值与停止信号约束
 - **全程可追溯** — 每轮迭代的 spec、contract、evaluation 以 Markdown + JSON 保存，便于审计、自动化与中断后恢复
 - **双模式** — **编排器模式**（外部 CLI 驱动 agent）或 **Cursor 原生模式**（IDE 内 skill + 子代理，无需外部进程）
@@ -49,7 +50,7 @@ cd harness-orchestrator
 
 ```bash
 harness --version
-# harness-orchestrator 1.1.0
+# harness-orchestrator 1.8.2
 ```
 
 ### 五步上手
@@ -195,24 +196,46 @@ Cursor 原生模式将整个 harness 工作流在 **Cursor IDE 内部**通过 sk
 
 | 工件 | 路径 | 用途 |
 |----------|------|---------|
-| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 规划与拆解任务为 spec + contract |
-| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | 按契约实现，运行 CI |
-| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | 多遍评审 + 跨模型对抗评估 |
-| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | 组合技：plan → build → eval → 修复循环 → commit → push → PR |
-| 对抗审查器 | `.cursor/agents/harness-adversarial-reviewer.md` | 基于 GPT 的对抗代码审查器（`model: gpt-4.1`，`readonly: true`） |
-| 评估器 | `.cursor/agents/harness-evaluator.md` | 结构化代码评估器（`model: inherit`，`readonly: true`） |
+| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 规划与拆解任务，含对抗式 spec 评审循环 |
+| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | 自主构建：按契约实现、运行 CI、分流测试失败、输出结构化构建日志 |
+| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | 三通道评审（Claude + Claude 对抗 + 跨模型）+ Fix-First 自动修复 |
+| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | 全自动流水线：合并基线 → 测试 → 评审 → 对抗评估 → 修复循环 → 可二分提交 → push → PR |
+| 对抗审查器 | `.cursor/agents/harness-adversarial-reviewer.md` | 跨模型对抗代码审查器，输出结构化 JSON（`model:` 可配置，默认 `gpt-4.1`；`readonly: true`） |
+| 评估器 | `.cursor/agents/harness-evaluator.md` | 结构化代码评估器，输出 JSON 裁定（`model: inherit`，`readonly: true`） |
 | 信任边界 | `.cursor/rules/harness-trust-boundary.mdc` | 始终生效规则：Builder 产出视为不可信 |
+| Fix-First | `.cursor/rules/harness-fix-first.mdc` | 始终生效规则：评审发现先分类 AUTO-FIX 或 ASK 再呈现 |
 | 工作流约定 | `.cursor/rules/harness-workflow.mdc` | 提交格式、分支命名、任务状态管理 |
 
-### 跨模型对抗评审
+### 三通道对抗评审
 
-`/harness-eval` skill 调度**跨模型对抗审查器** — 一个配置了不同模型族的 Cursor 子代理（默认 `gpt-4.1`），实现独立的跨模型验证：
+`/harness-eval` 和 `/harness-ship` 技能运行三通道评审流水线，并跨模型综合：
 
-1. **第一遍** — 主代理（Claude）做结构化代码审查
-2. **第二遍** — 对抗子代理（GPT）专注安全漏洞、竞态条件、边界场景
-3. **综合** — 两个模型共同标记的问题标注为高置信度
+1. **第一通道 — 结构化评审** — 主代理（Claude）在四个维度（完整性、质量、回归、设计）评分，以结构化 JSON 格式收集发现
+2. **第二通道 — Claude 对抗子代理** — 独立的 Claude 子代理以全新上下文搜寻安全漏洞、竞态条件、边界场景、资源泄漏与逻辑错误
+3. **第三通道 — 跨模型对抗** — 基于 GPT 的子代理（默认 `gpt-4.1`）从不同模型族提供独立视角
 
-对抗模型可在 `.agents/config.toml` 的 `[native] adversarial_model` 中配置。若子代理调用失败，评估将优雅降级为单模型审查。
+**综合**：按指纹（`path:line:category`）去重。被 2+ 通道发现的问题标注为**高置信度**，置信分加权提升。
+
+对抗模型可在 `.agents/config.toml` 的 `[native] adversarial_model` 中配置。第二、三通道并行调度以加速。若任一子代理失败，评估优雅降级 — 见下方降级矩阵。
+
+### Fix-First 自动修复
+
+评审后，所有发现在呈现前先分类：
+
+- **AUTO-FIX** — 高确定性、影响面小、可逆。立即修复并自动提交，附带验证测试。
+- **ASK** — 安全发现、行为变更、架构变更或关键发现置信度较低。以批次呈现给用户决策。
+
+这使评审→修复反馈环保持紧凑：琐碎问题不阻断发布，重要决策始终由人类判断。
+
+### 优雅降级
+
+| 第一通道（结构化） | 第二通道（Claude 子代理） | 第三通道（GPT） | 行为 |
+|---------------------|-------------------------|---------------|--------|
+| 正常 | 正常 | 正常 | 完整三通道综合 |
+| 正常 | 正常 | 失败 | 无跨模型综合，标记 `[claude-only]` |
+| 正常 | 失败 | 正常 | 无 Claude 子代理综合 |
+| 正常 | 失败 | 失败 | 单审查器模式，记录在评估中 |
+| 失败 | — | — | 致命 — 无法评估 |
 
 ### 重新生成工件
 

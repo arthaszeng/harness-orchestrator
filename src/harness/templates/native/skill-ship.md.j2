@@ -44,16 +44,16 @@ means DO IT. Run straight through and output the PR URL at the end.
 
 ---
 
-## Step 2: Merge the base branch (BEFORE tests)
+## Step 2: Rebase onto the base branch (BEFORE tests)
 
-Fetch and merge the base branch so tests run against the merged state:
+Fetch and rebase onto the base branch so tests run against the latest state:
 
 ```bash
-git fetch origin {{ trunk_branch }} && git merge origin/{{ trunk_branch }} --no-edit
+git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-**If merge conflicts:** Try to auto-resolve simple conflicts (VERSION, CHANGELOG ordering).
-If conflicts are complex or ambiguous, **STOP** and show them.
+**If rebase conflicts:** Try to auto-resolve simple conflicts (VERSION, CHANGELOG ordering).
+If conflicts are complex or ambiguous, run `git rebase --abort`, **STOP** and show the conflicts.
 
 **If already up to date:** Continue silently.
 
@@ -121,7 +121,6 @@ Run the full `/harness-eval` workflow inline. This includes:
    - **subagent_type**: `"generalPurpose"`
    - **prompt**: "Read the diff with `git diff {{ trunk_branch }}..HEAD`. Think like an attacker and chaos engineer. Find ways this code will fail in production. Edge cases, race conditions, security holes, resource leaks, failure modes, silent data corruption. No compliments — just problems. Output JSON findings: {\"severity\":\"CRITICAL|INFORMATIONAL\",\"confidence\":N,\"path\":\"file\",\"line\":N,\"category\":\"cat\",\"summary\":\"desc\",\"fix\":\"fix\",\"action\":\"FIXABLE|INVESTIGATE\"}"
    - **description**: `"Adversarial code review"`
-   - **readonly**: true
 
 3. **Pass 3**: Cross-model adversarial — dispatch via Task tool:
    - **subagent_type**: `"harness-adversarial-reviewer"`
