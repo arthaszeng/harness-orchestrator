@@ -39,14 +39,16 @@ IDE CLI setup:
 ```bash
 git clone https://github.com/arthaszeng/harness-orchestrator.git
 cd harness-orchestrator
-pip install -e .
+./install.sh
 ```
+
+The install script runs `pip install -e .` and automatically configures PATH if needed. You can also use `python3 -m harness` as a drop-in alternative to the `harness` command.
 
 Verify:
 
 ```bash
 harness --version
-# harness-orchestrator 1.0.0
+# harness-orchestrator 1.1.0
 ```
 
 ### Five steps to get going
