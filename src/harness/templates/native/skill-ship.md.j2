@@ -125,6 +125,8 @@ Run the full `/harness-eval` workflow inline. This includes:
    - 3-4: low → suppress to appendix
    - 1-2: speculation → only report if CRITICAL
    Score on 4 dimensions, collect findings
+1b. **Specialist Dispatch** (conditional): If diff >= 50 lines, dispatch testing + security + performance specialists in parallel via Task tool (subagent_type: generalPurpose, model: fast). If diff > 200 lines or CRITICAL findings exist, also dispatch red-team. Each specialist reads its checklist from `specialists/{name}.md` and outputs JSON findings. Deduplicate by fingerprint, boost confidence +1 for multi-specialist agreement. Compute PR Quality Score: `max(0, 10 - critical*2 - informational*0.5)`.
+
 2. **Pass 2**: Claude adversarial subagent — dispatch via Task tool:
    - **subagent_type**: `"generalPurpose"`
    - **prompt**: "Read the diff with `git diff {{ trunk_branch }}..HEAD`. Think like an attacker and chaos engineer. Find ways this code will fail in production. Edge cases, race conditions, security holes, resource leaks, failure modes, silent data corruption. No compliments — just problems. Output JSON findings: {\"severity\":\"CRITICAL|INFORMATIONAL\",\"confidence\":N,\"path\":\"file\",\"line\":N,\"category\":\"cat\",\"summary\":\"desc\",\"fix\":\"fix\",\"action\":\"FIXABLE|INVESTIGATE\"}"

@@ -60,6 +60,46 @@ Review the code changes against the contract using the structured checklist.
 
 ---
 
+## Step 1.5: Specialist Dispatch (conditional)
+
+Specialist subagents provide deep domain-specific review. They run in parallel for speed.
+
+**Trigger check:**
+1. Run `git diff {{ trunk_branch }}..HEAD --stat | tail -1` to get diff size
+2. If diff < 50 lines changed: **SKIP** specialist dispatch (too small to benefit)
+3. If diff >= 50 lines: dispatch **testing + security + performance** specialists in parallel
+4. If diff > 200 lines OR Step 1 found any CRITICAL finding: also dispatch **red-team** specialist
+
+**Dispatch each specialist via Task tool:**
+- **subagent_type**: `"generalPurpose"`
+- **model**: `"fast"` (specialists are tightly scoped)
+- **description**: `"Specialist review: {name}"`
+
+For each specialist, construct the prompt:
+```
+You are a specialist code reviewer focused on {DOMAIN}.
+Read the checklist below, then analyze the diff.
+
+{READ the specialist checklist from specialists/{name}.md}
+
+Run `git diff {{ trunk_branch }}..HEAD` and analyze the changes.
+Output findings as JSON objects, one per line:
+{"specialist":"{name}","severity":"CRITICAL|INFORMATIONAL","confidence":N,"file":"path","line":N,"category":"category","description":"text","fix":"recommendation"}
+
+If no findings: output `NO FINDINGS` and nothing else.
+```
+
+**After all specialists complete:**
+1. Collect all findings from all specialists
+2. Fingerprint each: `{path}:{line}:{category}`
+3. Deduplicate: same fingerprint from 2+ specialists → boost confidence by +1
+4. Compute **PR Quality Score**: `max(0, 10 - critical_count * 2 - informational_count * 0.5)`
+5. If PR Quality Score < 6: flag for extra attention in Step 5
+
+If any specialist fails or times out: log and continue — specialist review is best-effort.
+
+---
+
 ## Step 2: Claude Adversarial Subagent (always runs)
 
 Dispatch an independent reviewer via the Task tool. The subagent has fresh context —
@@ -138,13 +178,16 @@ After both subagents complete, merge findings across all three passes.
 **Synthesis table:**
 
 ```
-ADVERSARIAL REVIEW SYNTHESIS:
+REVIEW SYNTHESIS:
 ═══════════════════════════════════════════════════════════
-  High confidence (found by 2+ passes):  [list]
-  Unique to structured review (Pass 1):  [list]
-  Unique to Claude adversarial (Pass 2): [list]
-  Unique to {{ adversarial_model }} (Pass 3): [list]
-  Models used: Claude structured ✓  Claude adversarial ✓/✗  {{ adversarial_model }} ✓/✗
+  High confidence (found by 2+ passes):   [list]
+  Unique to structured review (Pass 1):   [list]
+  Unique to specialists (Step 1.5):        [list by specialist]
+  Unique to Claude adversarial (Pass 2):   [list]
+  Unique to {{ adversarial_model }} (Pass 3):  [list]
+
+  PR Quality Score: X/10
+  Models used: Claude structured ✓  Specialists ✓/✗  Claude adversarial ✓/✗  {{ adversarial_model }} ✓/✗
 ═══════════════════════════════════════════════════════════
 ```
 
