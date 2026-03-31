@@ -225,6 +225,104 @@ def test_single_task_pass_with_dual_evaluation(tmp_path: Path):
     assert data["source_artifacts"]["alignment_md"] is not None
 
 
+def test_single_task_dual_eval_alignment_failure(tmp_path: Path):
+    """alignment evaluator success=False → insights 不记录 aligned=True。"""
+    config, sm, resolver = _setup(tmp_path)
+    config.workflow.dual_evaluation = True
+
+    planner = MagicMock()
+    planner.invoke.return_value = AgentResult(
+        success=True,
+        output="# Spec\nspec\n# Contract\n- [ ] item",
+        exit_code=0,
+    )
+
+    builder = MagicMock()
+    builder.invoke.return_value = AgentResult(success=True, output="built", exit_code=0)
+
+    evaluator = MagicMock()
+    evaluator.invoke.return_value = AgentResult(
+        success=True, output=_make_eval_output(4.0), exit_code=0,
+    )
+
+    alignment_evaluator = MagicMock()
+    alignment_evaluator.invoke.return_value = AgentResult(
+        success=False, output="segfault", exit_code=139,
+    )
+
+    def _resolve(role: str):
+        if role == "planner":
+            return planner
+        if role == "builder":
+            return builder
+        if role == "alignment_evaluator":
+            return alignment_evaluator
+        return evaluator
+
+    resolver.resolve.side_effect = _resolve
+    resolver.agent_name.side_effect = lambda r: f"harness-{r}"
+
+    result = run_single_task(config, sm, resolver, "alignment fail task")
+
+    assert result.verdict == "PASS"
+
+    archive_dir = tmp_path / ".agents" / "archive" / result.task_id
+    insights_path = archive_dir / "insights.json"
+    assert insights_path.exists()
+    data = json.loads(insights_path.read_text(encoding="utf-8"))
+    assert data["alignment_summary"]["has_alignment"] is True
+    assert data["alignment_summary"]["aligned"] is not True
+
+
+def test_single_task_dual_eval_alignment_unknown_verdict(tmp_path: Path):
+    """alignment evaluator 成功但输出不含已知 verdict → aligned != True。"""
+    config, sm, resolver = _setup(tmp_path)
+    config.workflow.dual_evaluation = True
+
+    planner = MagicMock()
+    planner.invoke.return_value = AgentResult(
+        success=True,
+        output="# Spec\nspec\n# Contract\n- [ ] item",
+        exit_code=0,
+    )
+
+    builder = MagicMock()
+    builder.invoke.return_value = AgentResult(success=True, output="built", exit_code=0)
+
+    evaluator = MagicMock()
+    evaluator.invoke.return_value = AgentResult(
+        success=True, output=_make_eval_output(4.0), exit_code=0,
+    )
+
+    alignment_evaluator = MagicMock()
+    alignment_evaluator.invoke.return_value = AgentResult(
+        success=True, output="I checked the code and it looks fine.", exit_code=0,
+    )
+
+    def _resolve(role: str):
+        if role == "planner":
+            return planner
+        if role == "builder":
+            return builder
+        if role == "alignment_evaluator":
+            return alignment_evaluator
+        return evaluator
+
+    resolver.resolve.side_effect = _resolve
+    resolver.agent_name.side_effect = lambda r: f"harness-{r}"
+
+    result = run_single_task(config, sm, resolver, "unknown verdict task")
+
+    assert result.verdict == "PASS"
+
+    archive_dir = tmp_path / ".agents" / "archive" / result.task_id
+    insights_path = archive_dir / "insights.json"
+    assert insights_path.exists()
+    data = json.loads(insights_path.read_text(encoding="utf-8"))
+    assert data["alignment_summary"]["has_alignment"] is True
+    assert data["alignment_summary"]["aligned"] is None
+
+
 def test_single_task_blocked_early_abort_degraded(tmp_path: Path):
     """Planner 失败直接阻塞 — insights 降级为只含元数据。"""
     config, sm, resolver = _setup(tmp_path)

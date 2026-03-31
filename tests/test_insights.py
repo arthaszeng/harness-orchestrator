@@ -81,6 +81,26 @@ class TestExtractAlignmentFlags:
         assert result.misaligned is True
         assert result.contract_issue is False
 
+    def test_unknown_verdict_degrades_to_none(self):
+        """不含任何已知 verdict 关键词 → aligned=None。"""
+        result = _extract_alignment_flags("some random evaluator output with no verdict")
+        assert result.has_alignment is True
+        assert result.aligned is None
+        assert result.misaligned is False
+        assert result.contract_issue is False
+
+    def test_empty_text_degrades_to_none(self):
+        """空输出 → aligned=None。"""
+        result = _extract_alignment_flags("")
+        assert result.has_alignment is True
+        assert result.aligned is None
+
+    def test_error_output_degrades_to_none(self):
+        """evaluator 错误输出（不含 verdict）→ aligned=None。"""
+        result = _extract_alignment_flags("Error: connection timeout\nTraceback ...")
+        assert result.has_alignment is True
+        assert result.aligned is None
+
 
 # ---------------------------------------------------------------------------
 # _extract_learning
@@ -187,6 +207,43 @@ class TestGenerateInsightsPass:
         assert insights.alignment_summary.contract_issue is True
         assert insights.alignment_summary.aligned is False
 
+    def test_with_alignment_unknown_verdict_degrades(self, tmp_path: Path):
+        """alignment artifact 存在但不含已知 verdict → aligned=None, has_alignment=True。"""
+        _write_eval_sidecar(tmp_path)
+        _write_eval_md(tmp_path)
+        _write_alignment_md(tmp_path, content="Error: evaluator crashed unexpectedly")
+
+        insights = generate_task_insights(
+            task_id="task-004b",
+            requirement="test degradation",
+            verdict="PASS",
+            iterations=1,
+            task_dir=tmp_path,
+        )
+
+        assert insights.alignment_summary.has_alignment is True
+        assert insights.alignment_summary.aligned is None
+        assert insights.alignment_summary.misaligned is False
+        assert insights.alignment_summary.contract_issue is False
+        assert insights.source_artifacts.alignment_md == "alignment-r1.md"
+
+    def test_with_alignment_empty_output_degrades(self, tmp_path: Path):
+        """alignment artifact 为空 → aligned=None。"""
+        _write_eval_sidecar(tmp_path)
+        _write_eval_md(tmp_path)
+        _write_alignment_md(tmp_path, content="")
+
+        insights = generate_task_insights(
+            task_id="task-004c",
+            requirement="empty alignment",
+            verdict="PASS",
+            iterations=1,
+            task_dir=tmp_path,
+        )
+
+        assert insights.alignment_summary.has_alignment is True
+        assert insights.alignment_summary.aligned is None
+
     def test_picks_latest_iteration(self, tmp_path: Path):
         _write_eval_sidecar(tmp_path, iteration=1, weighted=2.0, verdict="ITERATE")
         _write_eval_md(tmp_path, iteration=1)
@@ -204,6 +261,29 @@ class TestGenerateInsightsPass:
         assert insights.quality_summary is not None
         assert insights.quality_summary.weighted_score == 4.5
         assert insights.source_artifacts.evaluation_json == "evaluation-r2.json"
+
+    def test_picks_r10_over_r2_by_numeric_order(self, tmp_path: Path):
+        """两位数迭代号 r10 应优先于 r2（数值排序而非字典序）。"""
+        _write_eval_sidecar(tmp_path, iteration=2, weighted=2.0, verdict="ITERATE")
+        _write_eval_md(tmp_path, iteration=2)
+        _write_alignment_md(tmp_path, iteration=2, content="MISALIGNED")
+        _write_eval_sidecar(tmp_path, iteration=10, weighted=4.5, verdict="PASS")
+        _write_eval_md(tmp_path, iteration=10)
+        _write_alignment_md(tmp_path, iteration=10, content="ALIGNED")
+
+        insights = generate_task_insights(
+            task_id="task-006",
+            requirement="many iterations",
+            verdict="PASS",
+            iterations=10,
+            task_dir=tmp_path,
+        )
+
+        assert insights.quality_summary.weighted_score == 4.5
+        assert insights.source_artifacts.evaluation_json == "evaluation-r10.json"
+        assert insights.source_artifacts.evaluation_md == "evaluation-r10.md"
+        assert insights.source_artifacts.alignment_md == "alignment-r10.md"
+        assert insights.alignment_summary.aligned is True
 
 
 # ---------------------------------------------------------------------------

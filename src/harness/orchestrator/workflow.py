@@ -315,8 +315,10 @@ def run_single_task(
                     parsed.verdict = "ITERATE"
                     alignment_feedback = f"[CONTRACT_ISSUE] {align_result.output}"
                     ui.step_done("[3/3 eval] alignment", a_elapsed, False, "CONTRACT_ISSUE → replan")
-                else:
+                elif align_result.success and "ALIGNED" in align_result.output:
                     ui.step_done("[3/3 eval] alignment", a_elapsed, True, "ALIGNED")
+                else:
+                    ui.step_done("[3/3 eval] alignment", a_elapsed, False, "alignment inconclusive")
 
             if parsed.verdict == "PASS":
                 sm.transition(TaskState.DONE)

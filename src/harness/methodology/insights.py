@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -121,10 +122,20 @@ class TaskInsights:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+_ITER_NUM_RE = re.compile(r"-r(\d+)\.")
+
+
 def _find_latest_artifact(task_dir: Path, pattern: str) -> Path | None:
-    """按文件名排序取最新匹配的工件路径。"""
-    matches = sorted(task_dir.glob(pattern))
-    return matches[-1] if matches else None
+    """按迭代号数值选择最新匹配的工件路径（而非字典序）。"""
+    matches = list(task_dir.glob(pattern))
+    if not matches:
+        return None
+
+    def _iter_num(p: Path) -> int:
+        m = _ITER_NUM_RE.search(p.name)
+        return int(m.group(1)) if m else 0
+
+    return max(matches, key=_iter_num)
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -135,7 +146,11 @@ def _load_json(path: Path) -> dict[str, Any] | None:
 
 
 def _extract_alignment_flags(alignment_text: str) -> AlignmentSummary:
-    """从 alignment markdown 中做标记级提取，不做语义解析。"""
+    """从 alignment markdown 中做标记级提取，显式 verdict 驱动。
+
+    只有存在明确 ``ALIGNED`` 关键词（且不含 ``MISALIGNED``）时才记为通过；
+    失败输出、空输出或未识别文本稳定降级为 ``aligned=None``。
+    """
     summary = AlignmentSummary(has_alignment=True)
     if "MISALIGNED" in alignment_text:
         summary.misaligned = True
@@ -143,8 +158,10 @@ def _extract_alignment_flags(alignment_text: str) -> AlignmentSummary:
     elif "CONTRACT_ISSUE" in alignment_text:
         summary.contract_issue = True
         summary.aligned = False
-    else:
+    elif "ALIGNED" in alignment_text:
         summary.aligned = True
+    else:
+        summary.aligned = None
     return summary
 
 
