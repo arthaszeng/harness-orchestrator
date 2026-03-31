@@ -11,7 +11,8 @@ Today's AI coding tools excel at single-shot tasks, but continuous development o
 
 - **Requirements move with a method** — Planner analyzes requirements to produce a spec and negotiate iterative contracts, instead of jumping straight to code
 - **Implementation and review are separate** — Builder implements against the contract; Evaluator reviews independently with four-dimensional scoring as a quality gate
-- **Cross-model adversarial review** — In Cursor-native mode, a GPT-based adversarial reviewer independently challenges Claude's work for higher-confidence findings
+- **Three-pass adversarial review** — In Cursor-native mode, Claude structured review + Claude adversarial subagent + cross-model GPT reviewer, with high-confidence synthesis across passes
+- **Fix-First auto-remediation** — Review findings are classified as AUTO-FIX (applied immediately) or ASK (presented for human judgment), keeping the feedback loop tight
 - **Autonomous but bounded** — Strategist picks tasks from vision, constrained by iteration limits, pass thresholds, and stop signals
 - **Full traceability** — Each iteration's spec, contract, and evaluation are saved in Markdown + JSON for audit, automation, and resume after interruption
 - **Two modes** — **Orchestrator** (external CLI drives agents) or **Cursor-native** (skills + subagents inside the IDE, no external process)
@@ -49,7 +50,7 @@ Verify:
 
 ```bash
 harness --version
-# harness-orchestrator 1.1.0
+# harness-orchestrator 1.8.2
 ```
 
 ### Five steps to get going
@@ -195,24 +196,46 @@ When you select cursor-native mode, `harness init` generates:
 
 | Artifact | Path | Purpose |
 |----------|------|---------|
-| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | Plan and decompose a task into spec + contract |
-| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | Implement the contract, run CI |
-| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | Multi-pass review with cross-model adversarial evaluation |
-| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | Composite: plan → build → eval → fix loop → commit → push → PR |
-| Adversarial reviewer | `.cursor/agents/harness-adversarial-reviewer.md` | GPT-based adversarial code reviewer (`model: gpt-4.1`, `readonly: true`) |
-| Evaluator | `.cursor/agents/harness-evaluator.md` | Structured code evaluator (`model: inherit`, `readonly: true`) |
+| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | Plan and decompose a task with adversarial spec review loop |
+| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | Autonomous build: implement contract, run CI, triage test failures, write structured build log |
+| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | Three-pass review (Claude + Claude adversarial + cross-model) with Fix-First auto-remediation |
+| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | Fully automated pipeline: merge base → test → review → adversarial eval → fix loop → bisectable commits → push → PR |
+| Adversarial reviewer | `.cursor/agents/harness-adversarial-reviewer.md` | Cross-model adversarial code reviewer with structured JSON output (`model:` configurable, default `gpt-4.1`; `readonly: true`) |
+| Evaluator | `.cursor/agents/harness-evaluator.md` | Structured code evaluator with JSON verdict output (`model: inherit`, `readonly: true`) |
 | Trust boundary | `.cursor/rules/harness-trust-boundary.mdc` | Always-on rule: Builder output is untrusted |
+| Fix-First | `.cursor/rules/harness-fix-first.mdc` | Always-on rule: classify findings as AUTO-FIX or ASK before presenting |
 | Workflow conventions | `.cursor/rules/harness-workflow.mdc` | Commit format, branch naming, task state management |
 
-### Cross-model adversarial review
+### Three-pass adversarial review
 
-The `/harness-eval` skill dispatches a **cross-model adversarial reviewer** — a Cursor subagent configured with a different model family (default: `gpt-4.1`). This gives independent, cross-model validation:
+The `/harness-eval` and `/harness-ship` skills run a three-pass review pipeline with cross-model synthesis:
 
-1. **Pass 1** — Main agent (Claude) does structured code review
-2. **Pass 2** — Adversarial subagent (GPT) hunts for security holes, race conditions, edge cases
-3. **Synthesis** — Findings agreed on by both models are flagged as high-confidence
+1. **Pass 1 — Structured review** — Main agent (Claude) scores on four dimensions (completeness, quality, regression, design) and collects findings with structured JSON output
+2. **Pass 2 — Claude adversarial subagent** — An independent Claude subagent with fresh context hunts for security holes, race conditions, edge cases, resource leaks, and logic errors
+3. **Pass 3 — Cross-model adversarial** — A GPT-based subagent (default: `gpt-4.1`) provides independent perspective from a different model family
 
-The adversarial model is configurable in `.agents/config.toml` under `[native] adversarial_model`. If the subagent fails, evaluation gracefully degrades to single-model review.
+**Synthesis**: Findings are deduplicated by fingerprint (`path:line:category`). Issues found by 2+ passes are flagged as **high confidence** with boosted confidence scores.
+
+The adversarial model is configurable in `.agents/config.toml` under `[native] adversarial_model`. Passes 2 and 3 are dispatched in parallel for speed. If any subagent fails, evaluation gracefully degrades — see the degradation matrix below.
+
+### Fix-First auto-remediation
+
+After review, all findings are classified before being presented:
+
+- **AUTO-FIX** — High certainty, small blast radius, reversible. Applied immediately with a verification test run and committed automatically.
+- **ASK** — Security findings, behavior changes, architecture changes, or low confidence on critical issues. Presented to the user in a single batch for decision.
+
+This keeps the review → fix feedback loop tight: trivial issues never block shipping, while important decisions always get human judgment.
+
+### Graceful degradation
+
+| Pass 1 (Structured) | Pass 2 (Claude subagent) | Pass 3 (GPT) | Action |
+|---------------------|-------------------------|---------------|--------|
+| OK | OK | OK | Full three-pass synthesis |
+| OK | OK | Failed | Synthesis without cross-model, tagged `[claude-only]` |
+| OK | Failed | OK | Synthesis without Claude subagent |
+| OK | Failed | Failed | Single-reviewer mode, noted in evaluation |
+| Failed | — | — | Fatal — cannot evaluate |
 
 ### Regenerating artifacts
 
