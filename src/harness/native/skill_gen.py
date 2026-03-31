@@ -34,6 +34,7 @@ _AGENT_TEMPLATES = [
 _RULE_TEMPLATES = [
     ("rule-trust-boundary.mdc.j2", "harness-trust-boundary"),
     ("rule-workflow.mdc.j2", "harness-workflow"),
+    ("rule-fix-first.mdc.j2", "harness-fix-first"),
 ]
 
 

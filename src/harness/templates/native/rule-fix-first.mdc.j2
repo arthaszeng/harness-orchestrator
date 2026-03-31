@@ -1,0 +1,58 @@
+---
+description: "Harness Fix-First heuristic: classify review findings as AUTO-FIX or ASK before presenting to user"
+alwaysApply: true
+---
+
+# Fix-First Heuristic
+
+When reviewing code (during /harness-eval or /harness-ship), classify every finding
+before presenting it. Fix what you can; only ask about what you must.
+
+## AUTO-FIX (fix immediately, no user input needed)
+
+Apply when ALL three conditions are met:
+1. **Certainty is high** — you are confident the finding is real (confidence >= 7)
+2. **Blast radius is small** — the fix touches <= 3 lines and no public API changes
+3. **Fix is reversible** — a revert would cleanly undo it
+
+Common AUTO-FIX categories:
+- Dead code, stale comments, unused imports
+- Missing error handling with obvious fix (e.g., unchecked return value)
+- Naming inconsistencies, formatting issues
+- Missing type hints where the type is obvious
+- N+1 queries with straightforward eager-loading fix
+- Stale TODO comments referencing completed work
+
+After auto-fixing:
+1. Apply the fix
+2. Run `{{ ci_command }}` to verify no regressions
+3. Log: `[AUTO-FIXED] file:line — Problem → What you did`
+4. Commit: `git add <fixed-files> && git commit -m "fix: auto-fix review findings"`
+
+## ASK (present to user for decision)
+
+Apply when ANY condition is true:
+- **Security finding** — even if the fix seems obvious
+- **Behavior change** — the fix would change observable output or user-facing behavior
+- **Architecture change** — the fix changes component boundaries, data flow, or API
+- **Data model change** — the fix modifies schemas, migrations, or stored data format
+- **Low confidence** — confidence < 7 on a CRITICAL finding
+- **Large blast radius** — fix touches > 3 files or changes a public API
+
+Present ALL ASK items in ONE batch (not one-by-one):
+- Number each finding
+- Show: severity, file:line, problem, recommended fix
+- Per-item options: A) Fix, B) Skip
+- If 0 ASK items: skip entirely — do not present an empty list
+
+## Classification Examples
+
+| Finding | Classification | Reason |
+|---------|---------------|--------|
+| Unused import `os` in utils.py | AUTO-FIX | High certainty, 1 line, reversible |
+| SQL injection in user input | ASK | Security finding |
+| Missing null check on API response | AUTO-FIX | Obvious fix, small blast radius |
+| Rename `data` parameter to `payload` | AUTO-FIX | Naming, small blast radius |
+| Change auth middleware to use JWT | ASK | Architecture change |
+| Remove deprecated endpoint | ASK | Behavior change (breaking) |
+| Add index to frequently-queried column | ASK | Data model change |
