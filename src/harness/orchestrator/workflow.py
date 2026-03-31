@@ -12,7 +12,6 @@ from harness.core.archive import archive_task, ensure_task_dir
 from harness.core.config import HarnessConfig
 from harness.core.events import EventEmitter, NullEventEmitter
 from harness.core.index import update_index
-from harness.core.progress import update_progress
 from harness.core.state import StateMachine, TaskState
 from harness.core.ui import get_ui
 from harness.drivers.base import AgentResult
@@ -328,7 +327,6 @@ def run_single_task(
                     git_ops.merge_branch(branch, "main", project_root)
 
                 archive_task(agents_dir, task_id)
-                update_progress(agents_dir, sm.state)
                 update_index(agents_dir, sm.state)
 
                 task_elapsed = time.monotonic() - task_start
@@ -346,7 +344,6 @@ def run_single_task(
     sm.transition(TaskState.BLOCKED)
     sm.complete_task(score=final_score, verdict="BLOCKED")
     ev.task_end(task_id=task_id, verdict="BLOCKED", score=final_score, iterations=total_iterations)
-    update_progress(agents_dir, sm.state)
     update_index(agents_dir, sm.state)
 
     block_reason = abort_reason or f"max iterations ({max_iter})"

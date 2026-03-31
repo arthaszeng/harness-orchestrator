@@ -209,8 +209,12 @@ class StateMachine:
             stop_file.unlink()
 
     def _checkpoint(self) -> None:
-        """Persist current state."""
+        """Persist current state and refresh progress.md."""
         self._state.save(self._agents_dir)
+        # Lazy import to avoid circular dependency (progress imports state)
+        from harness.core.progress import update_progress
+
+        update_progress(self._agents_dir, self._state)
 
     def _update_avg_score(self) -> None:
         scores = [t.score for t in self._state.completed if t.score > 0]

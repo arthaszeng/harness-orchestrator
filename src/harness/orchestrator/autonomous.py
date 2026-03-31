@@ -8,7 +8,6 @@ import time
 from harness import __version__
 from harness.core.config import HarnessConfig
 from harness.core.events import EventEmitter, NullEventEmitter
-from harness.core.progress import update_progress
 from harness.core.state import StateMachine
 from harness.core.ui import get_ui
 from harness.drivers.resolver import DriverResolver
@@ -196,7 +195,7 @@ def _invoke_reflector(
             ui.warn(f"[reflector] {drift}")
             ui.warn("[reflector] consider running `harness vision`")
 
-    update_progress(sm.agents_dir, sm.state)
+    # progress.md is now auto-refreshed by StateMachine._checkpoint()
 
 
 def detect_vision_drift(reflector_output: str) -> str | None:
