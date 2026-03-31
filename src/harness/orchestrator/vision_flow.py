@@ -102,11 +102,13 @@ def invoke_advisor(
     *,
     timeout: int = 300,
     on_output: Callable[[str], None] | None = None,
+    model: str = "",
 ) -> AdvisorOutput:
     """Invoke the Advisor agent and return parsed output."""
     prompt = build_advisor_prompt(ctx, user_input)
     result = driver.invoke(
-        agent_name, prompt, cwd, readonly=True, timeout=timeout, on_output=on_output,
+        agent_name, prompt, cwd,
+        readonly=True, timeout=timeout, on_output=on_output, model=model,
     )
 
     if not result.success:

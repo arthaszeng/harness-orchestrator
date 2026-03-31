@@ -170,6 +170,8 @@ def _step_driver_mode(ides: dict[str, bool]) -> tuple[str, dict[str, str]]:
 def _step_ci_command(
     project_root: Path,
     ides: dict[str, bool],
+    driver_mode: str,
+    roles: dict[str, str],
     *,
     ci_override: str = "",
 ) -> str:
@@ -207,7 +209,7 @@ def _step_ci_command(
             typer.echo(f"  -> {selected}")
             return selected
         if choice == ai_idx:
-            return _ai_suggest_ci(project_root, ides, scan)
+            return _ai_suggest_ci(project_root, ides, scan, driver_mode, roles)
         return typer.prompt(t("init.enter_ci"))
     typer.echo(t("init.no_suggestions"))
     typer.echo(t("init.opt_ai_analyze"))
@@ -216,24 +218,43 @@ def _step_ci_command(
     choice = _prompt_choice(t("init.choose"), 3, default=1)
 
     if choice == 1:
-        return _ai_suggest_ci(project_root, ides, scan)
+        return _ai_suggest_ci(project_root, ides, scan, driver_mode, roles)
     if choice == 2:
         return typer.prompt(t("init.enter_ci"))
     return ""
 
 
 def _ai_suggest_ci(
-    project_root: Path, ides: dict[str, bool], scan: ProjectScan,
+    project_root: Path,
+    ides: dict[str, bool],
+    scan: ProjectScan,
+    driver_mode: str,
+    roles: dict[str, str],
 ) -> str:
     """Use an AI agent to analyze the project and suggest a CI command."""
+    from harness.core.config import HarnessConfig
     from harness.drivers.codex import CodexDriver
     from harness.drivers.cursor import CursorDriver
+    from harness.drivers.resolver import DriverResolver
 
-    driver = None
-    if ides.get("codex"):
-        driver = CodexDriver()
-    elif ides.get("cursor"):
-        driver = CursorDriver()
+    drivers_payload: dict = {"default": driver_mode}
+    if roles:
+        drivers_payload["roles"] = roles
+
+    cfg = HarnessConfig.model_validate({"drivers": drivers_payload})
+    cfg.project_root = project_root
+
+    resolver = DriverResolver(cfg)
+    try:
+        driver = resolver.resolve("advisor")
+        advisor_model = resolver.resolve_model("advisor")
+    except RuntimeError:
+        driver = None
+        advisor_model = ""
+        if ides.get("codex"):
+            driver = CodexDriver()
+        elif ides.get("cursor"):
+            driver = CursorDriver()
 
     if not driver:
         typer.echo(t("init.ai_no_ide"))
@@ -250,7 +271,10 @@ def _ai_suggest_ci(
 
     typer.echo(t("init.ai_analyzing"))
     t0 = time.monotonic()
-    result = driver.invoke("harness-advisor", prompt, project_root, readonly=True, timeout=120)
+    result = driver.invoke(
+        "harness-advisor", prompt, project_root,
+        readonly=True, timeout=120, model=advisor_model,
+    )
     elapsed = time.monotonic() - t0
     typer.echo(t("init.ai_done", elapsed=elapsed))
 
@@ -347,7 +371,9 @@ def run_init(
         proj_name, description = _step_project_info(project_root, name_override=name)
         ides = _step_ide_setup(lang_norm)
         driver_mode, roles = _step_driver_mode(ides)
-        ci = _step_ci_command(project_root, ides, ci_override=ci_command)
+        ci = _step_ci_command(
+            project_root, ides, driver_mode, roles, ci_override=ci_command,
+        )
         memverse_enabled, memverse_driver, memverse_domain = _step_memverse(
             project_root, driver_mode,
         )

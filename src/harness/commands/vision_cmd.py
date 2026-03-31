@@ -45,6 +45,7 @@ def run_vision() -> None:
 
     driver = resolver.resolve("advisor")
     agent_name = resolver.agent_name("advisor")
+    advisor_model = resolver.resolve_model("advisor")
 
     while True:
         t0 = time.monotonic()
@@ -52,6 +53,7 @@ def run_vision() -> None:
             result = invoke_advisor(
                 driver, agent_name, ctx, user_input, project_root,
                 on_output=on_out,
+                model=advisor_model,
             )
         elapsed = time.monotonic() - t0
 
