@@ -65,8 +65,17 @@ MESSAGES: dict[str, str] = {
     "install.env_check": "环境检测:",
     "install.cursor_ok": "  Cursor CLI: ✓",
     "install.cursor_missing": "  Cursor CLI: ✗ 未找到",
+    "install.cursor_not_ready": (
+        "  Cursor CLI: ⚠ 检测到二进制但 `cursor agent` 未就绪\n"
+        "    -> 打开 Cursor -> 命令面板 -> 'Install cursor command'\n"
+        "    -> 确保 Cursor Pro 订阅有效且已登录"
+    ),
     "install.codex_ok": "  Codex CLI:  ✓",
     "install.codex_missing": "  Codex CLI:  ✗ 未找到",
+    "install.codex_not_ready": (
+        "  Codex CLI:  ⚠ 检测到二进制但 `codex exec` 未就绪\n"
+        "    -> 重新安装: npm install -g @openai/codex"
+    ),
     "install.no_ide": "\n[error] 未检测到 Cursor 或 Codex CLI，至少需要安装一个。",
     "install.no_source": "\n[error] agent 源文件目录不存在: {path}",
     "install.cursor_agents": "安装 Cursor agents:",
@@ -126,8 +135,16 @@ MESSAGES: dict[str, str] = {
     # ── drivers ───────────────────────────────────────────────────
     "driver.codex_not_found": "Codex CLI 未找到",
     "driver.codex_timeout": "Codex agent 超时",
+    "driver.codex_not_ready": (
+        "检测到 Codex 二进制但 `codex exec` 不可用，请重新安装: npm install -g @openai/codex"
+    ),
     "driver.cursor_not_found": "Cursor CLI 未找到",
     "driver.cursor_timeout": "Cursor agent 超时",
+    "driver.cursor_not_ready": (
+        "检测到 Cursor 编辑器但 `cursor agent` 不可用。"
+        "请: 1) 打开 Cursor -> 命令面板 -> 'Install cursor command'  "
+        "2) 确保 Cursor Pro 订阅有效且已登录"
+    ),
     "driver.heartbeat": "⏳ 运行中 {elapsed:.0f}s...",
     "driver.done": "✓ 完成 ({elapsed:.0f}s)",
     "driver.no_ide": "未检测到 Cursor 或 Codex CLI",

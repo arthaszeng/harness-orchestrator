@@ -89,6 +89,11 @@ def _compose_full_output(event_log: list[str], final_result: str) -> str:
     return "\n".join(parts)
 
 
+_NOT_READY_PATTERNS = ("not found", "installing", "install ")
+
+_PROBE_TIMEOUT = 8
+
+
 @dataclass
 class DriverProbe:
     available: bool
@@ -110,7 +115,7 @@ class CursorDriver:
         return shutil.which("cursor") is not None
 
     def probe(self) -> DriverProbe:
-        """Detect CLI version and validate required flags."""
+        """Detect CLI version and validate that ``cursor agent`` is functional."""
         if self._probe_result is not None:
             return self._probe_result
 
@@ -123,25 +128,40 @@ class CursorDriver:
         try:
             result = subprocess.run(
                 ["cursor", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=_PROBE_TIMEOUT,
             )
             version = result.stdout.strip() or result.stderr.strip()
         except Exception:
             warnings.append("could not detect cursor version")
 
+        functional = True
         try:
             help_result = subprocess.run(
                 ["cursor", "agent", "--help"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=_PROBE_TIMEOUT,
             )
-            help_text = help_result.stdout + help_result.stderr
-            for flag in ("--print", "--output-format", "--stream-partial-output"):
-                if flag not in help_text:
-                    warnings.append(f"cursor agent may not support {flag}")
-        except Exception:
-            warnings.append("could not probe cursor agent flags")
+            help_text = (help_result.stdout + help_result.stderr).lower()
 
-        self._probe_result = DriverProbe(available=True, version=version, warnings=warnings)
+            if any(p in help_text for p in _NOT_READY_PATTERNS):
+                functional = False
+                warnings.append(t("driver.cursor_not_ready"))
+            elif help_result.returncode != 0:
+                functional = False
+                warnings.append(t("driver.cursor_not_ready"))
+            else:
+                for flag in ("--print", "--output-format", "--stream-partial-output"):
+                    if flag not in help_text:
+                        warnings.append(f"cursor agent may not support {flag}")
+        except subprocess.TimeoutExpired:
+            functional = False
+            warnings.append(t("driver.cursor_not_ready"))
+        except Exception:
+            functional = False
+            warnings.append(t("driver.cursor_not_ready"))
+
+        self._probe_result = DriverProbe(
+            available=functional, version=version, warnings=warnings,
+        )
         return self._probe_result
 
     def invoke(

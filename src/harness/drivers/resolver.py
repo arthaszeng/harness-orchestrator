@@ -28,24 +28,29 @@ class DriverResolver:
         self._config = config
         self._cursor = CursorDriver()
         self._codex = CodexDriver()
-        self._cursor_ok = self._cursor.is_available()
-        self._codex_ok = self._codex.is_available()
 
         self._probe_results: dict[str, object] = {}
-        self._run_probes()
+        self._cursor_ok, self._codex_ok = self._run_probes()
 
-    def _run_probes(self) -> None:
-        """Probe available drivers at startup and emit warnings."""
-        for label, driver, ok in [
-            ("codex", self._codex, self._codex_ok),
-            ("cursor", self._cursor, self._cursor_ok),
+    def _run_probes(self) -> tuple[bool, bool]:
+        """Probe drivers at startup; return (cursor_ok, codex_ok) based on functional checks."""
+        cursor_ok = False
+        codex_ok = False
+        for label, driver, binary_found in [
+            ("codex", self._codex, self._codex.is_available()),
+            ("cursor", self._cursor, self._cursor.is_available()),
         ]:
-            if not ok:
+            if not binary_found:
                 continue
             probe = driver.probe()
             self._probe_results[label] = probe
             for w in probe.warnings:
                 sys.stderr.write(f"[harness] warning ({label}): {w}\n")
+            if label == "cursor":
+                cursor_ok = probe.available
+            else:
+                codex_ok = probe.available
+        return cursor_ok, codex_ok
 
     def resolve(self, role: str) -> AgentDriver:
         """Return the driver for the given role."""

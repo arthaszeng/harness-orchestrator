@@ -1,12 +1,13 @@
-"""cursor.py tests — stream-json parsing and prompt composition"""
+"""cursor.py tests — stream-json parsing, prompt composition, and probe logic"""
 
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-from harness.drivers.cursor import CursorDriver, _format_event, _compose_full_output
+from harness.drivers.cursor import CursorDriver, DriverProbe, _format_event, _compose_full_output
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -159,3 +160,91 @@ def test_invoke_handles_error_result(mock_popen: Mock, tmp_path: Path) -> None:
 
     assert result.success is False
     assert "ERROR:" in result.output
+
+
+# ── Probe tests ──────────────────────────────────────────────────
+
+
+@patch("harness.drivers.cursor.shutil.which", return_value=None)
+def test_probe_not_available_when_binary_missing(mock_which: Mock) -> None:
+    driver = CursorDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert probe.warnings == []
+
+
+@patch("harness.drivers.cursor.subprocess.run")
+@patch("harness.drivers.cursor.shutil.which", return_value="/usr/bin/cursor")
+def test_probe_available_when_agent_help_ok(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        r = MagicMock()
+        if cmd[0] == "cursor" and cmd[1] == "--version":
+            r.stdout, r.stderr, r.returncode = "1.0.0", "", 0
+        else:
+            r.stdout = "--print --output-format --stream-partial-output"
+            r.stderr = ""
+            r.returncode = 0
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CursorDriver()
+    probe = driver.probe()
+    assert probe.available is True
+    assert probe.version == "1.0.0"
+    assert probe.warnings == []
+
+
+@patch("harness.drivers.cursor.subprocess.run")
+@patch("harness.drivers.cursor.shutil.which", return_value="/usr/bin/cursor")
+def test_probe_not_available_when_agent_installing(mock_which: Mock, mock_run: Mock) -> None:
+    """Simulate 'cursor-agent not found, installing...' scenario."""
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        r = MagicMock()
+        if cmd[0] == "cursor" and cmd[1] == "--version":
+            r.stdout, r.stderr, r.returncode = "1.0.0", "", 0
+        else:
+            r.stdout = ""
+            r.stderr = "cursor-agent not found, installing via https://cursor.com/install ..."
+            r.returncode = 1
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CursorDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert len(probe.warnings) == 1
+    assert "cursor agent" in probe.warnings[0].lower() or "not available" in probe.warnings[0].lower()
+
+
+@patch("harness.drivers.cursor.subprocess.run")
+@patch("harness.drivers.cursor.shutil.which", return_value="/usr/bin/cursor")
+def test_probe_not_available_on_timeout(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        if "agent" in cmd:
+            raise subprocess.TimeoutExpired(cmd, 8)
+        r = MagicMock()
+        r.stdout, r.stderr, r.returncode = "1.0.0", "", 0
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CursorDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert len(probe.warnings) == 1
+
+
+@patch("harness.drivers.cursor.subprocess.run")
+@patch("harness.drivers.cursor.shutil.which", return_value="/usr/bin/cursor")
+def test_probe_not_available_on_nonzero_exit(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        r = MagicMock()
+        if "agent" in cmd:
+            r.stdout, r.stderr, r.returncode = "", "error", 1
+        else:
+            r.stdout, r.stderr, r.returncode = "1.0.0", "", 0
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CursorDriver()
+    probe = driver.probe()
+    assert probe.available is False

@@ -31,6 +31,7 @@ _ROLE_FILES = {
 
 _STREAM_PREFIX = "    │ "
 _HEARTBEAT_INTERVAL = 15
+_PROBE_TIMEOUT = 8
 
 
 @dataclass
@@ -58,7 +59,7 @@ class CodexDriver:
         return shutil.which("codex") is not None
 
     def probe(self) -> DriverProbe:
-        """Detect CLI version and validate required flags."""
+        """Detect CLI version and validate that ``codex exec`` is functional."""
         if self._probe_result is not None:
             return self._probe_result
 
@@ -71,26 +72,36 @@ class CodexDriver:
         try:
             result = subprocess.run(
                 ["codex", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=_PROBE_TIMEOUT,
             )
             version = result.stdout.strip() or result.stderr.strip()
         except Exception:
             warnings.append("could not detect codex version")
 
-        # Verify help text contains the flags we depend on
+        functional = True
         try:
             help_result = subprocess.run(
                 ["codex", "exec", "--help"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=_PROBE_TIMEOUT,
             )
             help_text = help_result.stdout + help_result.stderr
-            for flag in ("--full-auto", "--output-last-message"):
-                if flag not in help_text:
-                    warnings.append(f"codex exec may not support {flag}")
+            if help_result.returncode != 0:
+                functional = False
+                warnings.append(t("driver.codex_not_ready"))
+            else:
+                for flag in ("--full-auto", "--output-last-message"):
+                    if flag not in help_text:
+                        warnings.append(f"codex exec may not support {flag}")
+        except subprocess.TimeoutExpired:
+            functional = False
+            warnings.append(t("driver.codex_not_ready"))
         except Exception:
-            warnings.append("could not probe codex exec flags")
+            functional = False
+            warnings.append(t("driver.codex_not_ready"))
 
-        self._probe_result = DriverProbe(available=True, version=version, warnings=warnings)
+        self._probe_result = DriverProbe(
+            available=functional, version=version, warnings=warnings,
+        )
         return self._probe_result
 
     def invoke(

@@ -67,12 +67,40 @@ def _step_ide_setup(lang: str) -> dict[str, bool]:
         "cursor": shutil.which("cursor") is not None,
         "codex": shutil.which("codex") is not None,
     }
-    cursor_st = "ok" if ides["cursor"] else t("init.ide_not_detected")
-    codex_st = "ok" if ides["codex"] else t("init.ide_not_detected")
-    typer.echo(t("init.cursor_status", status=cursor_st))
-    typer.echo(t("init.codex_status", status=codex_st))
 
     if not any(ides.values()):
+        typer.echo(t("init.cursor_status", status=t("init.ide_not_detected")))
+        typer.echo(t("init.codex_status", status=t("init.ide_not_detected")))
+        typer.echo(t("init.ide_error"), err=True)
+        raise typer.Exit(1)
+
+    from harness.drivers.cursor import CursorDriver
+    from harness.drivers.codex import CodexDriver
+
+    ready = dict(ides)
+    if ides["cursor"]:
+        probe = CursorDriver().probe()
+        if probe.available:
+            typer.echo(t("init.cursor_status", status="ok"))
+        else:
+            typer.echo(t("init.cursor_status", status="⚠ not ready"))
+            typer.echo(t("install.cursor_not_ready"))
+            ready["cursor"] = False
+    else:
+        typer.echo(t("init.cursor_status", status=t("init.ide_not_detected")))
+
+    if ides["codex"]:
+        probe = CodexDriver().probe()
+        if probe.available:
+            typer.echo(t("init.codex_status", status="ok"))
+        else:
+            typer.echo(t("init.codex_status", status="⚠ not ready"))
+            typer.echo(t("install.codex_not_ready"))
+            ready["codex"] = False
+    else:
+        typer.echo(t("init.codex_status", status=t("init.ide_not_detected")))
+
+    if not any(ready.values()):
         typer.echo(t("init.ide_error"), err=True)
         raise typer.Exit(1)
 
@@ -81,7 +109,7 @@ def _step_ide_setup(lang: str) -> dict[str, bool]:
         from harness.commands.install import run_install
         run_install(force=True, lang=lang)
 
-    return ides
+    return ready
 
 
 # ── Step 3: driver mode ───────────────────────────────────────────

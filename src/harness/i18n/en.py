@@ -65,8 +65,17 @@ MESSAGES: dict[str, str] = {
     "install.env_check": "Environment check:",
     "install.cursor_ok": "  Cursor CLI: ✓",
     "install.cursor_missing": "  Cursor CLI: ✗ not found",
+    "install.cursor_not_ready": (
+        "  Cursor CLI: ⚠ binary found but `cursor agent` not ready\n"
+        "    -> Open Cursor -> Command Palette -> 'Install cursor command'\n"
+        "    -> Ensure Cursor Pro subscription is active and you are signed in"
+    ),
     "install.codex_ok": "  Codex CLI:  ✓",
     "install.codex_missing": "  Codex CLI:  ✗ not found",
+    "install.codex_not_ready": (
+        "  Codex CLI:  ⚠ binary found but `codex exec` not ready\n"
+        "    -> Reinstall: npm install -g @openai/codex"
+    ),
     "install.no_ide": "\n[error] Neither Cursor nor Codex CLI detected. At least one is required.",
     "install.no_source": "\n[error] Agent source directory not found: {path}",
     "install.cursor_agents": "Installing Cursor agents:",
@@ -126,8 +135,17 @@ MESSAGES: dict[str, str] = {
     # ── drivers ───────────────────────────────────────────────────
     "driver.codex_not_found": "Codex CLI not found",
     "driver.codex_timeout": "Codex agent timed out",
+    "driver.codex_not_ready": (
+        "Codex binary found but `codex exec` is not functional. "
+        "Please reinstall: npm install -g @openai/codex"
+    ),
     "driver.cursor_not_found": "Cursor CLI not found",
     "driver.cursor_timeout": "Cursor agent timed out",
+    "driver.cursor_not_ready": (
+        "Cursor editor detected but `cursor agent` is not available. "
+        "Please: 1) Open Cursor -> Command Palette -> 'Install cursor command'  "
+        "2) Ensure you have an active Cursor Pro subscription and are signed in"
+    ),
     "driver.heartbeat": "⏳ running {elapsed:.0f}s...",
     "driver.done": "✓ done ({elapsed:.0f}s)",
     "driver.no_ide": "Neither Cursor nor Codex CLI detected",

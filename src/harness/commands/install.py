@@ -107,6 +107,38 @@ def _install_codex_agents(source_dir: Path, *, force: bool, lang: str) -> int:
     return installed
 
 
+def _probe_ides(ides: dict[str, bool]) -> dict[str, bool]:
+    """Run functional probes and display status with guidance for non-ready CLIs.
+
+    Returns a dict with functional readiness (may downgrade True → False).
+    """
+    from harness.drivers.codex import CodexDriver
+    from harness.drivers.cursor import CursorDriver
+
+    ready = dict(ides)
+    if ides["cursor"]:
+        probe = CursorDriver().probe()
+        if probe.available:
+            typer.echo(t("install.cursor_ok"))
+        else:
+            typer.echo(t("install.cursor_not_ready"))
+            ready["cursor"] = False
+    else:
+        typer.echo(t("install.cursor_missing"))
+
+    if ides["codex"]:
+        probe = CodexDriver().probe()
+        if probe.available:
+            typer.echo(t("install.codex_ok"))
+        else:
+            typer.echo(t("install.codex_not_ready"))
+            ready["codex"] = False
+    else:
+        typer.echo(t("install.codex_missing"))
+
+    return ready
+
+
 def run_install(*, force: bool = False, lang: str | None = None) -> None:
     """Run install: preflight, then copy agent files."""
     resolved = _resolve_install_lang(lang)
@@ -114,8 +146,7 @@ def run_install(*, force: bool = False, lang: str | None = None) -> None:
 
     ides = _detect_ide()
     typer.echo(t("install.env_check"))
-    typer.echo(t("install.cursor_ok") if ides["cursor"] else t("install.cursor_missing"))
-    typer.echo(t("install.codex_ok") if ides["codex"] else t("install.codex_missing"))
+    _probe_ides(ides)
 
     if not any(ides.values()):
         typer.echo(t("install.no_ide"), err=True)

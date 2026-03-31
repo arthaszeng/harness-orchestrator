@@ -1,12 +1,13 @@
-"""codex.py tests"""
+"""codex.py tests — prompt composition, invoke, and probe logic"""
 
 from __future__ import annotations
 
 import io
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from harness.drivers.codex import CodexDriver
+from harness.drivers.codex import CodexDriver, DriverProbe
 
 
 def test_compose_prompt_includes_role_instructions_for_known_agent() -> None:
@@ -86,3 +87,70 @@ def test_invoke_falls_back_to_stdout_when_no_output_file(mock_popen: Mock, tmp_p
 
     assert result.success is True
     assert "streamed output" in result.output
+
+
+# ── Probe tests ──────────────────────────────────────────────────
+
+
+@patch("harness.drivers.codex.shutil.which", return_value=None)
+def test_probe_not_available_when_binary_missing(mock_which: Mock) -> None:
+    driver = CodexDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert probe.warnings == []
+
+
+@patch("harness.drivers.codex.subprocess.run")
+@patch("harness.drivers.codex.shutil.which", return_value="/usr/bin/codex")
+def test_probe_available_when_exec_help_ok(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        r = MagicMock()
+        if cmd[1] == "--version":
+            r.stdout, r.stderr, r.returncode = "0.5.0", "", 0
+        else:
+            r.stdout = "--full-auto --output-last-message"
+            r.stderr = ""
+            r.returncode = 0
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CodexDriver()
+    probe = driver.probe()
+    assert probe.available is True
+    assert probe.version == "0.5.0"
+    assert probe.warnings == []
+
+
+@patch("harness.drivers.codex.subprocess.run")
+@patch("harness.drivers.codex.shutil.which", return_value="/usr/bin/codex")
+def test_probe_not_available_on_exec_failure(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        r = MagicMock()
+        if cmd[1] == "--version":
+            r.stdout, r.stderr, r.returncode = "0.5.0", "", 0
+        else:
+            r.stdout, r.stderr, r.returncode = "", "unknown subcommand", 1
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CodexDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert len(probe.warnings) == 1
+
+
+@patch("harness.drivers.codex.subprocess.run")
+@patch("harness.drivers.codex.shutil.which", return_value="/usr/bin/codex")
+def test_probe_not_available_on_timeout(mock_which: Mock, mock_run: Mock) -> None:
+    def _side_effect(cmd, **kw):  # type: ignore[no-untyped-def]
+        if "exec" in cmd:
+            raise subprocess.TimeoutExpired(cmd, 8)
+        r = MagicMock()
+        r.stdout, r.stderr, r.returncode = "0.5.0", "", 0
+        return r
+
+    mock_run.side_effect = _side_effect
+    driver = CodexDriver()
+    probe = driver.probe()
+    assert probe.available is False
+    assert len(probe.warnings) == 1
