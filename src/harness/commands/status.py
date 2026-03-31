@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import typer
 from rich.panel import Panel
-from rich.table import Table
 
+from harness.core.progress import (
+    get_recent_blocked,
+    get_recent_completed,
+    is_resumable,
+    suggest_next_action,
+)
 from harness.core.state import SessionState
 from harness.core.ui import get_ui
 
@@ -26,7 +30,9 @@ def run_status() -> None:
 
     _render_header(console, state)
     _render_current(console, state)
-    _render_completed(console, state)
+    _render_recent_result(console, state)
+    _render_resume(console, state)
+    _render_next_action(console, state)
     _render_stats(console, state)
 
 
@@ -44,44 +50,52 @@ def _render_current(console, state: SessionState) -> None:
         return
     t = state.current_task
     console.print(f"\n[cyber.magenta]Current Task:[/] {t.requirement}")
-    console.print(f"  State:    {t.state.value}")
+    console.print(f"  Phase:     {t.state.value}")
     console.print(f"  Iteration: {t.iteration}")
-    console.print(f"  Branch:   [cyber.dim]{t.branch}[/]")
+    console.print(f"  Branch:    [cyber.dim]{t.branch}[/]")
 
 
-def _render_completed(console, state: SessionState) -> None:
-    if not state.completed and not state.blocked:
+def _render_recent_result(console, state: SessionState) -> None:
+    recent_done = get_recent_completed(state)
+    recent_block = get_recent_blocked(state)
+
+    if not recent_done and not recent_block:
         return
 
-    if state.completed:
-        table = Table(title="Completed Tasks", show_lines=False, border_style="cyber.dim")
-        table.add_column("#", style="cyber.dim", width=3)
-        table.add_column("Task")
-        table.add_column("Score", justify="right")
-        table.add_column("Verdict")
-        table.add_column("Iters", justify="right")
+    console.print("\n[cyber.magenta]Recent Result:[/]")
 
-        for i, t in enumerate(state.completed, 1):
-            score_style = "cyber.ok" if t.score >= 3.5 else "cyber.warn"
-            table.add_row(
-                str(i),
-                t.requirement,
-                f"[{score_style}]{t.score:.1f}[/{score_style}]",
-                t.verdict,
-                str(t.iterations),
-            )
-        console.print()
-        console.print(table)
+    if recent_done:
+        score_style = "cyber.ok" if recent_done.score >= 3.5 else "cyber.warn"
+        console.print(
+            f"  ✓ {recent_done.requirement} — "
+            f"[{score_style}]{recent_done.score:.1f}[/{score_style}] "
+            f"({recent_done.verdict}, {recent_done.iterations} iterations)"
+        )
 
-    if state.blocked:
-        console.print(f"\n[cyber.red]Blocked ({len(state.blocked)}):[/]")
-        for t in state.blocked:
-            console.print(f"  - {t.requirement} [cyber.dim](score: {t.score:.1f})[/]")
+    if recent_block:
+        console.print(
+            f"  ✗ {recent_block.requirement} — "
+            f"[cyber.red]{recent_block.score:.1f}[/cyber.red] "
+            f"({recent_block.verdict})"
+        )
+
+
+def _render_resume(console, state: SessionState) -> None:
+    if not is_resumable(state):
+        return
+    cmd = "harness run --resume" if state.mode == "run" else "harness auto --resume"
+    console.print(f"\n[cyber.warn]Resume:[/] session `{state.session_id}` can be resumed")
+    console.print(f"  → [bold]`{cmd}`[/bold]")
+
+
+def _render_next_action(console, state: SessionState) -> None:
+    action = suggest_next_action(state)
+    console.print(f"\n[cyber.magenta]Next Action:[/] {action}")
 
 
 def _render_stats(console, state: SessionState) -> None:
     s = state.stats
     console.print(
-        f"\n[cyber.dim]Tasks: {s.completed} done, {s.blocked} blocked | "
+        f"\n[cyber.dim]Stats: {s.completed} done, {s.blocked} blocked | "
         f"Avg: {s.avg_score:.1f} | Iters: {s.total_iterations}[/]",
     )
