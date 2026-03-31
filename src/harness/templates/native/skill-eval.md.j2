@@ -58,6 +58,12 @@ Review the code changes against the contract using the structured checklist.
    - **path**, **line**, **category**, **description**
    - Format: `[SEVERITY] (confidence: N/10) file:line — description`
 
+7. **Coverage spot-check**: For each changed file, trace the code paths and note test coverage:
+   - Identify all modified/added functions
+   - For each, check if tests exist: `[TESTED]` or `[GAP]`
+   - Include GAP paths as INFORMATIONAL findings (do NOT auto-generate tests in eval — that's ship-only)
+   - If any modified existing behavior lacks a regression test, flag as CRITICAL
+
 ---
 
 ## Step 1.5: Specialist Dispatch (conditional)

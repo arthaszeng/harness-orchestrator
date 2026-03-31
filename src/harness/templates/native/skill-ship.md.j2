@@ -89,6 +89,75 @@ If all failures were pre-existing, continue to Step 3.5.
 
 ---
 
+## Step 3.4: Test Coverage Audit
+
+Analyze the diff to ensure changed code paths have adequate test coverage.
+
+### 1. Detect Test Framework
+Scan for: `pytest.ini`, `pyproject.toml [tool.pytest]`, `jest.config.*`, `vitest.config.*`,
+`Makefile` test targets, `tox.ini`, `setup.cfg [tool:pytest]`. Note the framework for later use.
+
+### 2. Trace Code Paths
+For each file in `git diff {{ trunk_branch }}..HEAD`:
+1. Read the changed file and identify all modified/added functions and methods
+2. For each function, trace:
+   - Happy path (normal execution)
+   - Each conditional branch (if/else, match/case)
+   - Each error path (try/except, error returns)
+   - Each loop boundary (empty collection, single item, many items)
+3. Draw an ASCII coverage diagram:
+
+```
+COVERAGE: src/harness/workflow.py
+├─ single_task_pass()
+│  ├─ [TESTED ★★★] happy path — tested in test_single_task_pass
+│  ├─ [TESTED ★★]  max iterations — tested in test_blocked_after_max
+│  ├─ [GAP]        empty spec input — no test
+│  └─ [TESTED ★]   dual eval failure — tested but shallow
+├─ split_spec_contract()
+│  ├─ [TESTED ★★★] with marker
+│  ├─ [TESTED ★★★] without marker
+│  └─ [TESTED ★★★] case insensitive
+```
+
+Legend: ★★★ = thorough (multiple assertions), ★★ = basic (single assertion), ★ = exists but shallow, GAP = no test
+
+### 3. User Flow Coverage
+Check that these scenarios are covered for changed code:
+- Concurrent/parallel execution (if applicable)
+- Empty/null state
+- Boundary values (0, max, negative)
+- Error recovery paths
+
+### 4. E2E Decision Matrix
+For changed code paths, recommend test type:
+- Pure function with no I/O → **unit test**
+- Single component with mocked deps → **unit test**
+- 2 components interacting → **integration test**
+- 3+ components or full user flow → **E2E test**
+- LLM/AI behavior validation → **eval test**
+
+### 5. Regression Rule (Iron Law)
+If the diff modifies existing behavior (changes to existing functions, not just new code):
+- There MUST be a regression test that verifies the old behavior still works
+- This is non-negotiable — generate the test if missing, do NOT ask
+
+### 6. Coverage Gate
+Calculate estimated coverage from the diagram:
+- Count total code paths and tested paths
+- **>= 80%**: PASS — continue
+- **>= 60%**: WARNING — output: "Coverage at ~X%. Consider adding tests for: [list GAP paths]"
+- **< 60%**: GATE — auto-generate tests for GAP paths (max 20 tests), run them, then re-assess
+
+### 7. Auto-Generate Missing Tests (when coverage < 60%)
+For each GAP path:
+1. Generate a test following the project's existing test patterns
+2. Run the test to verify it passes
+3. Cap at 20 generated tests per audit
+4. Commit generated tests: `git add tests/ && git commit -m "test: auto-generate coverage for gaps"`
+
+---
+
 ## Step 3.5: Plan Completion Audit
 
 If a plan file exists at `.agents/tasks/task-NNN/plan.md`:
