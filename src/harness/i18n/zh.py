@@ -3,16 +3,16 @@
 MESSAGES: dict[str, str] = {
     # ── init command ──────────────────────────────────────────────
     "init.enter_range": "  请输入 1-{n} 之间的数字",
-    "init.step1_title": "\nStep 2/7  项目信息",
+    "init.step1_title": "\nStep 2/8  项目信息",
     "init.project_name": "  项目名称",
     "init.project_desc": "  项目描述（可选）",
-    "init.step2_title": "\nStep 3/7  IDE 环境",
+    "init.step2_title": "\nStep 3/8  IDE 环境",
     "init.cursor_status": "  Cursor CLI: {status}",
     "init.codex_status": "  Codex CLI:  {status}",
     "init.ide_not_detected": "未检测到",
     "init.ide_error": "\n  [error] 至少需要安装 Cursor 或 Codex CLI。",
     "init.install_agents_confirm": "  安装 agent 定义到本地 IDE?",
-    "init.step3_title": "\nStep 4/7  驱动模式",
+    "init.step3_title": "\nStep 4/8  驱动模式",
     "init.both_detected": "  检测到 Cursor + Codex，可选：",
     "init.opt_auto": "  1. auto -- Builder->Cursor, 其余->Codex（推荐）",
     "init.opt_cursor": "  2. cursor -- 全部使用 Cursor",
@@ -20,7 +20,9 @@ MESSAGES: dict[str, str] = {
     "init.choose": "  选择",
     "init.cursor_only": "  仅检测到 Cursor，将使用 cursor 模式",
     "init.codex_only": "  仅检测到 Codex，将使用 codex 模式",
-    "init.step4_title": "\nStep 5/7  CI 门禁",
+    "init.step_trunk_title": "\nStep 5/8  主干分支",
+    "init.trunk_prompt": "  主干分支名称",
+    "init.step4_title": "\nStep 6/8  CI 门禁",
     "init.scanning": "  分析项目结构...",
     "init.found": "    发现 {line}",
     "init.no_ci_found": "    未发现常见 CI 配置文件",
@@ -38,14 +40,14 @@ MESSAGES: dict[str, str] = {
     "init.ai_done": "  [AI] 完成 ({elapsed:.0f}s)",
     "init.ai_recommend": "  AI 推荐: {line}",
     "init.use_command": "  使用这个命令?",
-    "init.step5_title": "\nStep 6/7  Memverse 记忆集成",
+    "init.step5_title": "\nStep 7/8  Memverse 记忆集成",
     "init.memverse_desc": "  Memverse 可在 agent 反思时将关键决策持久化到长期记忆系统。",
     "init.opt_enable": "  1. 开启",
     "init.opt_disable": "  2. 关闭（默认）",
     "init.memverse_driver": "\n  Memverse driver 将跟随全局设置: {mode}",
     "init.memverse_all_ides": "  所有可用 IDE 均可写入 Memverse。",
     "init.domain_prefix": "  Domain prefix（用于区分项目）",
-    "init.step6_title": "\nStep 7/7  Vision",
+    "init.step6_title": "\nStep 8/8  Vision",
     "init.opt_vision_now": "  1. 现在用 harness vision 交互式生成（推荐）",
     "init.opt_vision_later": "  2. 跳过，稍后手动编辑 .agents/vision.md",
     "init.config_exists": ".agents/config.toml 已存在，是否覆盖?",
@@ -196,6 +198,12 @@ MESSAGES: dict[str, str] = {
         "{prompt}{readonly_block}\n"
     ),
 
+    # ── git operations ───────────────────────────────────────────
+    "git.rebasing": "[git] 正在 rebase 到 {trunk}...",
+    "git.rebase_failed": "[git] rebase 失败，分支 {branch} 已保留以供手动处理",
+    "git.dirty_worktree": "工作树存在未提交的更改。请先 commit 或 stash 后再启动任务。",
+    "git.cleanup": "[git] 正在清理：暂存更改并切回 {trunk}",
+
     # ── evaluation ────────────────────────────────────────────────
     "eval.ci_not_found": "CI 命令未找到: {error}",
     "eval.ci_timeout": "CI 命令超时 (300s)",
@@ -266,7 +274,7 @@ MESSAGES: dict[str, str] = {
         "## Builder 工作日志（摘要）\n{build_log}\n\n"
         "## 评估指引\n"
         "- **关键**：Builder 会 commit 代码，因此 `git diff`（working tree）可能为空。\n"
-        "  请使用上方的变更摘要，或执行 `git diff main..HEAD` 来查看实际变更。\n"
+        "  请使用上方的变更摘要，或执行 `git diff <trunk>..HEAD` 来查看实际变更。\n"
         "- **请基于本轮合同和本轮变更打分。**\n"
         "  不要因为前轮遗留的问题扣分，除非 Builder 使之恶化。\n"
         "- 检查测试状态，按四维标准打分。\n"

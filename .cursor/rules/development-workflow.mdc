@@ -1,0 +1,24 @@
+---
+description: harness-orchestrator 开发完成流程 — 每次代码变更后必须执行
+globs:
+alwaysApply: true
+---
+
+# Development Workflow — 强制完成步骤
+
+每次对 harness-orchestrator 进行代码修改、测试通过后，**必须依次执行以下步骤**。
+不得在任何步骤完成前结束对话或声称任务完成。
+
+## 完成流程 (mandatory)
+
+1. **Bump version** — `pyproject.toml` 中的 `version` 字段递增（patch/minor/major 视改动幅度而定）
+2. **Install** — `pip install -e .` 安装最新版本，并用 `harness --version` 验证
+3. **Git commit + push** — 测试通过后直接提交，不需额外确认。使用 conventional commit 风格
+4. **Memverse 记忆同步** — 调用 `add_memories` 记录本次变更摘要（版本号、关键改动、commit hash）
+5. **确认 git clean** — `git status` 确认工作树干净
+
+## 禁止事项
+
+- **禁止** 在代码 TODO 全部 completed 后就认为任务结束（必须走完上述 5 步）
+- **禁止** 跳过 bump version 或 pip install
+- **禁止** 遗漏 Memverse 同步

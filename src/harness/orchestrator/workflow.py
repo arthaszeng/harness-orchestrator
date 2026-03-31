@@ -59,12 +59,14 @@ def run_single_task(
 ) -> WorkflowResult:
     """Run the full plan → contract → build → eval loop."""
     from harness.integrations import git_ops
+    from harness.integrations.git_ops import DirtyWorktreeError
 
     ui = get_ui()
     ev = events or NullEventEmitter()
     project_root = config.project_root
     agents_dir = sm.agents_dir
     is_lite = config.workflow.profile == "lite"
+    trunk = config.workflow.trunk_branch
 
     if not task_id:
         seq = len(sm.state.completed) + len(sm.state.blocked) + 1
@@ -78,9 +80,54 @@ def run_single_task(
     if resume and current and current.id == task_id:
         ui.info(f"resuming [{task_id}] from {current.state.value}")
     else:
-        main_branch = git_ops.current_branch(project_root)
+        git_ops.ensure_clean(project_root)
         git_ops.create_branch(branch, project_root)
         sm.start_task(task_id, requirement, branch)
+
+    max_iter, pass_threshold = _resolve_profile(config)
+
+    start_iteration = 1
+    if resume and sm.state.current_task and sm.state.current_task.iteration > 0:
+        start_iteration = sm.state.current_task.iteration
+
+    _normal_return = False
+    try:
+        result = _run_task_loop(
+            config, sm, resolver, requirement, task_id, branch, task_dir, trunk,
+            ev=ev, registry=registry, max_iter=max_iter, pass_threshold=pass_threshold,
+            start_iteration=start_iteration, is_lite=is_lite,
+        )
+        _normal_return = True
+        return result
+    finally:
+        if not _normal_return:
+            ui.warn(t("git.cleanup", trunk=trunk))
+            git_ops.safe_cleanup(trunk, project_root)
+
+
+def _run_task_loop(
+    config: HarnessConfig,
+    sm: StateMachine,
+    resolver: DriverResolver,
+    requirement: str,
+    task_id: str,
+    branch: str,
+    task_dir: Path,
+    trunk: str,
+    *,
+    ev: EventEmitter | NullEventEmitter,
+    registry: Registry | None,
+    max_iter: int,
+    pass_threshold: float,
+    start_iteration: int,
+    is_lite: bool,
+) -> WorkflowResult:
+    """Inner task loop extracted so run_single_task can wrap it in try/finally."""
+    from harness.integrations import git_ops
+
+    ui = get_ui()
+    project_root = config.project_root
+    agents_dir = sm.agents_dir
 
     if registry is None:
         registry = Registry(agents_dir)
@@ -89,16 +136,10 @@ def run_single_task(
     ui.task_panel(task_id, requirement, branch)
     ev.task_start(task_id=task_id, requirement=requirement, branch=branch)
 
-    max_iter, pass_threshold = _resolve_profile(config)
     last_feedback = ""
     last_contract = ""
     task_start = time.monotonic()
     abort_reason = ""
-
-    # On resume, continue from the last recorded iteration to avoid overwriting artifacts
-    start_iteration = 1
-    if resume and sm.state.current_task and sm.state.current_task.iteration > 0:
-        start_iteration = sm.state.current_task.iteration
 
     for iteration in range(start_iteration, start_iteration + max_iter):
         if sm.stop_requested():
@@ -194,7 +235,7 @@ def run_single_task(
                 build_result.output, encoding="utf-8"
             )
 
-            if build_result.success and _has_build_changes(project_root):
+            if build_result.success and _has_build_changes(project_root, trunk):
                 ui.step_done("[2/3 builder]", elapsed, True, "deployed")
             elif build_result.success:
                 ui.step_done("[2/3 builder]", elapsed, False, "no changes")
@@ -260,6 +301,7 @@ def run_single_task(
                 requirement, task_dir, iteration, project_root,
                 branch=branch,
                 pre_build_commit=pre_build_commit,
+                trunk=trunk,
             )
 
             t0 = time.monotonic()
@@ -305,7 +347,8 @@ def run_single_task(
                 align_name = resolver.agent_name("alignment_evaluator")
                 align_model = resolver.resolve_model("alignment_evaluator")
                 align_prompt = _build_alignment_eval_prompt(
-                    requirement, task_dir, iteration, project_root, branch=branch,
+                    requirement, task_dir, iteration, project_root,
+                    branch=branch, trunk=trunk,
                 )
                 t0 = time.monotonic()
                 with tracker.track("alignment_evaluator", align_eval.name, align_name, iteration, readonly=True, prompt=align_prompt) as run:
@@ -350,8 +393,15 @@ def run_single_task(
                 write_task_insights(insights, task_dir)
 
                 if config.workflow.auto_merge:
-                    ui.info("[git] merging to main...")
-                    git_ops.merge_branch(branch, "main", project_root)
+                    if git_ops.has_changes(project_root):
+                        git_ops._run_git(["add", "-A"], project_root)
+                        git_ops._run_git(
+                            ["commit", "-m", f"harness: {task_id} artifacts"],
+                            project_root,
+                        )
+                    ui.info(t("git.rebasing", trunk=trunk))
+                    if not git_ops.rebase_and_merge(branch, trunk, project_root):
+                        ui.warn(t("git.rebase_failed", branch=branch))
 
                 archive_task(agents_dir, task_id)
                 update_index(agents_dir, sm.state)
@@ -398,8 +448,8 @@ _DRIVER_ERROR_THRESHOLD_SECS = 10
 _DRIVER_ERROR_OUTPUT_LEN = 200
 
 
-def _has_build_changes(project_root: Path) -> bool:
-    """Check if the builder produced any code changes (uncommitted or new commits vs main)."""
+def _has_build_changes(project_root: Path, trunk: str = "main") -> bool:
+    """Check if the builder produced any code changes (uncommitted or new commits vs trunk)."""
     try:
         uncommitted = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -408,12 +458,12 @@ def _has_build_changes(project_root: Path) -> bool:
         if uncommitted.stdout.strip():
             return True
         diff = subprocess.run(
-            ["git", "diff", "main..HEAD", "--stat"],
+            ["git", "diff", f"{trunk}..HEAD", "--stat"],
             capture_output=True, text=True, cwd=str(project_root), timeout=5,
         )
         return bool(diff.stdout.strip())
     except Exception:
-        return True  # assume changes on error to avoid false negatives
+        return True
 
 _CONTRACT_MARKERS = [
     re.compile(r"^#\s+Contract\b", re.IGNORECASE | re.MULTILINE),
@@ -452,26 +502,26 @@ def _git_head_commit(project_root: Path) -> str:
         return ""
 
 
-def _git_branch_summary(project_root: Path, branch: str) -> str:
-    """Summarize diff stat and commit log for the branch vs main."""
+def _git_branch_summary(project_root: Path, branch: str, trunk: str = "main") -> str:
+    """Summarize diff stat and commit log for the branch vs trunk."""
     parts: list[str] = []
     try:
         stat = subprocess.run(
-            ["git", "diff", "main..HEAD", "--stat"],
+            ["git", "diff", f"{trunk}..HEAD", "--stat"],
             capture_output=True, text=True, cwd=str(project_root), timeout=10,
         )
         if stat.stdout.strip():
-            parts.append(f"### git diff main..HEAD --stat\n```\n{stat.stdout.strip()}\n```")
+            parts.append(f"### git diff {trunk}..HEAD --stat\n```\n{stat.stdout.strip()}\n```")
     except Exception:
         pass
 
     try:
-        log = subprocess.run(
-            ["git", "log", "--oneline", "main..HEAD"],
+        log_result = subprocess.run(
+            ["git", "log", "--oneline", f"{trunk}..HEAD"],
             capture_output=True, text=True, cwd=str(project_root), timeout=10,
         )
-        if log.stdout.strip():
-            parts.append(f"### git log --oneline main..HEAD\n```\n{log.stdout.strip()}\n```")
+        if log_result.stdout.strip():
+            parts.append(f"### git log --oneline {trunk}..HEAD\n```\n{log_result.stdout.strip()}\n```")
     except Exception:
         pass
 
@@ -661,13 +711,14 @@ def _build_alignment_eval_prompt(
     project_root: Path,
     *,
     branch: str = "",
+    trunk: str = "main",
 ) -> str:
     contract = ""
     contract_file = task_dir / f"contract-r{iteration}.md"
     if contract_file.exists():
         contract = contract_file.read_text(encoding="utf-8")[:5000]
 
-    branch_summary = _git_branch_summary(project_root, branch)
+    branch_summary = _git_branch_summary(project_root, branch, trunk)
 
     return t(
         "prompt.alignment",
@@ -687,13 +738,14 @@ def _build_eval_prompt(
     *,
     branch: str = "",
     pre_build_commit: str = "",
+    trunk: str = "main",
 ) -> str:
     contract = ""
     contract_file = task_dir / f"contract-r{iteration}.md"
     if contract_file.exists():
         contract = contract_file.read_text(encoding="utf-8")[:5000]
 
-    branch_summary = _git_branch_summary(project_root, branch)
+    branch_summary = _git_branch_summary(project_root, branch, trunk)
     iteration_summary = _git_incremental_summary(project_root, pre_build_commit)
 
     build_log = ""

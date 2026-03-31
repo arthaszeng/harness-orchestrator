@@ -165,7 +165,30 @@ def _step_driver_mode(ides: dict[str, bool]) -> tuple[str, dict[str, str]]:
     return mode, roles
 
 
-# ── Step 4: CI gate ───────────────────────────────────────────────
+# ── Step 4: trunk branch ─────────────────────────────────────────
+
+def _step_trunk_branch(project_root: Path) -> str:
+    """Detect the current git branch and let the user confirm or change it."""
+    import subprocess
+
+    typer.echo(t("init.step_trunk_title"))
+
+    detected = "main"
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True, text=True, cwd=str(project_root), timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            detected = result.stdout.strip()
+    except Exception:
+        pass
+
+    trunk = typer.prompt(t("init.trunk_prompt"), default=detected)
+    return trunk
+
+
+# ── Step 5: CI gate ───────────────────────────────────────────────
 
 def _step_ci_command(
     project_root: Path,
@@ -295,7 +318,7 @@ def _ai_suggest_ci(
     return typer.prompt(t("init.enter_ci"), default="make test")
 
 
-# ── Step 5: Memverse ──────────────────────────────────────────────
+# ── Step 6: Memverse ──────────────────────────────────────────────
 
 def _step_memverse(
     project_root: Path,
@@ -320,7 +343,7 @@ def _step_memverse(
     return True, mv_driver, domain
 
 
-# ── Step 6: Vision ────────────────────────────────────────────────
+# ── Step 7: Vision ────────────────────────────────────────────────
 
 def _step_vision(agents_dir: Path) -> bool:
     """Return True if the user chose to generate vision now."""
@@ -368,6 +391,7 @@ def run_init(
         }
         driver_mode = "auto"
         roles: dict[str, str] = {}
+        trunk_branch = "main"
         ci = ci_command or "make test"
         memverse_enabled, memverse_driver, memverse_domain = False, "auto", ""
         launch_vision = False
@@ -375,6 +399,7 @@ def run_init(
         proj_name, description = _step_project_info(project_root, name_override=name)
         ides = _step_ide_setup(lang_norm)
         driver_mode, roles = _step_driver_mode(ides)
+        trunk_branch = _step_trunk_branch(project_root)
         ci = _step_ci_command(
             project_root, ides, driver_mode, roles, ci_override=ci_command,
         )
@@ -395,6 +420,7 @@ def run_init(
         ci_command=ci,
         driver_mode=driver_mode,
         roles=roles,
+        trunk_branch=trunk_branch,
         memverse_enabled="true" if memverse_enabled else "false",
         memverse_driver=memverse_driver,
         memverse_domain=memverse_domain,

@@ -3,16 +3,16 @@
 MESSAGES: dict[str, str] = {
     # ── init command ──────────────────────────────────────────────
     "init.enter_range": "  Please enter a number between 1 and {n}",
-    "init.step1_title": "\nStep 2/7  Project Info",
+    "init.step1_title": "\nStep 2/8  Project Info",
     "init.project_name": "  Project name",
     "init.project_desc": "  Description (optional)",
-    "init.step2_title": "\nStep 3/7  IDE Environment",
+    "init.step2_title": "\nStep 3/8  IDE Environment",
     "init.cursor_status": "  Cursor CLI: {status}",
     "init.codex_status": "  Codex CLI:  {status}",
     "init.ide_not_detected": "not detected",
     "init.ide_error": "\n  [error] At least one of Cursor or Codex CLI must be installed.",
     "init.install_agents_confirm": "  Install agent definitions to local IDE?",
-    "init.step3_title": "\nStep 4/7  Driver Mode",
+    "init.step3_title": "\nStep 4/8  Driver Mode",
     "init.both_detected": "  Detected Cursor + Codex, options:",
     "init.opt_auto": "  1. auto -- Builder->Cursor, others->Codex (recommended)",
     "init.opt_cursor": "  2. cursor -- Use Cursor for all roles",
@@ -20,7 +20,9 @@ MESSAGES: dict[str, str] = {
     "init.choose": "  Choose",
     "init.cursor_only": "  Only Cursor detected, using cursor mode",
     "init.codex_only": "  Only Codex detected, using codex mode",
-    "init.step4_title": "\nStep 5/7  CI Gate",
+    "init.step_trunk_title": "\nStep 5/8  Trunk Branch",
+    "init.trunk_prompt": "  Trunk (main) branch name",
+    "init.step4_title": "\nStep 6/8  CI Gate",
     "init.scanning": "  Analyzing project structure...",
     "init.found": "    Found {line}",
     "init.no_ci_found": "    No common CI config files found",
@@ -38,14 +40,14 @@ MESSAGES: dict[str, str] = {
     "init.ai_done": "  [AI] Done ({elapsed:.0f}s)",
     "init.ai_recommend": "  AI recommends: {line}",
     "init.use_command": "  Use this command?",
-    "init.step5_title": "\nStep 6/7  Memverse Integration",
+    "init.step5_title": "\nStep 7/8  Memverse Integration",
     "init.memverse_desc": "  Memverse persists key decisions to long-term memory during agent reflection.",
     "init.opt_enable": "  1. Enable",
     "init.opt_disable": "  2. Disable (default)",
     "init.memverse_driver": "\n  Memverse driver follows global setting: {mode}",
     "init.memverse_all_ides": "  All available IDEs can write to Memverse.",
     "init.domain_prefix": "  Domain prefix (to distinguish projects)",
-    "init.step6_title": "\nStep 7/7  Vision",
+    "init.step6_title": "\nStep 8/8  Vision",
     "init.opt_vision_now": "  1. Generate now with harness vision (recommended)",
     "init.opt_vision_later": "  2. Skip, edit .agents/vision.md later",
     "init.config_exists": ".agents/config.toml already exists, overwrite?",
@@ -197,6 +199,12 @@ MESSAGES: dict[str, str] = {
         "{prompt}{readonly_block}\n"
     ),
 
+    # ── git operations ───────────────────────────────────────────
+    "git.rebasing": "[git] rebasing onto {trunk}...",
+    "git.rebase_failed": "[git] rebase failed, branch {branch} preserved for manual resolution",
+    "git.dirty_worktree": "Working tree has uncommitted changes. Commit or stash them before starting a task.",
+    "git.cleanup": "[git] cleaning up: stashing changes and switching to {trunk}",
+
     # ── evaluation ────────────────────────────────────────────────
     "eval.ci_not_found": "CI command not found: {error}",
     "eval.ci_timeout": "CI command timed out (300s)",
@@ -270,7 +278,7 @@ MESSAGES: dict[str, str] = {
         "## Builder Work Log (Summary)\n{build_log}\n\n"
         "## Evaluation Guidelines\n"
         "- **Critical**: Builder commits code, so `git diff` (working tree) may be empty.\n"
-        "  Use the change summaries above, or run `git diff main..HEAD` to see actual changes.\n"
+        "  Use the change summaries above, or run `git diff <trunk>..HEAD` to see actual changes.\n"
         "- **Score based on THIS iteration's contract and this iteration's changes.**\n"
         "  Do not penalize for issues inherited from prior iterations unless the builder made them worse.\n"
         "- Check test status and score on four dimensions.\n"

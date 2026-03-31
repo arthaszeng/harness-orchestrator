@@ -71,6 +71,7 @@ class WorkflowConfig(BaseModel):
     pass_threshold: float = 3.5
     auto_merge: bool = True
     branch_prefix: str = "agent"
+    trunk_branch: str = "main"
     dual_evaluation: bool = False
 
 
