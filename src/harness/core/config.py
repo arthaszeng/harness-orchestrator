@@ -12,9 +12,11 @@ if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
-from pydantic import BaseModel, Field
+import warnings
 
-from harness.core.roles import ALL_ROLES
+from pydantic import BaseModel, Field, model_validator
+
+from harness.core.roles import ALL_ROLES, NATIVE_REVIEW_ROLES
 
 KNOWN_MODEL_ROLES: frozenset[str] = ALL_ROLES
 
@@ -77,6 +79,18 @@ class NativeModeConfig(BaseModel):
             'Empty string or absent = use IDE default model.'
         ),
     )
+
+    @model_validator(mode="after")
+    def _validate_role_models_keys(self) -> "NativeModeConfig":
+        unknown = set(self.role_models) - NATIVE_REVIEW_ROLES
+        if unknown:
+            warnings.warn(
+                f"Unknown native.role_models keys: {sorted(unknown)}. "
+                f"Valid keys: {sorted(NATIVE_REVIEW_ROLES)}",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
 
 
 class WorkflowConfig(BaseModel):

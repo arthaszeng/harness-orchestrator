@@ -15,6 +15,7 @@ import jinja2
 import typer
 
 from harness.core.config import HarnessConfig
+from harness.core.roles import NATIVE_REVIEW_ROLES
 from harness.i18n import t
 
 
@@ -78,7 +79,7 @@ def _detect_project_lang(cfg: HarnessConfig) -> str:
     return "unknown"
 
 
-_ROLE_NAMES = ("architect", "product_owner", "engineer", "qa", "project_manager")
+_ROLE_NAMES = tuple(sorted(NATIVE_REVIEW_ROLES))
 
 
 def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:

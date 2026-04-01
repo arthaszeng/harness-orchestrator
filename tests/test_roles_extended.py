@@ -63,3 +63,15 @@ def test_role_descriptor_frozen():
         assert False, "should be frozen"
     except AttributeError:
         pass
+
+
+def test_native_review_roles_defined():
+    from harness.core.roles import NATIVE_REVIEW_ROLES
+    expected = {"architect", "product_owner", "engineer", "qa", "project_manager"}
+    assert NATIVE_REVIEW_ROLES == expected
+
+
+def test_native_review_roles_disjoint_from_orchestrator():
+    from harness.core.roles import ALL_ROLES, NATIVE_REVIEW_ROLES
+    overlap = ALL_ROLES & NATIVE_REVIEW_ROLES
+    assert not overlap, f"Overlap between orchestrator and native roles: {overlap}"

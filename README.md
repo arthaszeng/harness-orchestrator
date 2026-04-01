@@ -301,7 +301,7 @@ IDE CLI setup:
 |---|---|---|
 | **How it runs** | External `harness` CLI spawns agent processes | Skills + subagents inside Cursor IDE |
 | **Entry point** | `harness run` / `harness auto` | `/harness-brainstorm`, `/harness-vision`, `/harness-plan` |
-| **Cross-model review** | Configurable per role | Adversarial subagent with a different model |
+| **Cross-model review** | Configurable per role | 5-role parallel reviewers with per-role model overrides (`native.role_models`) |
 | **When to use** | CI/CD, headless, multi-IDE | Interactive development, Cursor-only |
 
 ### Role architecture

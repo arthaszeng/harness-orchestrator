@@ -399,6 +399,19 @@ def test_config_role_models_accepts_valid_values():
     assert cfg.role_models["qa"] == "o3-mini"
 
 
+def test_config_role_models_warns_on_unknown_keys():
+    """role_models validator warns on unknown keys."""
+    import warnings as _w
+    from harness.core.config import NativeModeConfig
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        cfg = NativeModeConfig(role_models={"architect": "gpt-4.1", "product-owner": "o3"})
+    assert any("product-owner" in str(w.message) for w in caught), (
+        "Expected warning about unknown key 'product-owner'"
+    )
+    assert cfg.role_models["architect"] == "gpt-4.1"
+
+
 # --- StrictUndefined template validation ---
 
 

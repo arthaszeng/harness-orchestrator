@@ -301,7 +301,7 @@ IDE CLI 配置：
 |---|---|---|
 | **运行方式** | 外部 `harness` CLI 生成 agent 进程 | Cursor IDE 内 skill + 子代理 |
 | **入口** | `harness run` / `harness auto` | `/harness-brainstorm`、`/harness-vision`、`/harness-plan` |
-| **跨模型评审** | 按角色配置 | 对抗子代理使用不同模型 |
+| **跨模型评审** | 按角色配置 | 5 角色并行评审，支持 `native.role_models` 按角色指定模型 |
 | **适用场景** | CI/CD、无头自动化、多 IDE | 交互式开发、纯 Cursor 工作流 |
 
 ### 角色架构

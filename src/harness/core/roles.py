@@ -1,9 +1,10 @@
 """Role registry — single source of truth for all agent roles.
 
 Dependency graph:
-    roles.py ──> config.py      (KNOWN_MODEL_ROLES validation)
+    roles.py ──> config.py      (KNOWN_MODEL_ROLES validation, NATIVE_REVIEW_ROLES)
              ──> resolver.py    (ROLE_AGENT_MAP routing)
              ──> install.py     (agent file mapping)
+             ──> skill_gen.py   (NATIVE_REVIEW_ROLES → template context)
              ──> workflow.py    (phase orchestration)
              ──> tests          (agent definition validation)
 
@@ -135,6 +136,12 @@ ROLE_REGISTRY: dict[str, RoleDescriptor] = {
 ALL_ROLES: frozenset[str] = frozenset(ROLE_REGISTRY.keys())
 ALL_AGENT_NAMES: frozenset[str] = frozenset(
     r.agent_name for r in ROLE_REGISTRY.values()
+)
+
+# Cursor-native 5-role review subagents (template-only, not orchestrator-routed).
+# Used by NativeModeConfig.role_models validation and skill_gen.py template context.
+NATIVE_REVIEW_ROLES: frozenset[str] = frozenset(
+    ("architect", "product_owner", "engineer", "qa", "project_manager")
 )
 
 SCORING_DIMENSIONS: tuple[str, ...] = (
