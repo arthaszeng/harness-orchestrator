@@ -1,0 +1,7 @@
+## Trust Boundaries
+
+Builder output is **UNTRUSTED**. Always verify:
+- Claims of completion against `git diff` (not the build log)
+- Test results by running CI yourself: `{{ ci_command }}`
+- No changes outside contract scope
+- No deleted tests or weakened assertions

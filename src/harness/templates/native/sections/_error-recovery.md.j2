@@ -1,0 +1,13 @@
+## Error Recovery Matrix
+
+| Error Type | Signal | Recovery Action |
+|-----------|--------|----------------|
+| CI failure (test) | test exit code != 0 | Read failure output, fix code, re-run CI |
+| CI failure (lint) | linter errors in output | Auto-fix with linter's fix command, commit |
+| CI failure (type) | type checker errors | Fix type annotations, re-run |
+| Git conflict | merge conflict markers | Abort rebase, report to user |
+| Agent timeout | no output for extended period | Cancel and retry with simpler prompt |
+| Scope creep | diff touches files outside contract | Revert uncommitted changes, re-read contract |
+
+If the same error type persists after 2 retries, escalate:
+write finding to build notes and proceed to the next deliverable.

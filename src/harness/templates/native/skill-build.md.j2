@@ -97,6 +97,21 @@ If tests fail, determine ownership:
 **After triage:** If in-branch failures remain after 3 attempts, note them as blockers
 in the build log and stop.
 
+## Error Recovery Matrix
+
+| Error Type | Signal | Recovery Action |
+|-----------|--------|----------------|
+| CI failure (test) | test runner exit code != 0 | Read failure output, fix code, re-run `{{ ci_command }}` |
+| CI failure (lint) | linter errors in output | Auto-fix if linter supports it, commit, re-run |
+| CI failure (type) | type checker errors | Fix type annotations, re-run |
+| Git conflict | merge conflict markers | Report to user, do not attempt resolution |
+| Scope creep | diff touches files outside contract | Revert uncommitted changes, re-read contract |
+| Import error | ModuleNotFoundError or similar | Check if dependency is missing, add to requirements |
+| Permission error | PermissionError or EACCES | Report to user, do not retry |
+
+If the same error type persists after 2 retries of the same fix strategy,
+write the finding to `.agents/tasks/<task-id>/build-notes.md` and proceed to the next deliverable.
+
 ---
 
 ## Step 5: Write Build Log

@@ -1,0 +1,14 @@
+{% if hooks_pre_build %}
+## Pre-Build Hook
+Before starting implementation, execute: `{{ hooks_pre_build }}`
+If it exits non-zero, report the error and stop.
+{% endif %}
+{% if hooks_post_eval %}
+## Post-Eval Hook
+After evaluation completes, execute: `{{ hooks_post_eval }}`
+{% endif %}
+{% if hooks_pre_ship %}
+## Pre-Ship Hook
+Before pushing, execute: `{{ hooks_pre_ship }}`
+If it exits non-zero, report the error and stop.
+{% endif %}

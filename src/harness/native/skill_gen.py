@@ -48,9 +48,29 @@ def _get_template_dir() -> Path:
     return Path(str(pkg))
 
 
-def _build_context(cfg: HarnessConfig) -> dict[str, str]:
-    """Build the Jinja2 template context from config + i18n."""
-    return {
+def _detect_project_lang(cfg: HarnessConfig) -> str:
+    """Detect project language from project root markers."""
+    root = cfg.project_root
+    if (root / "pyproject.toml").exists() or (root / "setup.py").exists():
+        return "python"
+    if (root / "package.json").exists():
+        return "typescript"
+    if (root / "go.mod").exists():
+        return "go"
+    if (root / "Cargo.toml").exists():
+        return "rust"
+    if (root / "pom.xml").exists() or (root / "build.gradle").exists():
+        return "java"
+    return "unknown"
+
+
+def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
+    """Build the Jinja2 template context from config + i18n.
+
+    When role is specified, irrelevant variables are stripped to reduce
+    token noise (inspired by Claude Code's omitClaudeMd pattern).
+    """
+    ctx: dict[str, str] = {
         "ci_command": cfg.ci.command,
         "trunk_branch": cfg.workflow.trunk_branch,
         "branch_prefix": cfg.workflow.branch_prefix,
@@ -61,7 +81,29 @@ def _build_context(cfg: HarnessConfig) -> dict[str, str]:
         "planner_principles": _planner_principles(),
         "builder_principles": _builder_principles(),
         "project_name": cfg.project.name,
+        "project_lang": _detect_project_lang(cfg),
+        "hooks_pre_build": cfg.native.hooks_pre_build,
+        "hooks_post_eval": cfg.native.hooks_post_eval,
+        "hooks_pre_ship": cfg.native.hooks_pre_ship,
     }
+
+    if role == "adversarial_reviewer":
+        for key in (
+            "builder_principles",
+            "planner_principles",
+            "ci_command",
+            "max_iterations",
+            "branch_prefix",
+        ):
+            ctx.pop(key, None)
+    elif role == "evaluator":
+        for key in ("planner_principles", "branch_prefix"):
+            ctx.pop(key, None)
+    elif role == "planner":
+        for key in ("builder_principles",):
+            ctx.pop(key, None)
+
+    return ctx
 
 
 def _planner_principles() -> str:
@@ -85,8 +127,12 @@ def _builder_principles() -> str:
 
 
 def _render_template(tmpl_dir: Path, tmpl_name: str, context: dict[str, str]) -> str:
-    tmpl_path = tmpl_dir / tmpl_name
-    tmpl = jinja2.Template(tmpl_path.read_text(encoding="utf-8"))
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(tmpl_dir)),
+        undefined=jinja2.Undefined,
+        keep_trailing_newline=True,
+    )
+    tmpl = env.get_template(tmpl_name)
     return tmpl.render(**context)
 
 
@@ -121,8 +167,10 @@ def generate_native_artifacts(
     agents_dir = project_root / ".cursor" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
     for tmpl_name, agent_name in _AGENT_TEMPLATES:
+        role = "adversarial_reviewer" if "adversarial" in agent_name else "evaluator"
+        agent_context = _build_context(cfg, role=role)
         out_path = agents_dir / f"{agent_name}.md"
-        content = _render_template(tmpl_dir, tmpl_name, context)
+        content = _render_template(tmpl_dir, tmpl_name, agent_context)
         out_path.write_text(content, encoding="utf-8")
         typer.echo(t("native.generated_agent", path=_rel(project_root, out_path)))
         count += 1
