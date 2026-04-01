@@ -240,7 +240,7 @@ def run_init(
         _run_reinit(project_root)
         return
 
-    if config_exists:
+    if config_exists and not non_interactive:
         overwrite = typer.confirm(t("init.config_exists"), default=False)
         if not overwrite:
             console.print(f"  [cyber.dim]{t('init.cancelled')}[/]")

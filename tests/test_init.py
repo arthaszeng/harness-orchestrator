@@ -260,3 +260,34 @@ class TestRunInitReinit:
         with patch("harness.native.skill_gen.generate_native_artifacts"):
             run_init(non_interactive=True, force=True)
         assert (tmp_path / ".agents" / "config.toml").exists()
+
+    @patch("harness.native.skill_gen.generate_native_artifacts")
+    def test_no_force_config_exists_confirm_yes_overwrites(self, _mock_gen, monkeypatch, tmp_path):
+        """Confirming overwrite re-runs the wizard and rewrites config."""
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".agents"
+        agents.mkdir(parents=True)
+        (agents / "config.toml").write_text(
+            '[project]\nname = "stale-proj"\n[ci]\ncommand = "t"\n',
+            encoding="utf-8",
+        )
+        with patch("harness.commands.init.typer.confirm", return_value=True):
+            set_lang("en")
+            run_init(non_interactive=True)
+        body = (agents / "config.toml").read_text(encoding="utf-8")
+        assert 'name = "stale-proj"' not in body
+
+    @patch("harness.native.skill_gen.generate_native_artifacts")
+    def test_non_interactive_config_exists_skips_confirm(self, _mock_gen, monkeypatch, tmp_path):
+        """non_interactive + existing config skips confirm prompt and overwrites."""
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".agents"
+        agents.mkdir(parents=True)
+        (agents / "config.toml").write_text(
+            '[project]\nname = "stale"\n[ci]\ncommand = "x"\n',
+            encoding="utf-8",
+        )
+        set_lang("en")
+        run_init(non_interactive=True)
+        body = (agents / "config.toml").read_text(encoding="utf-8")
+        assert "stale" not in body
