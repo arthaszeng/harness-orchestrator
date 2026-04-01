@@ -10,7 +10,7 @@ from harness import __version__
 
 app = typer.Typer(
     name="harness",
-    help="Contract-driven multi-agent autonomous development orchestration",
+    help="Cursor-native multi-agent development framework",
     no_args_is_help=True,
 )
 
@@ -28,28 +28,23 @@ def main(
         help="Show version and exit",
     ),
 ) -> None:
-    """GAN-style multi-agent autonomous development framework"""
+    """Cursor-native multi-agent development framework."""
 
 
 @app.command()
 def install(
     force: bool = typer.Option(
         False, "--force", "-f",
-        help="Overwrite existing files, retry CLI installations without prompts (use to fix broken installs)",
+        help="Overwrite existing files and regenerate native artifacts",
     ),
     lang: Optional[str] = typer.Option(
         None,
         "--lang",
         "-l",
-        help="Language for agent definitions (en/zh); default from project config or UI language",
+        help="Language for generated artifacts (en/zh); default from project config",
     ),
 ) -> None:
-    """Install agent definitions to local IDE (Cursor / Codex).
-
-    Re-run with --force to fix a broken installation:
-    overwrites existing agent files, retries CLI installations,
-    and re-generates native mode artifacts.
-    """
+    """Generate native mode artifacts (.cursor/ skills, agents, rules)."""
     from harness.commands.install import run_install
     run_install(force=force, lang=lang)
 
@@ -65,34 +60,6 @@ def init(
     """Initialize harness configuration in the current project (interactive wizard)"""
     from harness.commands.init import run_init
     run_init(name=name, ci_command=ci_command, non_interactive=non_interactive)
-
-
-@app.command()
-def vision() -> None:
-    """Interactively create or update project vision (.agents/vision.md)"""
-    from harness.commands.vision_cmd import run_vision
-    run_vision()
-
-
-@app.command()
-def run(
-    requirement: str = typer.Argument(..., help="Requirement description"),
-    resume: bool = typer.Option(False, "--resume", "-r", help="Resume from last interruption"),
-    verbose: bool = typer.Option(False, "--verbose", "-V", help="Show full agent output"),
-) -> None:
-    """Run a single development task"""
-    from harness.commands.run import run_task
-    run_task(requirement=requirement, resume=resume, verbose=verbose)
-
-
-@app.command()
-def auto(
-    resume: bool = typer.Option(False, "--resume", "-r", help="Resume from last interruption"),
-    verbose: bool = typer.Option(False, "--verbose", "-V", help="Show full agent output"),
-) -> None:
-    """Start the autonomous development loop"""
-    from harness.commands.auto import run_auto
-    run_auto(resume=resume, verbose=verbose)
 
 
 @app.command()
@@ -117,15 +84,8 @@ def update(
 
     Steps:
     1. Check PyPI for newer version and upgrade via pip
-    2. Reinstall agent definitions (only after upgrade, or with --force)
+    2. Reinstall native artifacts (only after upgrade, or with --force)
     3. Check .agents/config.toml for new/deprecated keys
     """
     from harness.commands.update import run_update
     run_update(check=check, force=force)
-
-
-@app.command()
-def stop() -> None:
-    """Gracefully stop the currently running task"""
-    from harness.commands.stop import run_stop
-    run_stop()
