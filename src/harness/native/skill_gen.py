@@ -107,6 +107,8 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
         "review_gate": cfg.native.review_gate,
         "plan_review_gate": cfg.native.plan_review_gate,
         "retro_window_days": str(cfg.native.retro_window_days),
+        "gate_full_review_min": str(cfg.native.gate_full_review_min),
+        "gate_summary_confirm_min": str(cfg.native.gate_summary_confirm_min),
     }
 
     for rn in _ROLE_NAMES:

@@ -71,6 +71,14 @@ class NativeModeConfig(BaseModel):
     hooks_pre_build: str = ""
     hooks_post_eval: str = ""
     hooks_pre_ship: str = ""
+    gate_full_review_min: int = Field(
+        default=5, ge=1,
+        description="Escalation score threshold for FULL REVIEW (human must review).",
+    )
+    gate_summary_confirm_min: int = Field(
+        default=3, ge=1,
+        description="Escalation score threshold for SUMMARY CONFIRM (brief confirmation).",
+    )
     role_models: dict[str, str] = Field(
         default_factory=dict,
         description=(
@@ -81,7 +89,12 @@ class NativeModeConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _validate_role_models_keys(self) -> "NativeModeConfig":
+    def _validate_native_config(self) -> "NativeModeConfig":
+        if self.gate_summary_confirm_min >= self.gate_full_review_min:
+            raise ValueError(
+                f"gate_summary_confirm_min ({self.gate_summary_confirm_min}) "
+                f"must be less than gate_full_review_min ({self.gate_full_review_min})"
+            )
         unknown = set(self.role_models) - NATIVE_REVIEW_ROLES
         if unknown:
             warnings.warn(

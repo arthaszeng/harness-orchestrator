@@ -46,6 +46,8 @@ trunk_branch = "{{ trunk_branch }}"
 adversarial_model = "{{ adversarial_model }}"  # cross-model adversarial reviewer
 adversarial_mechanism = "auto"  # subagent / cli / auto
 review_gate = "eng"  # hard gate: only eng review blocks shipping
+gate_full_review_min = {{ gate_full_review_min }}  # escalation score for full human review
+gate_summary_confirm_min = {{ gate_summary_confirm_min }}  # escalation score for summary confirm
 {% endif %}
 
 [autonomous]
