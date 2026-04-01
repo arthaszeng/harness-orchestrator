@@ -138,7 +138,7 @@ class Registry:
         self,
         *,
         role: str,
-        driver: str,
+        runtime: str,
         agent_name: str,
         task_id: str | None = None,
         parent_run_id: int | None = None,
@@ -148,7 +148,10 @@ class Registry:
         branch: str | None = None,
         prompt: str = "",
     ) -> int:
-        """Insert a new running agent; return the auto-increment id."""
+        """Insert a new running agent; return the auto-increment id.
+
+        ``runtime`` is stored in the SQLite ``driver`` column for schema compatibility.
+        """
         prompt_str = str(prompt) if prompt else ""
         cur = self._conn.execute(
             """INSERT INTO agent_runs
@@ -157,7 +160,7 @@ class Registry:
                VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?)""",
             (
                 _to_text(task_id), parent_run_id,
-                _to_text(role), _to_text(driver), _to_text(agent_name),
+                _to_text(role), _to_text(runtime), _to_text(agent_name),
                 iteration,
                 1 if readonly else 0,
                 _to_text(cwd), _to_text(branch),
@@ -168,7 +171,7 @@ class Registry:
         )
         self._conn.commit()
         run_id = cur.lastrowid
-        log.debug("registered run #%d  role=%s driver=%s", run_id, role, driver)
+        log.debug("registered run #%d  role=%s runtime=%s", run_id, role, runtime)
         return run_id  # type: ignore[return-value]
 
     def complete(

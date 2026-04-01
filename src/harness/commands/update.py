@@ -66,7 +66,7 @@ def _migrate_config(project_root: Path) -> int:
     recommended_sections = {
         "project": "project name and language",
         "ci": "CI gate command",
-        "workflow": "workflow mode and iteration settings",
+        "workflow": "iteration and branch settings",
     }
     for section, desc in recommended_sections.items():
         if section not in data:

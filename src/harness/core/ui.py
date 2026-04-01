@@ -57,9 +57,9 @@ _TAIL_LINES = 5
 class _TailRenderable:
     """Rich Live renderable for the scrolling tail of agent output."""
 
-    def __init__(self, label: str, driver_name: str, start: float) -> None:
+    def __init__(self, label: str, runtime_name: str, start: float) -> None:
         self.label = label
-        self.driver_name = driver_name
+        self.runtime_name = runtime_name
         self.start = start
         self.lines: deque[str] = deque(maxlen=_TAIL_LINES)
         self.line_count = 0
@@ -167,16 +167,16 @@ class HarnessUI:
 
     @contextmanager
     def agent_step(
-        self, label: str, driver_name: str,
+        self, label: str, runtime_name: str,
     ) -> Generator[Callable[[str], None] | None, None, None]:
         """Context manager for an agent step.
 
         Default mode: Rich Live shows a scrolling tail, then clears when done.
-        Verbose mode: yields None; the driver writes raw stderr.
+        Verbose mode: yields None; caller handles raw stderr.
         """
         self.console.print(
             f"  [cyber.magenta]▸[/] [cyber.label]{label}[/] "
-            f"[cyber.dim]// {driver_name}[/]",
+            f"[cyber.dim]// {runtime_name}[/]",
         )
 
         if self.verbose:
@@ -184,7 +184,7 @@ class HarnessUI:
             return
 
         start = time.monotonic()
-        tail = _TailRenderable(label, driver_name, start)
+        tail = _TailRenderable(label, runtime_name, start)
 
         def on_output(line: str) -> None:
             tail.add_line(line)

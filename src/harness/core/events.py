@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from harness.core.roles import DEFAULT_DRIVER
+from harness.core.roles import DEFAULT_RUNTIME
 
 
 class EventEmitter:
@@ -34,12 +34,12 @@ class EventEmitter:
     # ── agent lifecycle ──────────────────────────────────────────
 
     def agent_start(
-        self, *, role: str, driver: str = DEFAULT_DRIVER, agent_name: str, iteration: int,
+        self, *, role: str, runtime: str = DEFAULT_RUNTIME, agent_name: str, iteration: int,
     ) -> float:
         """Record agent invocation start; returns a monotonic timestamp for elapsed calc."""
         self._emit(
             "agent_start",
-            role=role, driver=driver, agent_name=agent_name, iteration=iteration,
+            role=role, driver=runtime, agent_name=agent_name, iteration=iteration,
         )
         return time.monotonic()
 
@@ -47,7 +47,7 @@ class EventEmitter:
         self,
         *,
         role: str,
-        driver: str = DEFAULT_DRIVER,
+        runtime: str = DEFAULT_RUNTIME,
         agent_name: str,
         iteration: int,
         exit_code: int,
@@ -57,7 +57,7 @@ class EventEmitter:
     ) -> None:
         self._emit(
             "agent_end",
-            role=role, driver=driver, agent_name=agent_name, iteration=iteration,
+            role=role, driver=runtime, agent_name=agent_name, iteration=iteration,
             exit_code=exit_code, success=success, output_len=output_len,
             elapsed_ms=elapsed_ms,
         )

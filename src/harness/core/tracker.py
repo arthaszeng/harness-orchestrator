@@ -4,7 +4,7 @@ Provides a single ``with tracker.track(...):`` block for any agent invocation.
 Both the SQLite registry and the append-only JSONL log are written on every
 call, keeping the two systems in sync.
 
-In cursor-native mode the driver is always "cursor".
+In cursor-native mode the runtime is always "cursor".
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
-from harness.core.roles import DEFAULT_DRIVER
+from harness.core.roles import DEFAULT_RUNTIME
 
 if TYPE_CHECKING:
     from harness.core.events import EventEmitter, NullEventEmitter
@@ -45,7 +45,7 @@ class RunTracker:
     def track(
         self,
         role: str,
-        driver_name: str = DEFAULT_DRIVER,
+        runtime_name: str = DEFAULT_RUNTIME,
         agent_name: str = "unknown",
         iteration: int | None = None,
         *,
@@ -65,7 +65,7 @@ class RunTracker:
         """
         run_id = self.registry.register(
             role=role,
-            driver=driver_name,
+            runtime=runtime_name,
             agent_name=agent_name,
             task_id=self.task_id,
             parent_run_id=self.parent_run_id,
@@ -77,7 +77,7 @@ class RunTracker:
         )
 
         self.events.agent_start(
-            role=role, driver=driver_name,
+            role=role, runtime=runtime_name,
             agent_name=agent_name, iteration=iteration or 0,
         )
 
@@ -96,7 +96,7 @@ class RunTracker:
                 log_path=info.log_path,
             )
             self.events.agent_end(
-                role=role, driver=driver_name,
+                role=role, runtime=runtime_name,
                 agent_name=agent_name, iteration=iteration or 0,
                 exit_code=info.exit_code, success=False,
                 output_len=info.output_len, elapsed_ms=elapsed_ms,
@@ -122,7 +122,7 @@ class RunTracker:
                     log_path=info.log_path,
                 )
             self.events.agent_end(
-                role=role, driver=driver_name,
+                role=role, runtime=runtime_name,
                 agent_name=agent_name, iteration=iteration or 0,
                 exit_code=info.exit_code, success=info.success,
                 output_len=info.output_len, elapsed_ms=elapsed_ms,

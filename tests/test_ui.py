@@ -18,7 +18,7 @@ from harness.core.ui import (
 
 class TestTailRenderable:
     def test_add_lines_respects_maxlen(self):
-        tail = _TailRenderable("test", "codex", time.monotonic())
+        tail = _TailRenderable("test", "cursor", time.monotonic())
         for i in range(20):
             tail.add_line(f"line {i}")
         assert tail.line_count == 20
@@ -26,7 +26,7 @@ class TestTailRenderable:
         assert "line 19" in list(tail.lines)[-1]
 
     def test_renders_with_prefix(self):
-        tail = _TailRenderable("test", "codex", time.monotonic())
+        tail = _TailRenderable("test", "cursor", time.monotonic())
         tail.add_line("hello world")
         console = Console(file=io.StringIO(), force_terminal=True, width=80)
         console.print(tail)
@@ -35,7 +35,7 @@ class TestTailRenderable:
         assert "hello world" in output
 
     def test_shows_line_count(self):
-        tail = _TailRenderable("test", "codex", time.monotonic())
+        tail = _TailRenderable("test", "cursor", time.monotonic())
         tail.add_line("a")
         tail.add_line("b")
         console = Console(file=io.StringIO(), force_terminal=True, width=80)
@@ -121,12 +121,12 @@ class TestHarnessUI:
 
     def test_agent_step_verbose_yields_none(self):
         ui, _ = self._make_ui(verbose=True)
-        with ui.agent_step("[test]", "codex") as on_out:
+        with ui.agent_step("[test]", "cursor") as on_out:
             assert on_out is None
 
     def test_agent_step_default_yields_callback(self):
         ui, _ = self._make_ui(verbose=False)
-        with ui.agent_step("[test]", "codex") as on_out:
+        with ui.agent_step("[test]", "cursor") as on_out:
             assert callable(on_out)
             on_out("test line\n")
 

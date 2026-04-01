@@ -37,10 +37,10 @@ class _Stringable:
 class TestRegisterNormalization:
     """register() 接收非基础类型参数时正常入库。"""
 
-    def test_mock_driver_and_agent_name(self, registry: Registry) -> None:
+    def test_mock_runtime_and_agent_name(self, registry: Registry) -> None:
         run_id = registry.register(
             role="builder",
-            driver=MagicMock(),          # type: ignore[arg-type]
+            runtime=MagicMock(),          # type: ignore[arg-type]
             agent_name=MagicMock(),      # type: ignore[arg-type]
         )
         row = registry.get(run_id)
@@ -51,7 +51,7 @@ class TestRegisterNormalization:
     def test_path_cwd_and_branch(self, registry: Registry) -> None:
         run_id = registry.register(
             role="planner",
-            driver="cursor",
+            runtime="cursor",
             agent_name="harness-planner",
             cwd=Path("/tmp/workspace"),      # type: ignore[arg-type]
             branch=Path("feature/test"),     # type: ignore[arg-type]
@@ -64,7 +64,7 @@ class TestRegisterNormalization:
     def test_stringable_task_id(self, registry: Registry) -> None:
         run_id = registry.register(
             role="evaluator",
-            driver="codex",
+            runtime="cursor",
             agent_name="harness-evaluator",
             task_id=_Stringable("task-099"),     # type: ignore[arg-type]
         )
@@ -75,7 +75,7 @@ class TestRegisterNormalization:
     def test_all_text_columns_mixed(self, registry: Registry) -> None:
         run_id = registry.register(
             role=_Stringable("builder"),         # type: ignore[arg-type]
-            driver=MagicMock(),                  # type: ignore[arg-type]
+            runtime=MagicMock(),                 # type: ignore[arg-type]
             agent_name=Path("agent.toml"),       # type: ignore[arg-type]
             task_id=MagicMock(),                 # type: ignore[arg-type]
             cwd=Path("/workspace"),              # type: ignore[arg-type]
@@ -94,7 +94,7 @@ class TestCompleteNormalization:
     """complete() 接收 Path / Mock 等类型的 log_path、session_id。"""
 
     def test_path_log_path(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.complete(
             run_id,
             log_path=Path("/logs/run.log"),  # type: ignore[arg-type]
@@ -105,14 +105,14 @@ class TestCompleteNormalization:
         assert row.status == "completed"
 
     def test_mock_session_id(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.complete(run_id, session_id=MagicMock())  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None
         assert isinstance(row.session_id, str)
 
     def test_stringable_log_path_and_session_id(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.complete(
             run_id,
             log_path=_Stringable("/var/log/agent.log"),  # type: ignore[arg-type]
@@ -131,7 +131,7 @@ class TestFailNormalization:
     """fail() 接收非基础类型的 error / log_path。"""
 
     def test_path_log_path(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.fail(run_id, log_path=Path("/logs/err.log"))  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None
@@ -139,7 +139,7 @@ class TestFailNormalization:
         assert row.status == "failed"
 
     def test_mock_error(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.fail(run_id, error=MagicMock())  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None
@@ -153,21 +153,21 @@ class TestSetSessionIdNormalization:
     """set_session_id() 接收 Path / Mock / Stringable。"""
 
     def test_path_session_id(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.set_session_id(run_id, Path("/sessions/abc"))  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None
         assert row.session_id == "/sessions/abc"
 
     def test_mock_session_id(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.set_session_id(run_id, MagicMock())  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None
         assert isinstance(row.session_id, str)
 
     def test_stringable_session_id(self, registry: Registry) -> None:
-        run_id = registry.register(role="builder", driver="cursor", agent_name="b")
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
         registry.set_session_id(run_id, _Stringable("sess-77"))  # type: ignore[arg-type]
         row = registry.get(run_id)
         assert row is not None

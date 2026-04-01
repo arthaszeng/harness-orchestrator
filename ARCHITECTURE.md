@@ -93,10 +93,10 @@ Queries PyPI for newer versions, runs **`pip install --upgrade harness-orchestra
 
 Minimal constants only:
 
-- **`ALL_ROLES`** — empty `frozenset` (no orchestrator-routed roles in native-only mode).
+- **`ALL_ROLES`** — empty `frozenset` (no routed roles in native-only mode).
 - **`NATIVE_REVIEW_ROLES`** — the five native review roles: `architect`, `product_owner`, `engineer`, `qa`, `project_manager`.
 - **`SCORING_DIMENSIONS`** — evaluation dimension labels (used by tests for validation).
-- **`DEFAULT_DRIVER`** — default driver value (`"cursor"`) for registry/events/tracker.
+- **`DEFAULT_RUNTIME`** — default runtime label (`"cursor"`) for registry/events/tracker.
 
 ### `state.py`
 
