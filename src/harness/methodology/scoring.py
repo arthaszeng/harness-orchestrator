@@ -34,7 +34,7 @@ class Scores:
     def min_score(self) -> float:
         return min(self.values) if self.values else 0.0
 
-    def verdict(self, threshold: float = 3.5) -> str:
+    def verdict(self, threshold: float = 7.0) -> str:
         """PASS vs ITERATE verdict."""
         if self.weighted >= threshold and self.min_score > 1.0:
             return "PASS"

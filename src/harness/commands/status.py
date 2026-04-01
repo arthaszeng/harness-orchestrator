@@ -70,7 +70,7 @@ def _render_recent_result(console, state: SessionState) -> None:
     console.print("\n[cyber.magenta]Recent Result:[/]")
 
     if recent_done:
-        score_style = "cyber.ok" if recent_done.score >= 3.5 else "cyber.warn"
+        score_style = "cyber.ok" if recent_done.score >= 7.0 else "cyber.warn"
         console.print(
             f"  ✓ {recent_done.requirement} — "
             f"[{score_style}]{recent_done.score:.1f}[/{score_style}] "

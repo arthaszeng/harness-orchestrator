@@ -97,7 +97,7 @@ class WorkflowConfig(BaseModel):
     mode: str = "orchestrator"  # orchestrator / cursor-native
     profile: str = "standard"  # lite / standard / autonomous
     max_iterations: int = 3
-    pass_threshold: float = 3.5
+    pass_threshold: float = 7.0
     auto_merge: bool = True
     branch_prefix: str = "agent"
     trunk_branch: str = "main"

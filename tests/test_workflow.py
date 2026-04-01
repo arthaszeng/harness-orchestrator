@@ -44,7 +44,7 @@ def test_split_spec_contract_case_insensitive():
     assert "# contract" in contract
 
 
-def _make_eval_output(score: float = 4.0) -> str:
+def _make_eval_output(score: float = 8.0) -> str:
     return f"""\
 # Evaluation — Iteration 1
 
@@ -117,7 +117,7 @@ def test_single_task_pass_invokes_agent_with_resolver_model_per_role(tmp_path: P
     )
     evaluator = _mock_driver("codex")
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     def _resolve(role: str):
@@ -162,7 +162,7 @@ def test_single_task_pass(tmp_path: Path):
     evaluator = MagicMock()
     evaluator.name = "mock-evaluator"
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     def _resolve(role: str):
@@ -257,7 +257,7 @@ def test_single_task_pass_with_dual_evaluation(tmp_path: Path):
     evaluator = MagicMock()
     evaluator.name = "mock-evaluator"
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     alignment_evaluator = MagicMock()
@@ -312,7 +312,7 @@ def test_single_task_dual_eval_alignment_failure(tmp_path: Path):
     evaluator = MagicMock()
     evaluator.name = "mock-evaluator"
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     alignment_evaluator = MagicMock()
@@ -366,7 +366,7 @@ def test_single_task_dual_eval_alignment_unknown_verdict(tmp_path: Path):
     evaluator = MagicMock()
     evaluator.name = "mock-evaluator"
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     alignment_evaluator = MagicMock()
@@ -460,7 +460,7 @@ def test_pass_rebases_to_trunk(tmp_path: Path):
     )
     evaluator = MagicMock(name="mock-evaluator")
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.0), exit_code=0,
+        success=True, output=_make_eval_output(8.0), exit_code=0,
     )
 
     def _resolve(role: str):
@@ -537,7 +537,7 @@ def test_trunk_branch_configurable(tmp_path: Path):
     )
     evaluator = MagicMock(name="mock-evaluator")
     evaluator.invoke.return_value = AgentResult(
-        success=True, output=_make_eval_output(4.5), exit_code=0,
+        success=True, output=_make_eval_output(8.5), exit_code=0,
     )
 
     def _resolve(role: str):

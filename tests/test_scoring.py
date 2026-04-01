@@ -17,17 +17,17 @@ def test_weighted_all_equal():
 
 
 def test_verdict_pass():
-    s = Scores(completeness=4.0, quality=4.0, regression=4.0, design=4.0)
+    s = Scores(completeness=8.0, quality=8.0, regression=8.0, design=8.0)
     assert s.verdict() == "PASS"
 
 
 def test_verdict_iterate_low_weighted():
-    s = Scores(completeness=4.0, quality=4.0, regression=1.5, design=4.0)
+    s = Scores(completeness=8.0, quality=8.0, regression=4.0, design=8.0)
     assert s.verdict() == "ITERATE"
 
 
 def test_verdict_iterate_min_too_low():
-    s = Scores(completeness=5.0, quality=5.0, regression=1.0, design=5.0)
+    s = Scores(completeness=9.0, quality=9.0, regression=1.0, design=9.0)
     assert s.verdict() == "ITERATE"  # min=1.0 不满足 > 1.0
 
 

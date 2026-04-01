@@ -16,7 +16,7 @@ from harness.core.config import (
 def test_default_config():
     cfg = HarnessConfig()
     assert cfg.workflow.max_iterations == 3
-    assert cfg.workflow.pass_threshold == 3.5
+    assert cfg.workflow.pass_threshold == 7.0
     assert cfg.drivers.default == "auto"
     assert cfg.integrations.memverse.enabled is False
 

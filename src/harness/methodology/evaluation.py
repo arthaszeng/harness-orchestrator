@@ -109,7 +109,7 @@ def _extract_feedback_section(raw_output: str) -> str:
     return body if body else raw_output
 
 
-def parse_evaluation(raw_output: str, threshold: float = 3.5) -> EvalResult:
+def parse_evaluation(raw_output: str, threshold: float = 7.0) -> EvalResult:
     """Stage 2: parse evaluator agent output."""
     scores = parse_scores(raw_output)
     verdict = scores.verdict(threshold)
