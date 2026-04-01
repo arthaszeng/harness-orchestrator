@@ -64,7 +64,7 @@ class NativeModeConfig(BaseModel):
     adversarial_model: str = "gpt-4.1"
     adversarial_mechanism: Literal["subagent", "cli", "auto"] = "auto"
     review_gate: Literal["eng", "advisory"] = "eng"
-    retro_window_days: int = 14
+    retro_window_days: int = Field(default=14, ge=1, le=365)
     hooks_pre_build: str = ""
     hooks_post_eval: str = ""
     hooks_pre_ship: str = ""

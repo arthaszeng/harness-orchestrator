@@ -64,11 +64,16 @@ unless git diff is empty.
 
 ---
 
-## Step 1: Dispatch All Reviewers (parallel)
+## Step 1: Dispatch Reviewers (two waves)
 
-Dispatch all review passes **in a single message** using multiple Task tool calls for
-maximum parallelism. The main agent is the orchestrator — it does NOT perform the
-structured review itself.
+Dispatch reviewers in two waves. The main agent is the orchestrator — it does NOT
+perform the structured review itself.
+
+**Wave A** — dispatch Pass 1, Pass 2, Pass 3, and baseline specialists (if applicable)
+**in a single message** using multiple Task tool calls for maximum parallelism.
+
+**Wave B** — after Pass 1 (harness-evaluator) returns, conditionally dispatch red-team
+(see Step 1.5). Do NOT wait for Pass 2/3 before sending Wave B.
 
 {% if adversarial_mechanism == 'subagent' %}
 **Adversarial dispatch: subagent-only mode.**
@@ -304,7 +309,7 @@ Also write machine-readable JSON to `.agents/tasks/task-NNN/evaluation-rN.json`:
   "verdict": "PASS",
   "scores": {"completeness": 4, "quality": 4, "regression": 5, "design": 4},
   "average": 4.25,
-  "models_used": ["primary", "{{ adversarial_model }}"],
+  "models_used": {"evaluator": "inherit", "adversarial_primary": "inherit", "adversarial_cross": "{{ adversarial_model }}"},
   "findings_count": {"high_confidence": 0, "structural": 1, "adversarial_primary": 0, "adversarial_cross": 0},
   "auto_fixed": 0,
   "ask_items": 0

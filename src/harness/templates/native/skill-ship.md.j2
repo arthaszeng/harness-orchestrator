@@ -231,7 +231,9 @@ Do NOT use Task tool for adversarial review. Use external CLI instead.
 Attempt subagent dispatch; degrade gracefully on failure.
 {% endif %}
 
-**Dispatch all passes in one message** (multiple Task tool calls):
+**Dispatch passes in two waves:**
+- **Wave A**: Pass 1 + Pass 2 + Pass 3 + baseline specialists — all in one message
+- **Wave B**: After Pass 1 returns, conditionally dispatch red-team (if CRITICAL or diff > 200 LOC)
 
 1. **Pass 1**: Structured review — dispatch `harness-evaluator` subagent:
    - **subagent_type**: `"harness-evaluator"`

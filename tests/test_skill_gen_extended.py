@@ -435,7 +435,7 @@ def test_eval_dispatches_evaluator_subagent(tmp_path: Path):
     ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
     content = ev.read_text(encoding="utf-8")
     assert "harness-evaluator" in content
-    assert "Dispatch All Reviewers" in content
+    assert "Dispatch Reviewers" in content
     assert "(you, the main agent)" not in content
 
 
