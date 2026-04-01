@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "harness-orchestrator"
-version = "2.1.0"
+version = "2.1.1"
 description = "Contract-driven multi-agent development orchestrator for Cursor & Codex"
 readme = "README.md"
 license = "MIT"
@@ -12,8 +12,23 @@ requires-python = ">=3.9"
 authors = [
     { name = "Arthas Zeng" },
 ]
-keywords = ["ai", "agents", "orchestration", "multi-agent", "cursor", "codex"]
-
+keywords = ["ai", "agents", "orchestration", "multi-agent", "cursor", "codex", "harness", "development"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
 dependencies = [
     "typer[all]>=0.12",
     "pydantic>=2.0",
@@ -28,6 +43,12 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.5",
 ]
+
+[project.urls]
+Homepage = "https://github.com/arthaszeng/harness-orchestrator"
+Repository = "https://github.com/arthaszeng/harness-orchestrator"
+Issues = "https://github.com/arthaszeng/harness-orchestrator/issues"
+Changelog = "https://github.com/arthaszeng/harness-orchestrator/releases"
 
 [project.scripts]
 harness = "harness.cli:app"
