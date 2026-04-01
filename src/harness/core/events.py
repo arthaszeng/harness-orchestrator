@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from harness.core.roles import DEFAULT_DRIVER
+
 
 class EventEmitter:
     """Append-only JSONL event writer for a single session run."""
@@ -32,7 +34,7 @@ class EventEmitter:
     # ── agent lifecycle ──────────────────────────────────────────
 
     def agent_start(
-        self, *, role: str, driver: str = "cursor", agent_name: str, iteration: int,
+        self, *, role: str, driver: str = DEFAULT_DRIVER, agent_name: str, iteration: int,
     ) -> float:
         """Record agent invocation start; returns a monotonic timestamp for elapsed calc."""
         self._emit(
@@ -45,7 +47,7 @@ class EventEmitter:
         self,
         *,
         role: str,
-        driver: str = "cursor",
+        driver: str = DEFAULT_DRIVER,
         agent_name: str,
         iteration: int,
         exit_code: int,

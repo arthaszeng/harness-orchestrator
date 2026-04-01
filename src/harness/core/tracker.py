@@ -14,6 +14,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
+from harness.core.roles import DEFAULT_DRIVER
+
 if TYPE_CHECKING:
     from harness.core.events import EventEmitter, NullEventEmitter
     from harness.core.registry import Registry
@@ -43,7 +45,7 @@ class RunTracker:
     def track(
         self,
         role: str,
-        driver_name: str = "cursor",
+        driver_name: str = DEFAULT_DRIVER,
         agent_name: str = "",
         iteration: int | None = None,
         *,
