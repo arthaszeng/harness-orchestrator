@@ -66,11 +66,11 @@ jobs:
           whl = next(p for p in __import__('pathlib').Path('dist').iterdir() if p.suffix == '.whl')
           with zipfile.ZipFile(whl) as z:
               names = z.namelist()
-              agents = [n for n in names if 'agents/' in n and n.endswith(('.toml', '.md'))]
               templates = [n for n in names if 'templates/' in n]
-              print(f'Agents: {len(agents)}, Templates: {len(templates)}, Total: {len(names)}')
-              assert len(agents) >= 16, f'Expected >=16 agent files, got {len(agents)}'
+              py_files = [n for n in names if n.endswith('.py')]
+              print(f'Templates: {len(templates)}, Python: {len(py_files)}, Total: {len(names)}')
               assert len(templates) >= 20, f'Expected >=20 template files, got {len(templates)}'
+              assert len(py_files) >= 15, f'Expected >=15 Python files, got {len(py_files)}'
               print('Wheel contents verified.')
           "
 
