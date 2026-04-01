@@ -1,11 +1,10 @@
 """Memverse integration — disabled by default, failure non-blocking, clear fallback.
 
 Design:
-  Actual Memverse search/add runs indirectly via the reflector agent's MCP tools;
+  Actual Memverse search/add runs via Cursor MCP tools in the IDE;
   Python does not call MCP directly. Therefore:
   - NullMemverse always returns empty results safely
   - SafeMemverse wraps any implementation so failures do not block the main flow
-  - If Python should call MCP directly later, implement it inside SafeMemverse with isolated exceptions
 """
 
 from __future__ import annotations
@@ -65,12 +64,10 @@ class SafeMemverse:
 
 
 class _PromptMemverse:
-    """Memverse enabled but delegated to agent prompts.
+    """Memverse enabled but delegated to Cursor IDE agent prompts.
 
-    The reflector agent's prompt includes MCP memverse instructions.
-    This class marks memverse as "enabled" so the reflector prompt
-    includes the memverse write/search directives, but Python-side
-    search/add are no-ops (the agent handles it via MCP tools).
+    Skills include MCP memverse instructions when enabled.
+    Python-side search/add are no-ops (the agent handles it via MCP tools).
     """
 
     @property
@@ -84,10 +81,7 @@ class _PromptMemverse:
         pass
 
 
-def create_memverse(
-    enabled: bool,
-    driver: object | None = None,
-) -> MemverseClient:
+def create_memverse(enabled: bool) -> MemverseClient:
     """Create a Memverse client.
 
     - disabled → NullMemverse (zero overhead)
