@@ -142,6 +142,8 @@ MESSAGES: dict[str, str] = {
     "install.done": "\nDone: {count} agent definition(s) installed.",
     "install.warn_missing": "  [warn] Source file not found: {src}",
     "install.skip_exists": "  [skip] Already exists: {dst} (use --force to overwrite)",
+    "install.force_retry": "  ▸ --force mode: retrying installation without prompts...",
+    "install.force_hint": "\n  Tip: run `harness install --force` to overwrite files and retry failed installations.",
 
     # ── vision command ────────────────────────────────────────────
     "vision.no_config": ".agents/config.toml not found, please run `harness init` first",

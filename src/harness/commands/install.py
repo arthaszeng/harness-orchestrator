@@ -293,6 +293,80 @@ def _probe_ides(ides: dict[str, bool]) -> dict[str, bool]:
     return ready
 
 
+def _probe_ides_force(ides: dict[str, bool]) -> dict[str, bool]:
+    """Like _probe_ides but auto-accepts CLI installations (no confirmation prompts).
+
+    Used by ``harness install --force`` to make reinstall a single-command fix.
+    """
+    from harness.drivers.codex import CodexDriver
+    from harness.drivers.cursor import CursorDriver
+
+    ready = dict(ides)
+
+    # ── Cursor ────────────────────────────────────────────────────
+    if ides["cursor"]:
+        probe = CursorDriver().probe()
+        if probe.available:
+            typer.echo(t("install.cursor_ok"))
+        else:
+            typer.echo(t("install.cursor_not_ready"))
+            if not shutil.which("curl"):
+                typer.echo(t("install.curl_missing"))
+                ready["cursor"] = False
+            else:
+                typer.echo(t("install.force_retry"))
+                ok = _run_cli_install(
+                    ["bash", "-c", "curl https://cursor.com/install -fsS | bash"],
+                    "Cursor Agent",
+                )
+                if ok:
+                    global _needs_shell_reload
+                    if _ensure_path(_AGENT_BIN_DIR):
+                        _needs_shell_reload = True
+                    reprobe = CursorDriver().probe()
+                    if reprobe.available:
+                        typer.echo(t("install.cursor_ok"))
+                    else:
+                        ready["cursor"] = False
+                else:
+                    ready["cursor"] = False
+    else:
+        typer.echo(t("install.cursor_missing"))
+
+    # ── Codex ─────────────────────────────────────────────────────
+    if ides["codex"]:
+        probe = CodexDriver().probe()
+        if probe.available:
+            typer.echo(t("install.codex_ok"))
+        else:
+            typer.echo(t("install.codex_not_ready"))
+            typer.echo(t("install.force_retry"))
+            npm = shutil.which("npm")
+            if npm:
+                ok = _run_cli_install(["npm", "install", "-g", "@openai/codex"], "Codex CLI")
+                if ok:
+                    reprobe = CodexDriver().probe()
+                    if reprobe.available:
+                        typer.echo(t("install.codex_ok"))
+                    else:
+                        ready["codex"] = False
+                else:
+                    ready["codex"] = False
+            else:
+                typer.echo(t("install.npm_missing"))
+                ready["codex"] = False
+    else:
+        typer.echo(t("install.codex_missing"))
+        npm = shutil.which("npm")
+        if npm:
+            ok = _run_cli_install(["npm", "install", "-g", "@openai/codex"], "Codex CLI")
+            if ok:
+                ready["codex"] = True
+                typer.echo(t("install.codex_ok"))
+
+    return ready
+
+
 def _install_native_mode(project_root: Path, *, lang: str) -> int:
     """Generate Cursor-native mode artifacts if workflow.mode == cursor-native."""
     try:
@@ -306,7 +380,12 @@ def _install_native_mode(project_root: Path, *, lang: str) -> int:
 
 
 def run_install(*, force: bool = False, lang: str | None = None) -> None:
-    """Run install: preflight, then copy agent files."""
+    """Run install: preflight, then copy agent files.
+
+    When *force* is True, overwrite existing agent files, re-run IDE probes,
+    and re-attempt CLI installations without extra confirmation prompts.
+    This makes ``harness install --force`` the canonical "fix my install" command.
+    """
     global _needs_shell_reload
 
     resolved = _resolve_install_lang(lang)
@@ -314,31 +393,47 @@ def run_install(*, force: bool = False, lang: str | None = None) -> None:
 
     ides = _detect_ide()
     typer.echo(t("install.env_check"))
-    _probe_ides(ides)
+
+    if force:
+        ready = _probe_ides_force(ides)
+    else:
+        ready = _probe_ides(ides)
 
     native_count = _install_native_mode(Path.cwd(), lang=resolved)
 
-    if not any(ides.values()) and native_count == 0:
+    if not any(ready.values()) and native_count == 0:
         typer.echo(t("install.no_ide"), err=True)
         raise typer.Exit(1)
 
     source_dir = _agents_pkg_dir()
-    if not source_dir.exists() and any(ides.values()):
+    if not source_dir.exists() and any(ready.values()):
         typer.echo(t("install.no_source", path=source_dir), err=True)
         raise typer.Exit(1)
 
     total = native_count
+    skipped_any = False
     typer.echo()
 
-    if ides["cursor"] and source_dir.exists():
+    if ready.get("cursor") and source_dir.exists():
         typer.echo(t("install.cursor_agents"))
-        total += _install_cursor_agents(source_dir, force=force, lang=resolved)
+        expected = len(_CURSOR_AGENTS)
+        count = _install_cursor_agents(source_dir, force=force, lang=resolved)
+        if not force and count < expected:
+            skipped_any = True
+        total += count
 
-    if ides["codex"] and source_dir.exists():
+    if ready.get("codex") and source_dir.exists():
         typer.echo(t("install.codex_agents"))
-        total += _install_codex_agents(source_dir, force=force, lang=resolved)
+        expected = len(_CODEX_AGENTS)
+        count = _install_codex_agents(source_dir, force=force, lang=resolved)
+        if not force and count < expected:
+            skipped_any = True
+        total += count
 
     typer.echo(t("install.done", count=total))
+
+    if skipped_any:
+        typer.echo(t("install.force_hint"))
 
     if _needs_shell_reload:
         typer.echo(t("install.reload_hint", rc=_detect_shell_rc()))

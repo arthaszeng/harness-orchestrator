@@ -33,7 +33,10 @@ def main(
 
 @app.command()
 def install(
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing agent definitions"),
+    force: bool = typer.Option(
+        False, "--force", "-f",
+        help="Overwrite existing files, retry CLI installations without prompts (use to fix broken installs)",
+    ),
     lang: Optional[str] = typer.Option(
         None,
         "--lang",
@@ -41,7 +44,12 @@ def install(
         help="Language for agent definitions (en/zh); default from project config or UI language",
     ),
 ) -> None:
-    """Install agent definitions to local IDE (Cursor / Codex)"""
+    """Install agent definitions to local IDE (Cursor / Codex).
+
+    Re-run with --force to fix a broken installation:
+    overwrites existing agent files, retries CLI installations,
+    and re-generates native mode artifacts.
+    """
     from harness.commands.install import run_install
     run_install(force=force, lang=lang)
 

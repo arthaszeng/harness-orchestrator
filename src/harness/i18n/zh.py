@@ -142,6 +142,8 @@ MESSAGES: dict[str, str] = {
     "install.done": "\n完成: {count} 个 agent 定义已安装。",
     "install.warn_missing": "  [warn] 源文件不存在: {src}",
     "install.skip_exists": "  [skip] 已存在: {dst} (用 --force 覆盖)",
+    "install.force_retry": "  ▸ --force 模式：跳过确认，重新安装...",
+    "install.force_hint": "\n  提示: 运行 `harness install --force` 可覆盖已有文件并重试失败的安装。",
 
     # ── vision command ────────────────────────────────────────────
     "vision.no_config": "未找到 .agents/config.toml，请先运行 `harness init`",
