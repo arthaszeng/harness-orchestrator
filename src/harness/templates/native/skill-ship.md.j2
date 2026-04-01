@@ -201,7 +201,7 @@ If any NOT DONE items: note them in the PR body. Continue — this is informatio
 
 Run the full `/harness-eval` workflow inline. This includes:
 
-1. **Pass 1**: Structured review using the review checklist (`review-checklist.md`).
+1. **Pass 1**: Structured review using the review checklist (`.cursor/skills/harness/harness-eval/review-checklist.md`).
    Apply in two passes: Pass 1 CRITICAL, Pass 2 INFORMATIONAL.
    Every finding MUST include a confidence score (1-10):
    - 9-10: verified bug → show normally
@@ -210,7 +210,7 @@ Run the full `/harness-eval` workflow inline. This includes:
    - 3-4: low → suppress to appendix
    - 1-2: speculation → only report if CRITICAL
    Score on 4 dimensions, collect findings
-1b. **Specialist Dispatch** (conditional): If diff >= 50 lines, dispatch testing + security + performance specialists in parallel via Task tool (subagent_type: generalPurpose, model: fast). If diff > 200 lines or CRITICAL findings exist, also dispatch red-team. Each specialist reads its checklist from `specialists/{name}.md` and outputs JSON findings. Deduplicate by fingerprint, boost confidence +1 for multi-specialist agreement. Compute PR Quality Score: `max(0, 10 - critical*2 - informational*0.5)`.
+1b. **Specialist Dispatch** (conditional): If diff >= 50 lines, dispatch testing + security + performance specialists in parallel via Task tool (subagent_type: generalPurpose, model: fast). If diff > 200 lines or CRITICAL findings exist, also dispatch red-team. Each specialist reads its checklist from `.cursor/skills/harness/harness-eval/specialists/{name}.md` and outputs JSON findings. Deduplicate by fingerprint, boost confidence +1 for multi-specialist agreement. Compute PR Quality Score: `max(0, 10 - critical*2 - informational*0.5)`.
 
 2. **Pass 2**: Claude adversarial subagent — dispatch via Task tool:
    - **subagent_type**: `"generalPurpose"`
@@ -231,6 +231,15 @@ Run the full `/harness-eval` workflow inline. This includes:
    - **ASK** findings: present in one batch. Per-item: A) Fix, B) Skip.
 
 6. **Compute scores and verdict**: avg >= {{ pass_threshold }} → PASS, else → ITERATE.
+{% if review_gate == 'eng' %}
+
+**Review Gate (eng):** Evaluation is a hard gate — ITERATE verdict blocks shipping.
+All CRITICAL findings must be resolved before proceeding.
+{% elif review_gate == 'advisory' %}
+
+**Review Gate (advisory):** Evaluation is advisory — ITERATE verdict is logged but does not block.
+CRITICAL findings are flagged but shipping continues.
+{% endif %}
 
 Write evaluation to `.agents/tasks/task-NNN/evaluation-rN.md` and `.json`.
 
@@ -310,6 +319,10 @@ Once evaluation PASSES:
 
 ---
 
+{% include 'sections/_bypass-immunity.md.j2' %}
+
+---
+
 ## Step 7: Verification Gate — IRON LAW
 
 ```
@@ -331,6 +344,10 @@ Claiming work is complete without verification is dishonesty, not efficiency.
    re-run `{{ ci_command }}`. Paste fresh output — not a summary, the actual output.
 2. If tests fail: STOP. Fix and return to Step 3.
 3. Verify git status is clean (no stray untracked files).
+
+---
+
+{% include 'sections/_hook-points.md.j2' %}
 
 ---
 

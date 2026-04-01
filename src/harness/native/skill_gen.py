@@ -42,6 +42,14 @@ _RULE_TEMPLATES = [
     ("rule-safety-guardrails.mdc.j2", "harness-safety-guardrails"),
 ]
 
+_RESOURCE_FILES = [
+    "review-checklist.md",
+    "specialists/testing.md",
+    "specialists/security.md",
+    "specialists/performance.md",
+    "specialists/red-team.md",
+]
+
 
 def _get_template_dir() -> Path:
     pkg = importlib.resources.files("harness") / "templates" / _TEMPLATE_DIR
@@ -85,6 +93,7 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
         "hooks_pre_build": cfg.native.hooks_pre_build,
         "hooks_post_eval": cfg.native.hooks_post_eval,
         "hooks_pre_ship": cfg.native.hooks_pre_ship,
+        "review_gate": cfg.native.review_gate,
     }
 
     if role == "adversarial_reviewer":
@@ -183,6 +192,19 @@ def generate_native_artifacts(
         content = _render_template(tmpl_dir, tmpl_name, context)
         out_path.write_text(content, encoding="utf-8")
         typer.echo(t("native.generated_rule", path=_rel(project_root, out_path)))
+        count += 1
+
+    # Resources → .cursor/skills/harness/harness-eval/<path>
+    eval_resource_dir = skills_base / "harness-eval"
+    eval_resource_dir.mkdir(parents=True, exist_ok=True)
+    for resource_path in _RESOURCE_FILES:
+        src = tmpl_dir / resource_path
+        if not src.exists():
+            continue
+        dest = eval_resource_dir / resource_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        typer.echo(t("native.generated_skill", path=_rel(project_root, dest)))
         count += 1
 
     typer.echo(t("native.done", count=count))

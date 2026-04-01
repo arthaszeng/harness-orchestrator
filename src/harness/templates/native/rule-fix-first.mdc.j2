@@ -56,7 +56,7 @@ Present ALL ASK items in ONE batch (not one-by-one):
 | Change auth middleware to use JWT | ASK | Architecture change |
 | Remove deprecated endpoint | ASK | Behavior change (breaking) |
 | Add index to frequently-queried column | ASK | Data model change |
-| LLM output written to DB without validation | AUTO-FIX | Obvious fix, add type check |
+| LLM output written to DB without validation | ASK | Trust boundary / security finding |
 | Race condition in status transition | ASK | Concurrency fix needs design |
 | Stale comment contradicts current code | AUTO-FIX | Mechanical, reversible |
 | Version mismatch between pyproject.toml and CHANGELOG | AUTO-FIX | Mechanical consistency |

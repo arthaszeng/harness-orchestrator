@@ -36,11 +36,15 @@ which means DO IT. Run straight through and output the evaluation result at the 
 
 ---
 
+{% include 'sections/_trust-boundary.md.j2' %}
+
+---
+
 ## Step 1: Structured Review (you, the main agent)
 
 Review the code changes against the contract using the structured checklist.
 
-1. Read the review checklist (`review-checklist.md` in the templates directory or project root).
+1. Read the review checklist (`.cursor/skills/harness/harness-eval/review-checklist.md`).
    Apply the checklist in two passes: **Pass 1 CRITICAL**, then **Pass 2 INFORMATIONAL**.
 2. Run `git diff {{ trunk_branch }}..HEAD` to see actual code changes
 3. For each contract deliverable, verify it is implemented in the diff
@@ -53,6 +57,27 @@ Review the code changes against the contract using the structured checklist.
 | Quality      | Buggy, no patterns    | Works, some issues    | Clean, well-tested      |
 | Regression   | Broke existing tests  | Tests pass, fragile   | All tests pass, robust  |
 | Design       | Inconsistent, messy   | Follows conventions   | Improves architecture   |
+
+{% if project_lang == 'python' %}
+
+### Python-Specific Review Focus
+- Check for bare `except:` or `except Exception:` without re-raise
+- Verify `subprocess.run()` uses argument lists, not `shell=True` with f-strings
+- Check async/sync mixing (sync I/O inside `async def`)
+- Verify type hints on public API functions
+{% elif project_lang == 'typescript' %}
+
+### TypeScript-Specific Review Focus
+- Check for `any` type usage that could be narrowed
+- Verify `async`/`await` is not missing on Promise-returning calls
+- Check for proper null/undefined handling (optional chaining vs assertion)
+{% elif project_lang == 'go' %}
+
+### Go-Specific Review Focus
+- Check all error returns are handled (not `_`)
+- Verify goroutine lifecycle management (no leaked goroutines)
+- Check for race conditions with shared state
+{% endif %}
 
 6. Collect findings. For each finding, classify:
    - **severity**: CRITICAL or INFORMATIONAL
@@ -89,7 +114,7 @@ For each specialist, construct the prompt:
 You are a specialist code reviewer focused on {DOMAIN}.
 Read the checklist below, then analyze the diff.
 
-{READ the specialist checklist from specialists/{name}.md}
+{READ the specialist checklist from .cursor/skills/harness/harness-eval/specialists/{name}.md}
 
 Run `git diff {{ trunk_branch }}..HEAD` and analyze the changes.
 Output findings as JSON objects, one per line:
@@ -139,7 +164,7 @@ If no findings: output `NO FINDINGS` and nothing else.
 Do not output anything else — no preamble, no summary, no commentary.
 ```
 
-If the subagent fails or times out: "Claude adversarial subagent unavailable. Continuing."
+If the subagent fails or times out: "Claude adversarial subagent unavailable. Continuing with reduced review coverage."
 
 ---
 
@@ -147,6 +172,11 @@ If the subagent fails or times out: "Claude adversarial subagent unavailable. Co
 
 Dispatch the cross-model reviewer. This uses {{ adversarial_model }} for independent
 perspective from a different model family.
+
+{% if adversarial_mechanism == 'cli' %}
+**Note:** Adversarial mechanism is set to CLI mode. If the `harness-adversarial-reviewer`
+subagent is unavailable, use the CLI to invoke the adversarial model directly.
+{% endif %}
 
 **Dispatch via Task tool:**
 - **subagent_type**: `"harness-adversarial-reviewer"`

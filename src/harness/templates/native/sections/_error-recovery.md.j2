@@ -2,12 +2,14 @@
 
 | Error Type | Signal | Recovery Action |
 |-----------|--------|----------------|
-| CI failure (test) | test exit code != 0 | Read failure output, fix code, re-run CI |
-| CI failure (lint) | linter errors in output | Auto-fix with linter's fix command, commit |
+| CI failure (test) | test runner exit code != 0 | Read failure output, fix code, re-run `{{ ci_command }}` |
+| CI failure (lint) | linter errors in output | Auto-fix if linter supports it, commit, re-run |
 | CI failure (type) | type checker errors | Fix type annotations, re-run |
-| Git conflict | merge conflict markers | Abort rebase, report to user |
-| Agent timeout | no output for extended period | Cancel and retry with simpler prompt |
+| Git conflict | merge conflict markers | Report to user, do not attempt resolution |
 | Scope creep | diff touches files outside contract | Revert uncommitted changes, re-read contract |
+| Import error | ModuleNotFoundError or similar | Check if dependency is missing, add to requirements |
+| Permission error | PermissionError or EACCES | Report to user, do not retry |
+| Agent timeout | no output for extended period | Cancel and retry with simpler prompt |
 
-If the same error type persists after 2 retries, escalate:
-write finding to build notes and proceed to the next deliverable.
+If the same error type persists after 2 retries of the same fix strategy,
+write the finding to `.agents/tasks/<task-id>/build-notes.md` and proceed to the next deliverable.

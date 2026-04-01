@@ -69,6 +69,33 @@ For each deliverable in the contract:
 - If you discover related issues outside contract scope, note them in the build log
   but do NOT fix them
 
+{% if project_lang == 'python' %}
+
+### Python-Specific Guidance
+- Run `ruff check` before committing; auto-fix with `ruff check --fix`
+- Use type hints (PEP 484); run `mypy` if project uses it
+- Prefer `pathlib.Path` over `os.path`
+- Use `from __future__ import annotations` for modern type syntax
+{% elif project_lang == 'typescript' %}
+
+### TypeScript-Specific Guidance
+- Run `tsc --noEmit` for type checking before commit
+- Prefer `strict: true` in tsconfig
+- Use `readonly` for immutable properties
+- Prefer `interface` over `type` for object shapes
+{% elif project_lang == 'go' %}
+
+### Go-Specific Guidance
+- Run `go vet ./...` and `staticcheck ./...` before commit
+- Check for unchecked errors with `errcheck`
+- Run `gofmt` / `goimports` before commit
+{% elif project_lang == 'rust' %}
+
+### Rust-Specific Guidance
+- Run `cargo clippy` before commit
+- Run `cargo fmt --check` for formatting
+{% endif %}
+
 ---
 
 ## Step 4: Run CI
@@ -97,20 +124,7 @@ If tests fail, determine ownership:
 **After triage:** If in-branch failures remain after 3 attempts, note them as blockers
 in the build log and stop.
 
-## Error Recovery Matrix
-
-| Error Type | Signal | Recovery Action |
-|-----------|--------|----------------|
-| CI failure (test) | test runner exit code != 0 | Read failure output, fix code, re-run `{{ ci_command }}` |
-| CI failure (lint) | linter errors in output | Auto-fix if linter supports it, commit, re-run |
-| CI failure (type) | type checker errors | Fix type annotations, re-run |
-| Git conflict | merge conflict markers | Report to user, do not attempt resolution |
-| Scope creep | diff touches files outside contract | Revert uncommitted changes, re-read contract |
-| Import error | ModuleNotFoundError or similar | Check if dependency is missing, add to requirements |
-| Permission error | PermissionError or EACCES | Report to user, do not retry |
-
-If the same error type persists after 2 retries of the same fix strategy,
-write the finding to `.agents/tasks/<task-id>/build-notes.md` and proceed to the next deliverable.
+{% include 'sections/_error-recovery.md.j2' %}
 
 ---
 
@@ -142,6 +156,10 @@ Write a structured build log to `.agents/tasks/task-NNN/build-rN.log`:
 ## Out-of-Scope Issues Found
 - (issues discovered but not fixed — outside contract scope)
 ```
+
+---
+
+{% include 'sections/_hook-points.md.j2' %}
 
 ---
 
