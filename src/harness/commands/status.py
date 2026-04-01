@@ -12,7 +12,6 @@ from harness.core.config import HarnessConfig, WorkflowConfig
 from harness.core.progress import (
     get_recent_blocked,
     get_recent_completed,
-    is_resumable,
     suggest_next_action,
 )
 from harness.core.state import SessionState
@@ -42,7 +41,7 @@ def run_status() -> None:
     state = SessionState.load(agents_dir)
 
     if state.mode == "idle" and not state.completed and not state.blocked:
-        ui.info("no active session. run `harness run` or `harness auto` to begin.")
+        ui.info("no active session.")
         return
 
     pass_threshold = _load_pass_threshold()
@@ -51,7 +50,6 @@ def run_status() -> None:
     _render_current(console, state)
     _render_agents(console, state, agents_dir)
     _render_recent_result(console, state, pass_threshold=pass_threshold)
-    _render_resume(console, state)
     _render_next_action(console, state)
     _render_stats(console, state)
 
@@ -103,14 +101,6 @@ def _render_recent_result(
             f"[cyber.red]{recent_block.score:.1f}[/cyber.red] "
             f"({recent_block.verdict})"
         )
-
-
-def _render_resume(console, state: SessionState) -> None:
-    if not is_resumable(state):
-        return
-    cmd = "harness run --resume" if state.mode == "run" else "harness auto --resume"
-    console.print(f"\n[cyber.warn]Resume:[/] session `{state.session_id}` can be resumed")
-    console.print(f"  → [bold]`{cmd}`[/bold]")
 
 
 def _render_next_action(console, state: SessionState) -> None:

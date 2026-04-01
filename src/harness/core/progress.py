@@ -34,15 +34,14 @@ def is_resumable(state: SessionState) -> bool:
 def suggest_next_action(state: SessionState) -> str:
     """Derive a human-readable next-step suggestion from the current state."""
     if is_resumable(state):
-        cmd = "harness run --resume" if state.mode == "run" else "harness auto --resume"
-        return f"会话可恢复，运行 `{cmd}` 继续"
+        return "会话可恢复 — 在 Cursor 中通过 harness 技能继续当前任务"
     if state.mode != "idle":
         return "会话进行中，等待当前流程完成"
     if state.blocked and not state.completed:
         return "所有任务已阻塞，检查阻塞原因后重新发起"
     if state.completed:
-        return "运行 `harness auto` 开始新会话，或 `harness run <requirement>` 执行单个任务"
-    return "运行 `harness run <requirement>` 或 `harness auto` 开始"
+        return "使用 Cursor 中的 harness 技能开始新的计划、构建或评审流程"
+    return "使用 Cursor 中的 harness 技能开始"
 
 
 # ---------------------------------------------------------------------------
@@ -109,9 +108,8 @@ def update_progress(agents_dir: Path, state: SessionState) -> None:
     # Resumable
     lines.append("\n### Resumable\n")
     if is_resumable(state):
-        cmd = "harness run --resume" if state.mode == "run" else "harness auto --resume"
         lines.append(f"⚠️ 会话可恢复 (session: `{state.session_id}`)")
-        lines.append(f"- 建议命令: `{cmd}`")
+        lines.append("- 在 Cursor 中通过 harness 技能继续")
     else:
         lines.append("(无可恢复会话)")
 

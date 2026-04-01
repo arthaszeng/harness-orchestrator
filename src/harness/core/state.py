@@ -1,12 +1,8 @@
-"""State machine and checkpoint persistence."""
+"""Session state and checkpoint persistence."""
 
 from __future__ import annotations
 
 import json
-import signal
-import sys
-import time
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -22,18 +18,6 @@ class TaskState(str, Enum):
     EVALUATING = "evaluating"
     DONE = "done"
     BLOCKED = "blocked"
-
-
-# Allowed state transitions
-_TRANSITIONS: dict[TaskState, set[TaskState]] = {
-    TaskState.IDLE: {TaskState.PLANNING},
-    TaskState.PLANNING: {TaskState.CONTRACTED, TaskState.BLOCKED},
-    TaskState.CONTRACTED: {TaskState.BUILDING},
-    TaskState.BUILDING: {TaskState.EVALUATING, TaskState.BLOCKED},
-    TaskState.EVALUATING: {TaskState.DONE, TaskState.PLANNING, TaskState.BLOCKED},
-    TaskState.DONE: {TaskState.IDLE},
-    TaskState.BLOCKED: {TaskState.IDLE},
-}
 
 
 class TaskArtifacts(BaseModel):
@@ -84,7 +68,7 @@ class StopContext(BaseModel):
 class SessionState(BaseModel):
     """Full session state, persisted to .agents/state.json."""
     session_id: str = ""
-    mode: str = "idle"  # idle / run / auto
+    mode: str = "idle"
     current_task: TaskRecord | None = None
     completed: list[CompletedTask] = Field(default_factory=list)
     blocked: list[CompletedTask] = Field(default_factory=list)
@@ -118,169 +102,3 @@ class SessionState(BaseModel):
         return None
 
 
-class StateMachine:
-    """Manages task state transitions and checkpoints."""
-
-    def __init__(self, project_root: Path) -> None:
-        self._agents_dir = project_root / ".agents"
-        self._state = SessionState.load(self._agents_dir)
-        self._session_start = datetime.now(timezone.utc)
-        self._register_sigint()
-
-    @property
-    def state(self) -> SessionState:
-        return self._state
-
-    @property
-    def agents_dir(self) -> Path:
-        return self._agents_dir
-
-    def start_session(self, mode: str) -> None:
-        """Start a new session."""
-        self._state.session_id = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        self._state.mode = mode
-        self._session_start = datetime.now(timezone.utc)
-        self._checkpoint()
-
-    def start_task(self, task_id: str, requirement: str, branch: str) -> TaskRecord:
-        """Start a new task."""
-        task = TaskRecord(
-            id=task_id,
-            requirement=requirement,
-            state=TaskState.IDLE,
-            branch=branch,
-            started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        )
-        self._state.current_task = task
-        self._state.stats.total_tasks += 1
-        self._checkpoint()
-        return task
-
-    def transition(self, to: TaskState) -> None:
-        """Apply a state transition; each transition checkpoints."""
-        task = self._state.current_task
-        if task is None:
-            raise RuntimeError("No active task")
-
-        allowed = _TRANSITIONS.get(task.state, set())
-        if to not in allowed:
-            raise ValueError(f"Illegal transition: {task.state.value} → {to.value}")
-
-        task.state = to
-
-        if to == TaskState.PLANNING:
-            task.iteration += 1
-            self._state.stats.total_iterations += 1
-
-        self._checkpoint()
-
-    def complete_task(self, score: float, verdict: str) -> None:
-        """Mark the current task complete."""
-        task = self._state.current_task
-        if task is None:
-            raise RuntimeError("No active task")
-
-        task.finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        record = CompletedTask(
-            id=task.id,
-            requirement=task.requirement,
-            score=score,
-            verdict=verdict,
-            iterations=task.iteration,
-            elapsed_seconds=_elapsed(task.started_at),
-        )
-
-        if verdict == "PASS":
-            self._state.completed.append(record)
-            self._state.stats.completed += 1
-        else:
-            self._state.blocked.append(record)
-            self._state.stats.blocked += 1
-
-        self._update_avg_score()
-        self._state.current_task = None
-        self._checkpoint()
-
-    def record_stop_context(self, stop_context: StopContext) -> None:
-        """Record structured stop context and persist."""
-        self._state.stop_context = stop_context
-        self._checkpoint()
-
-    def end_session(self) -> None:
-        """End the session."""
-        elapsed = (datetime.now(timezone.utc) - self._session_start).total_seconds()
-        self._state.stats.elapsed_seconds = elapsed
-        self._state.mode = "idle"
-        self._state.current_task = None
-        self._checkpoint()
-
-    def stop_requested(self) -> bool:
-        """Return True if a stop signal file is present."""
-        return (self._agents_dir / ".stop").exists()
-
-    def clear_stop_signal(self) -> None:
-        """Remove the stop signal file if it exists."""
-        stop_file = self._agents_dir / ".stop"
-        if stop_file.exists():
-            stop_file.unlink()
-
-    def _checkpoint(self) -> None:
-        """Persist current state and refresh progress.md."""
-        self._state.save(self._agents_dir)
-        # Lazy import to avoid circular dependency (progress imports state)
-        from harness.core.progress import update_progress
-
-        update_progress(self._agents_dir, self._state)
-
-    def _update_avg_score(self) -> None:
-        scores = [t.score for t in self._state.completed if t.score > 0]
-        self._state.stats.avg_score = sum(scores) / len(scores) if scores else 0.0
-
-    def _register_sigint(self) -> None:
-        """Two-stage SIGINT handler (inspired by CodeMachine-CLI cleanup.ts).
-
-        First Ctrl+C  : checkpoint + warn — workflow continues to next safe point
-        Second Ctrl+C : kill all child processes + checkpoint + exit(130)
-        """
-        from harness.drivers.process import kill_all_active
-
-        first_press_time: float = 0.0
-        _DEBOUNCE_MS = 500
-
-        def _handler(sig: int, frame: Any) -> None:
-            nonlocal first_press_time
-
-            now = time.monotonic()
-            if first_press_time == 0.0:
-                first_press_time = now
-                sys.stderr.write(
-                    "\n    │ Ctrl+C received — finishing current phase. "
-                    "Press Ctrl+C again to force quit.\n"
-                )
-                sys.stderr.flush()
-                self._checkpoint()
-                # Write stop signal so workflow loop breaks at next check
-                stop_file = self._agents_dir / ".stop"
-                stop_file.parent.mkdir(parents=True, exist_ok=True)
-                stop_file.write_text("sigint", encoding="utf-8")
-                return
-
-            if (now - first_press_time) * 1000 < _DEBOUNCE_MS:
-                return  # ignore rapid double-press
-
-            sys.stderr.write("\n    │ Force quit — killing child processes...\n")
-            sys.stderr.flush()
-            kill_all_active()
-            self._checkpoint()
-            sys.exit(130)
-
-        signal.signal(signal.SIGINT, _handler)
-
-
-def _elapsed(started_at: str) -> float:
-    """Seconds from started_at (ISO) to now."""
-    if not started_at:
-        return 0.0
-    start = datetime.fromisoformat(started_at)
-    now = datetime.now(timezone.utc)
-    return (now - start).total_seconds()

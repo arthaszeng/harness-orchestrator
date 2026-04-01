@@ -73,16 +73,6 @@ def _migrate_config(project_root: Path) -> int:
             typer.echo(t("update.config_missing_section", section=section, desc=desc))
             warnings += 1
 
-    workflow = data.get("workflow", {})
-    new_workflow_keys = {
-        "mode": "orchestrator",
-        "trunk_branch": "main",
-    }
-    for key, default in new_workflow_keys.items():
-        if key not in workflow and "workflow" in data:
-            typer.echo(t("update.config_new_key", section="workflow", config_key=key, default=default))
-            warnings += 1
-
     deprecated: list[tuple[str, str, str]] = [
         # ("old_section.old_key", "replacement", "version"),
     ]

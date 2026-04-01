@@ -8,47 +8,22 @@ command = "{{ ci_command }}"
 architecture_check = ""
 frontend_dir = ""
 
-[drivers]
-default = "{{ driver_mode }}"  # auto / cursor / codex
-
-[drivers.roles]
-{% if roles -%}
-{% for role, driver in roles.items() -%}
-{{ role }} = "{{ driver }}"
-{% endfor -%}
-{% else -%}
-# planner = "codex"
-# builder = "cursor"
-# evaluator = "codex"
-# advisor = "codex"
-{% endif %}
 [models]
-default = ""  # 留空 = 不向 CLI 传 --model，使用 IDE 默认模型
-
-[models.driver_defaults]
-# codex = "o3"
-# cursor = "claude-4-opus"
-
-[models.role_overrides]
-# planner = "o3-pro"
-# builder = ""
+default = ""
 
 [workflow]
-mode = "{{ workflow_mode }}"  # orchestrator / cursor-native
 max_iterations = 3
 pass_threshold = 7.0
 auto_merge = true
 branch_prefix = "agent"
 trunk_branch = "{{ trunk_branch }}"
-{% if workflow_mode == "cursor-native" %}
 
 [native]
-adversarial_model = "{{ adversarial_model }}"  # cross-model adversarial reviewer
-adversarial_mechanism = "auto"  # subagent / cli / auto
-review_gate = "eng"  # hard gate: only eng review blocks shipping
-gate_full_review_min = {{ gate_full_review_min }}  # escalation score for full human review
-gate_summary_confirm_min = {{ gate_summary_confirm_min }}  # escalation score for summary confirm
-{% endif %}
+adversarial_model = "{{ adversarial_model }}"
+adversarial_mechanism = "auto"
+review_gate = "eng"
+gate_full_review_min = {{ gate_full_review_min }}
+gate_summary_confirm_min = {{ gate_summary_confirm_min }}
 
 [autonomous]
 enabled = true
@@ -58,5 +33,4 @@ consecutive_block_limit = 2
 
 [integrations.memverse]
 enabled = {{ memverse_enabled | lower }}
-driver = "{{ memverse_driver }}"
 domain_prefix = "{{ memverse_domain }}"

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
-import time
 from pathlib import Path
 
 import jinja2
 import typer
 
-from harness.core.scanner import ProjectScan, format_scan_report, scan_project
+from harness.core.scanner import format_scan_report, scan_project
 from harness.i18n import set_lang, t
 
 
@@ -59,147 +57,7 @@ def _step_project_info(
     return name, description
 
 
-# ── Step 2: IDE environment ───────────────────────────────────────
-
-def _step_ide_setup(lang: str) -> dict[str, bool]:
-    typer.echo(t("init.step2_title"))
-    ides = {
-        "cursor": shutil.which("cursor") is not None,
-        "codex": shutil.which("codex") is not None,
-    }
-
-    from harness.drivers.cursor import CursorDriver
-    from harness.drivers.codex import CodexDriver
-    from harness.commands.install import (
-        _try_install_cursor_agent,
-        _try_install_codex_cli,
-    )
-
-    # ── Cursor ────────────────────────────────────────────────────
-    ready = dict(ides)
-    if ides["cursor"]:
-        probe = CursorDriver().probe()
-        if probe.available:
-            typer.echo(t("init.cursor_status", status="ok"))
-        else:
-            typer.echo(t("init.cursor_status", status="⚠ not ready"))
-            typer.echo(t("install.cursor_not_ready"))
-            if _try_install_cursor_agent():
-                reprobe = CursorDriver().probe()
-                if reprobe.available:
-                    typer.echo(t("init.cursor_status", status="ok"))
-                else:
-                    ready["cursor"] = False
-            else:
-                ready["cursor"] = False
-    else:
-        typer.echo(t("init.cursor_status", status=t("init.ide_not_detected")))
-
-    # ── Codex ─────────────────────────────────────────────────────
-    if ides["codex"]:
-        probe = CodexDriver().probe()
-        if probe.available:
-            typer.echo(t("init.codex_status", status="ok"))
-        else:
-            typer.echo(t("init.codex_status", status="⚠ not ready"))
-            typer.echo(t("install.codex_not_ready"))
-            if _try_install_codex_cli():
-                reprobe = CodexDriver().probe()
-                if reprobe.available:
-                    typer.echo(t("init.codex_status", status="ok"))
-                else:
-                    ready["codex"] = False
-            else:
-                ready["codex"] = False
-    else:
-        typer.echo(t("init.codex_status", status=t("init.ide_not_detected")))
-        if _try_install_codex_cli():
-            ides["codex"] = True
-            ready["codex"] = True
-            typer.echo(t("init.codex_status", status="ok"))
-
-    if not any(ready.values()):
-        typer.echo(t("init.no_ide_hint"))
-
-    if any(ready.values()):
-        do_install = typer.confirm(t("init.install_agents_confirm"), default=True)
-        if do_install:
-            from harness.commands.install import run_install
-            run_install(force=True, lang=lang)
-
-    return ready
-
-
-# ── Step 3: driver mode ───────────────────────────────────────────
-
-def _step_driver_mode(ides: dict[str, bool]) -> tuple[str, dict[str, str]]:
-    """Return (mode, roles_dict)."""
-    typer.echo(t("init.step3_title"))
-
-    both = ides["cursor"] and ides["codex"]
-    cursor_only = ides["cursor"] and not ides["codex"]
-
-    if both:
-        typer.echo(t("init.both_detected"))
-        typer.echo(t("init.opt_auto"))
-        typer.echo(t("init.opt_cursor"))
-        typer.echo(t("init.opt_codex"))
-        choice = _prompt_choice(t("init.choose"), 3, default=1)
-        mode = ["auto", "cursor", "codex"][choice - 1]
-    elif cursor_only:
-        typer.echo(t("init.cursor_only"))
-        mode = "cursor"
-    else:
-        typer.echo(t("init.codex_only"))
-        mode = "codex"
-
-    roles: dict[str, str] = {}
-    if mode == "auto" and both:
-        roles = {
-            "planner": "codex",
-            "builder": "cursor",
-            "evaluator": "codex",
-        }
-
-    return mode, roles
-
-
-# ── Step 4: workflow mode ─────────────────────────────────────────
-
-def _step_workflow_mode(ides: dict[str, bool]) -> tuple[str, str]:
-    """Return (workflow_mode, adversarial_model).
-
-    cursor-native mode only generates skill/agent/rule files into .cursor/ —
-    it does NOT require the cursor desktop client or cursor-agent CLI.
-    Always offer it as an option, and it is the recommended default.
-    """
-    typer.echo(t("init.step_mode_title"))
-
-    if ides.get("cursor"):
-        typer.echo(t("init.mode_desc"))
-    else:
-        typer.echo(t("init.mode_desc_no_cursor"))
-
-    typer.echo(t("init.opt_native"))
-    typer.echo(t("init.opt_orchestrator"))
-    choice = _prompt_choice(t("init.choose"), 2, default=1)
-
-    if choice == 1:
-        typer.echo(t("init.mode_native_selected"))
-        adv_model = typer.prompt(
-            t("init.native_adversarial_model"), default="gpt-4.1",
-        )
-        return "cursor-native", adv_model
-
-    if not ides.get("cursor") and not ides.get("codex"):
-        typer.echo(t("init.no_ide_orchestrator_warn"), err=True)
-        raise typer.Exit(1)
-
-    typer.echo(t("init.mode_orchestrator_selected"))
-    return "orchestrator", ""
-
-
-# ── Step 5: trunk branch ─────────────────────────────────────────
+# ── Step 2: trunk branch ─────────────────────────────────────────
 
 def _step_trunk_branch(project_root: Path) -> str:
     """Detect the current git branch and let the user confirm or change it."""
@@ -222,13 +80,10 @@ def _step_trunk_branch(project_root: Path) -> str:
     return trunk
 
 
-# ── Step 5: CI gate ───────────────────────────────────────────────
+# ── Step 3: CI gate ───────────────────────────────────────────────
 
 def _step_ci_command(
     project_root: Path,
-    ides: dict[str, bool],
-    driver_mode: str,
-    roles: dict[str, str],
     *,
     ci_override: str = "",
 ) -> str:
@@ -254,9 +109,7 @@ def _step_ci_command(
             label = t("init.recommended_label") if i == 1 else ""
             typer.echo(f"  {i}. {cmd} -- {desc}{label}")
 
-        ai_idx = len(suggestions) + 1
-        custom_idx = ai_idx + 1
-        typer.echo(t("init.ai_analyze", idx=ai_idx))
+        custom_idx = len(suggestions) + 1
         typer.echo(t("init.custom_input", idx=custom_idx))
 
         choice = _prompt_choice(t("init.choose"), custom_idx, default=1)
@@ -265,100 +118,24 @@ def _step_ci_command(
             selected = suggestions[choice - 1][0]
             typer.echo(f"  -> {selected}")
             return selected
-        if choice == ai_idx:
-            return _ai_suggest_ci(project_root, ides, scan, driver_mode, roles)
         return typer.prompt(t("init.enter_ci"))
+
     typer.echo(t("init.no_suggestions"))
-    typer.echo(t("init.opt_ai_analyze"))
-    typer.echo(t("init.opt_custom"))
-    typer.echo(t("init.opt_skip"))
-    choice = _prompt_choice(t("init.choose"), 3, default=1)
+    typer.echo(t("init.custom_input", idx=1))
+    skip_label = t("init.opt_skip").replace("3.", "2.", 1)
+    typer.echo(skip_label)
+
+    choice = _prompt_choice(t("init.choose"), 2, default=2)
 
     if choice == 1:
-        return _ai_suggest_ci(project_root, ides, scan, driver_mode, roles)
-    if choice == 2:
         return typer.prompt(t("init.enter_ci"))
     return ""
 
 
-def _ai_suggest_ci(
-    project_root: Path,
-    ides: dict[str, bool],
-    scan: ProjectScan,
-    driver_mode: str,
-    roles: dict[str, str],
-) -> str:
-    """Use an AI agent to analyze the project and suggest a CI command."""
-    from harness.core.config import DriversRolesConfig, HarnessConfig
-    from harness.drivers.codex import CodexDriver
-    from harness.drivers.cursor import CursorDriver
-    from harness.drivers.resolver import DriverResolver
+# ── Step 4: Memverse ──────────────────────────────────────────────
 
-    cfg = HarnessConfig.load(project_root)
-    cfg.drivers.default = driver_mode
-    if roles:
-        update = {
-            k: v
-            for k, v in roles.items()
-            if k in DriversRolesConfig.model_fields
-        }
-        if update:
-            cfg.drivers.roles = cfg.drivers.roles.model_copy(update=update)
-
-    resolver = DriverResolver(cfg)
-    try:
-        driver = resolver.resolve("advisor")
-        advisor_model = resolver.resolve_model("advisor")
-    except RuntimeError:
-        driver = None
-        advisor_model = ""
-        if ides.get("codex"):
-            driver = CodexDriver()
-        elif ides.get("cursor"):
-            driver = CursorDriver()
-
-    if not driver:
-        typer.echo(t("init.ai_no_ide"))
-        return typer.prompt(t("init.enter_ci"), default="make test")
-
-    report_lines = format_scan_report(scan)
-    report_text = "\n".join(f"- {line}" for line in report_lines) if report_lines else "(none)"
-
-    prompt = t(
-        "prompt.ai_ci",
-        project_root=str(project_root),
-        report=report_text,
-    )
-
-    typer.echo(t("init.ai_analyzing"))
-    t0 = time.monotonic()
-    result = driver.invoke(
-        "harness-advisor", prompt, project_root,
-        readonly=True, timeout=120, model=advisor_model,
-    )
-    elapsed = time.monotonic() - t0
-    typer.echo(t("init.ai_done", elapsed=elapsed))
-
-    if result.success and result.output.strip():
-        for line in result.output.strip().split("\n"):
-            line = line.strip().strip("`").strip()
-            if line and not line.startswith("#"):
-                typer.echo(t("init.ai_recommend", line=line))
-                use_it = typer.confirm(t("init.use_command"), default=True)
-                if use_it:
-                    return line
-                break
-
-    return typer.prompt(t("init.enter_ci"), default="make test")
-
-
-# ── Step 6: Memverse ──────────────────────────────────────────────
-
-def _step_memverse(
-    project_root: Path,
-    driver_mode: str,
-) -> tuple[bool, str, str]:
-    """Return (enabled, driver, domain_prefix)."""
+def _step_memverse(project_root: Path) -> tuple[bool, str, str]:
+    """Return (enabled, driver, domain_prefix). Native-only: driver is always cursor."""
     typer.echo(t("init.step5_title"))
     typer.echo(t("init.memverse_desc"))
     typer.echo(t("init.opt_enable"))
@@ -366,18 +143,14 @@ def _step_memverse(
     choice = _prompt_choice(t("init.choose"), 2, default=2)
 
     if choice == 2:
-        return False, "auto", ""
-
-    mv_driver = driver_mode
-    typer.echo(t("init.memverse_driver", mode=driver_mode))
-    typer.echo(t("init.memverse_all_ides"))
+        return False, "cursor", ""
 
     domain = typer.prompt(t("init.domain_prefix"), default=project_root.name)
 
-    return True, mv_driver, domain
+    return True, "cursor", domain
 
 
-# ── Step 7: Vision ────────────────────────────────────────────────
+# ── Step 5: Vision ────────────────────────────────────────────────
 
 def _step_vision(agents_dir: Path) -> bool:
     """Return True if the user chose to generate vision now."""
@@ -419,29 +192,16 @@ def run_init(
     if non_interactive:
         proj_name = name or project_root.name
         description = ""
-        ides = {
-            "cursor": shutil.which("cursor") is not None,
-            "codex": shutil.which("codex") is not None,
-        }
-        driver_mode = "auto"
-        roles: dict[str, str] = {}
-        workflow_mode = "cursor-native"
-        adversarial_model = "gpt-4.1"
         trunk_branch = "main"
         ci = ci_command or "make test"
-        memverse_enabled, memverse_driver, memverse_domain = False, "auto", ""
+        memverse_enabled, memverse_driver, memverse_domain = False, "cursor", ""
         launch_vision = False
     else:
         proj_name, description = _step_project_info(project_root, name_override=name)
-        ides = _step_ide_setup(lang_norm)
-        driver_mode, roles = _step_driver_mode(ides)
-        workflow_mode, adversarial_model = _step_workflow_mode(ides)
         trunk_branch = _step_trunk_branch(project_root)
-        ci = _step_ci_command(
-            project_root, ides, driver_mode, roles, ci_override=ci_command,
-        )
+        ci = _step_ci_command(project_root, ci_override=ci_command)
         memverse_enabled, memverse_driver, memverse_domain = _step_memverse(
-            project_root, driver_mode,
+            project_root,
         )
         launch_vision = _step_vision(agents_dir)
 
@@ -455,11 +215,11 @@ def run_init(
         description=description,
         lang=lang_norm,
         ci_command=ci,
-        driver_mode=driver_mode,
-        roles=roles,
-        workflow_mode=workflow_mode,
-        adversarial_model=adversarial_model or "gpt-4.1",
+        workflow_mode="cursor-native",
+        adversarial_model="gpt-4.1",
         trunk_branch=trunk_branch,
+        gate_full_review_min=5,
+        gate_summary_confirm_min=3,
         memverse_enabled="true" if memverse_enabled else "false",
         memverse_driver=memverse_driver,
         memverse_domain=memverse_domain,
@@ -473,9 +233,8 @@ def run_init(
         vision_content = tmpl.render(project_name=proj_name)
         vision_path.write_text(vision_content, encoding="utf-8")
 
-    if workflow_mode == "cursor-native":
-        from harness.native.skill_gen import generate_native_artifacts
-        generate_native_artifacts(project_root, lang=lang_norm)
+    from harness.native.skill_gen import generate_native_artifacts
+    generate_native_artifacts(project_root, lang=lang_norm)
 
     _update_gitignore(project_root)
 
@@ -484,23 +243,20 @@ def run_init(
     if not launch_vision and vision_path.exists():
         typer.echo(t("init.vision_generated"))
     typer.echo(t("init.gitignore_updated"))
-    if workflow_mode == "cursor-native":
-        typer.echo(t("native.init_hint"))
-        typer.echo(t("native.hint_brainstorm"))
-        typer.echo(t("native.hint_vision"))
-        typer.echo(t("native.hint_plan"))
-        typer.echo(t("native.hint_build"))
-        typer.echo(t("native.hint_eval"))
-        typer.echo(t("native.hint_ship"))
-        typer.echo(t("native.hint_parallel"))
-    else:
-        typer.echo(t("init.next_auto"))
-        typer.echo(t("init.next_status"))
+    typer.echo(t("native.init_hint"))
+    typer.echo(t("native.hint_brainstorm"))
+    typer.echo(t("native.hint_vision"))
+    typer.echo(t("native.hint_plan"))
+    typer.echo(t("native.hint_build"))
+    typer.echo(t("native.hint_eval"))
+    typer.echo(t("native.hint_ship"))
+    typer.echo(t("native.hint_parallel"))
 
     if launch_vision:
         typer.echo(t("init.launch_vision"))
-        from harness.commands.vision_cmd import run_vision
-        run_vision()
+        typer.echo(t("native.hint_vision"))
+
+    # harness vision CLI removed; native flow uses Cursor skills (see hint above)
 
 
 def _update_gitignore(project_root: Path) -> None:

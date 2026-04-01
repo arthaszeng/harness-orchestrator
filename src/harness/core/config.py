@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import os
+import sys
+import warnings
 from pathlib import Path
 from typing import Any, Literal
-
-import sys
 
 if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
-import warnings
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from harness.core.roles import ALL_ROLES, NATIVE_REVIEW_ROLES
 
@@ -33,21 +32,6 @@ class CIConfig(BaseModel):
     frontend_dir: str = ""
 
 
-class DriversRolesConfig(BaseModel):
-    planner: str = ""
-    builder: str = ""
-    evaluator: str = ""
-    alignment_evaluator: str = ""
-    strategist: str = ""
-    reflector: str = ""
-    advisor: str = ""
-
-
-class DriversConfig(BaseModel):
-    default: str = "auto"  # auto / cursor / codex
-    roles: DriversRolesConfig = Field(default_factory=DriversRolesConfig)
-
-
 class RoleModelConfig(BaseModel):
     """单个角色的模型配置，支持模型和温度覆盖。"""
     model: str | None = None
@@ -62,7 +46,7 @@ class ModelsConfig(BaseModel):
 
 
 class NativeModeConfig(BaseModel):
-    """Cursor-native mode settings — only used when workflow.mode = cursor-native."""
+    """Native IDE workflow settings (eval, ship, skills)."""
     adversarial_model: str = "gpt-4.1"
     adversarial_mechanism: Literal["subagent", "cli", "auto"] = "auto"
     review_gate: Literal["eng", "advisory"] = "eng"
@@ -107,14 +91,11 @@ class NativeModeConfig(BaseModel):
 
 
 class WorkflowConfig(BaseModel):
-    mode: str = "orchestrator"  # orchestrator / cursor-native
-    profile: str = "standard"  # lite / standard / autonomous
     max_iterations: int = 3
     pass_threshold: float = 7.0
     auto_merge: bool = True
     branch_prefix: str = "agent"
     trunk_branch: str = "main"
-    dual_evaluation: bool = False
 
 
 class AutonomousConfig(BaseModel):
@@ -126,7 +107,6 @@ class AutonomousConfig(BaseModel):
 
 class MemverseConfig(BaseModel):
     enabled: bool = False
-    driver: str = "auto"  # auto / cursor / codex
     domain_prefix: str = ""
 
 
@@ -136,9 +116,10 @@ class IntegrationsConfig(BaseModel):
 
 class HarnessConfig(BaseModel):
     """Complete harness configuration."""
+    model_config = ConfigDict(extra="ignore")
+
     project: ProjectConfig = Field(default_factory=ProjectConfig)
     ci: CIConfig = Field(default_factory=CIConfig)
-    drivers: DriversConfig = Field(default_factory=DriversConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     native: NativeModeConfig = Field(default_factory=NativeModeConfig)
@@ -179,39 +160,11 @@ class HarnessConfig(BaseModel):
         return cfg
 
 
-def resolve_model(role: str, driver_name: str, models: ModelsConfig) -> str:
-    """解析角色对应的模型，按以下优先级 fallback:
-
-    1. ``role_overrides[role]``  — 角色级精确覆盖
-    2. ``role_configs[role].model`` — 角色扩展配置中的模型
-    3. ``driver_defaults[driver]`` — 驱动级批量配置
-    4. ``default`` — 全局默认
-
-    返回空字符串表示"使用 IDE/CLI 自身默认模型"，driver 侧仅在非空时
-    附加 ``--model``，因此零配置不改变现有运行路径。
-    """
-    if role in models.role_overrides:
-        return models.role_overrides[role]
-    rc = models.role_configs.get(role)
-    if rc and rc.model is not None:
-        return rc.model
-    if driver_name in models.driver_defaults:
-        return models.driver_defaults[driver_name]
-    return models.default
-
-
-def resolve_role_temperature(role: str, models: ModelsConfig) -> float | None:
-    """解析角色温度配置，无配置时返回 None。"""
-    rc = models.role_configs.get(role)
-    return rc.temperature if rc else None
-
-
 def _env_overrides() -> dict[str, Any]:
     """Extract HARNESS_* environment variables as config overrides.
 
     Mapping convention:
         HARNESS_CI_COMMAND        → {"ci": {"command": "..."}}
-        HARNESS_WORKFLOW_PROFILE  → {"workflow": {"profile": "..."}}
         HARNESS_MODELS_DEFAULT    → {"models": {"default": "..."}}
 
     Only non-empty values are included. Nested keys use underscore separation

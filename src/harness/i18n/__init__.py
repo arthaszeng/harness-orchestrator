@@ -8,7 +8,7 @@ Usage::
     print(t("init.done"))   # "初始化完成！"
 
     # with interpolation
-    print(t("init.ai_done", elapsed=12))  # "[AI] 完成 (12s)"
+    print(t("init.found", line="pytest.ini"))  # e.g. "    Found pytest.ini"
 """
 
 from __future__ import annotations
