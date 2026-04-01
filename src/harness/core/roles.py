@@ -1,8 +1,8 @@
 """Role constants for native harness.
 
-Exports used by config validation, skill generation, and templates.
-Orchestrator role registry has been removed; ``ALL_ROLES`` is empty for
-backward compatibility with ``KNOWN_MODEL_ROLES`` in config.
+Exports used by native review validation (``NATIVE_REVIEW_ROLES``),
+skill generation templates, and scoring dimensions.
+``ALL_ROLES`` is empty in native-only mode (no orchestrator-routed roles).
 """
 
 from __future__ import annotations

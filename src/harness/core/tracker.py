@@ -1,9 +1,8 @@
 """RunTracker — context manager that dual-writes to Registry + EventEmitter.
 
-Replaces manual ev.agent_start() / ev.agent_end() pairs scattered across
-workflow.py and autonomous.py with a single ``with tracker.track(...):`` block.
+Provides a single ``with tracker.track(...):`` block for any agent invocation.
 Both the SQLite registry and the append-only JSONL log are written on every
-agent invocation, keeping the two systems in sync.
+call, keeping the two systems in sync.
 """
 
 from __future__ import annotations

@@ -25,12 +25,6 @@ review_gate = "eng"
 gate_full_review_min = {{ gate_full_review_min }}
 gate_summary_confirm_min = {{ gate_summary_confirm_min }}
 
-[autonomous]
-enabled = true
-max_tasks_per_session = 10
-progress_report_interval = 5
-consecutive_block_limit = 2
-
 [integrations.memverse]
 enabled = {{ memverse_enabled | lower }}
 domain_prefix = "{{ memverse_domain }}"

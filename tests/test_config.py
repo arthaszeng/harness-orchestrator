@@ -3,13 +3,11 @@
 from pathlib import Path
 
 from harness.core.config import (
-    KNOWN_MODEL_ROLES,
     HarnessConfig,
     ModelsConfig,
     RoleModelConfig,
     _deep_merge,
 )
-from harness.core.roles import ALL_ROLES
 
 
 def test_default_config():
@@ -46,19 +44,12 @@ def test_models_config_from_toml(tmp_path: Path):
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[models]\ndefault = "gpt-4o"\n\n'
-        '[models.driver_defaults]\ncodex = "o3"\n\n'
         '[models.role_overrides]\nplanner = "o3-pro"\n',
         encoding="utf-8",
     )
     cfg = HarnessConfig.load(tmp_path)
     assert cfg.models.default == "gpt-4o"
-    assert cfg.models.driver_defaults == {"codex": "o3"}
     assert cfg.models.role_overrides == {"planner": "o3-pro"}
-
-
-def test_known_model_roles_matches_all_roles():
-    assert KNOWN_MODEL_ROLES == ALL_ROLES
-    assert KNOWN_MODEL_ROLES == frozenset()
 
 
 def test_legacy_drivers_section_ignored(tmp_path: Path):
@@ -97,6 +88,5 @@ def test_role_model_config_roundtrip():
 def test_models_empty():
     models = ModelsConfig()
     assert models.default == ""
-    assert models.driver_defaults == {}
     assert models.role_overrides == {}
     assert models.role_configs == {}

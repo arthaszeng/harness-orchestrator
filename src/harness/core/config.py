@@ -15,9 +15,7 @@ else:
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from harness.core.roles import ALL_ROLES, NATIVE_REVIEW_ROLES
-
-KNOWN_MODEL_ROLES: frozenset[str] = ALL_ROLES
+from harness.core.roles import NATIVE_REVIEW_ROLES
 
 
 class ProjectConfig(BaseModel):
@@ -40,7 +38,6 @@ class RoleModelConfig(BaseModel):
 
 class ModelsConfig(BaseModel):
     default: str = ""
-    driver_defaults: dict[str, str] = Field(default_factory=dict)
     role_overrides: dict[str, str] = Field(default_factory=dict)
     role_configs: dict[str, RoleModelConfig] = Field(default_factory=dict)
 
@@ -98,13 +95,6 @@ class WorkflowConfig(BaseModel):
     trunk_branch: str = "main"
 
 
-class AutonomousConfig(BaseModel):
-    enabled: bool = True
-    max_tasks_per_session: int = 10
-    progress_report_interval: int = 5
-    consecutive_block_limit: int = 2
-
-
 class MemverseConfig(BaseModel):
     enabled: bool = False
     domain_prefix: str = ""
@@ -123,7 +113,6 @@ class HarnessConfig(BaseModel):
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     native: NativeModeConfig = Field(default_factory=NativeModeConfig)
-    autonomous: AutonomousConfig = Field(default_factory=AutonomousConfig)
     integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
 
     # Runtime-injected, excluded from serialization
