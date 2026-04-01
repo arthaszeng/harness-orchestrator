@@ -8,6 +8,7 @@ from pathlib import Path
 from rich.panel import Panel
 from rich.table import Table
 
+from harness.core.config import HarnessConfig
 from harness.core.progress import (
     get_recent_blocked,
     get_recent_completed,
@@ -18,6 +19,18 @@ from harness.core.state import SessionState
 from harness.core.ui import get_ui
 
 log = logging.getLogger("harness.commands.status")
+
+_DEFAULT_PASS_THRESHOLD = 7.0
+
+
+def _load_pass_threshold() -> float:
+    """Load pass_threshold from config, falling back to default on any error."""
+    try:
+        cfg = HarnessConfig.load()
+        return cfg.workflow.pass_threshold
+    except Exception:
+        log.debug("could not load config for pass_threshold, using default", exc_info=True)
+        return _DEFAULT_PASS_THRESHOLD
 
 
 def run_status() -> None:
@@ -32,10 +45,12 @@ def run_status() -> None:
         ui.info("no active session. run `harness run` or `harness auto` to begin.")
         return
 
+    pass_threshold = _load_pass_threshold()
+
     _render_header(console, state)
     _render_current(console, state)
     _render_agents(console, state, agents_dir)
-    _render_recent_result(console, state)
+    _render_recent_result(console, state, pass_threshold=pass_threshold)
     _render_resume(console, state)
     _render_next_action(console, state)
     _render_stats(console, state)
@@ -60,7 +75,12 @@ def _render_current(console, state: SessionState) -> None:
     console.print(f"  Branch:    [cyber.dim]{t.branch}[/]")
 
 
-def _render_recent_result(console, state: SessionState) -> None:
+def _render_recent_result(
+    console,
+    state: SessionState,
+    *,
+    pass_threshold: float = _DEFAULT_PASS_THRESHOLD,
+) -> None:
     recent_done = get_recent_completed(state)
     recent_block = get_recent_blocked(state)
 
@@ -70,7 +90,7 @@ def _render_recent_result(console, state: SessionState) -> None:
     console.print("\n[cyber.magenta]Recent Result:[/]")
 
     if recent_done:
-        score_style = "cyber.ok" if recent_done.score >= 7.0 else "cyber.warn"
+        score_style = "cyber.ok" if recent_done.score >= pass_threshold else "cyber.warn"
         console.print(
             f"  ✓ {recent_done.requirement} — "
             f"[{score_style}]{recent_done.score:.1f}[/{score_style}] "
