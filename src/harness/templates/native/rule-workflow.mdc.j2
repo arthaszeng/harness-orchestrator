@@ -1,5 +1,5 @@
 ---
-description: "Harness workflow conventions: versioning, commit format, task state management"
+description: "Harness workflow conventions: commit format, task state management"
 alwaysApply: true
 ---
 
@@ -26,9 +26,3 @@ Use conventional commits: `<type>(scope): description`
 - Feature branches: `{{ branch_prefix }}/<task-id>-<short-desc>`
 - Trunk branch: `{{ trunk_branch }}`
 - Never commit directly to trunk
-
-## Version Management
-
-- If `VERSION` file exists, bump it on successful ship
-- MICRO/PATCH: auto-detect from diff
-- MINOR/MAJOR: ask the user

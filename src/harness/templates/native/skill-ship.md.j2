@@ -21,7 +21,6 @@ Run straight through and output the PR URL at the end.
 
 **Never stop for:**
 - Uncommitted changes (always include them)
-- Version bump choice (auto-pick PATCH)
 - Commit message approval (auto-commit)
 - PR content (auto-generate)
 - AUTO-FIX review findings (fix and continue)
@@ -75,19 +74,6 @@ Run straight through and output the PR URL at the end.
 
 ---
 
-## Step 1.5: Distribution Pipeline Check
-
-If the diff introduces new distributable artifacts (new packages, binaries, Docker images, etc.):
-
-1. Check `.github/workflows/` for publish/release workflows
-2. Check `Makefile` / `pyproject.toml` / `package.json` for build/publish targets
-3. If a new artifact type is introduced but no release pipeline exists: flag as INFORMATIONAL warning
-4. If existing — verify version tag format consistency across VERSION file, git tags, and publish scripts
-
-This is informational — does not block shipping.
-
----
-
 ## Step 2: Rebase onto the base branch (BEFORE tests)
 
 Fetch and rebase onto the base branch so tests run against the latest state:
@@ -96,7 +82,7 @@ Fetch and rebase onto the base branch so tests run against the latest state:
 git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-**If rebase conflicts:** Try to auto-resolve simple conflicts (VERSION, CHANGELOG ordering).
+**If rebase conflicts:** Try to auto-resolve simple conflicts (e.g. CHANGELOG ordering).
 If conflicts are complex or ambiguous, run `git rebase --abort`, **STOP** and show the conflicts.
 
 **If already up to date:** Continue silently.
@@ -332,7 +318,7 @@ The eval is what catches issues tests cannot: security holes, design flaws, scop
 
 ---
 
-## Step 6: Version + Commit (bisectable chunks)
+## Step 6: Commit (bisectable chunks)
 
 {% if review_gate == 'advisory' %}
 Once evaluation completes (advisory mode — ITERATE verdict is logged but does not block):
@@ -340,23 +326,15 @@ Once evaluation completes (advisory mode — ITERATE verdict is logged but does 
 Once evaluation PASSES:
 {% endif %}
 
-1. **Version bump**: If a `VERSION` file exists, bump PATCH (auto-decide).
-   If `pyproject.toml` has a version field, bump it too.
-
-   **Do NOT create a git tag.** Version tags are created automatically by CI
-   (`auto-tag.yml`) after the PR is merged to `{{ trunk_branch }}`. This prevents
-   publishing a release from an unmerged PR.
-
-2. **Bisectable commits**: Analyze the diff and group into logical commits:
+1. **Bisectable commits**: Analyze the diff and group into logical commits:
    - Infrastructure/config changes first
    - Core logic + tests together
-   - VERSION/CHANGELOG in the final commit
    - Each commit must be independently valid
 
-3. **Commit format**: `<type>(scope): description`
+2. **Commit format**: `<type>(scope): description`
    Types: feat, fix, refactor, test, docs, chore
 
-4. Stage and commit by file groups (not `git add -A`):
+3. Stage and commit by file groups (not `git add -A`):
    ```bash
    git add <specific-files> && git commit -m "<type>(scope): description"
    ```
@@ -384,7 +362,7 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 
 **Before pushing, verify:**
 
-1. If ANY code changed after Step 3's test run (review fixes, version bumps don't count),
+1. If ANY code changed after Step 3's test run (review fixes don't count),
    re-run `{{ ci_command }}`. Paste fresh output — not a summary, the actual output.
 2. If tests fail: STOP. Fix and return to Step 3.
 3. Verify git status is clean (no stray untracked files).
@@ -481,7 +459,6 @@ Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospecti
 ```json
 {
   "timestamp": "ISO-8601",
-  "version": "X.Y.Z",
   "branch": "agent/feature-name",
   "coverage_pct": 85,
   "plan_total": 5,
@@ -522,6 +499,4 @@ If interrupted, resume by checking which artifacts exist and which round number 
 - **Never ask for trivial confirmations.** Auto-commit, auto-push, auto-PR.
 - **Split commits for bisectability** — each commit = one logical change.
 - **Never push without fresh verification evidence.** If code changed after tests, re-run.
-- **Never confuse development-workflow.mdc with ship.** If you are in `/harness-ship`,
-  follow THIS workflow. `release.sh` runs AFTER ship completes (Step 8+), not instead of eval.
 - **The goal is: user says `/harness-ship`, next thing they see is the PR URL.**
