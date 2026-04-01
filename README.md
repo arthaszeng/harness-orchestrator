@@ -106,7 +106,7 @@ The same 5 specialized roles review both **plans** and **code**, dispatched in p
 | **QA** | Test strategy, boundary values, regression risk | Test coverage, edge cases, CI health |
 | **Project Manager** | Task decomposition, parallelism, scope | Scope drift, plan completion, delivery risk |
 
-Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.agents/config.toml`.
+Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.agents/config.toml`. Invalid or locally unavailable model pins are dropped during artifact generation so agents fall back to the IDE default model instead of hard-failing on a bad config.
 
 ### Fix-First auto-remediation
 
@@ -155,13 +155,13 @@ Project settings live in `.agents/config.toml`:
 | `workflow.pass_threshold` | 7.0 | Evaluator pass threshold (1-10) |
 | `workflow.auto_merge` | true | Auto-merge branch after pass |
 | `workflow.branch_prefix` | "agent" | Task branch prefix |
-| `native.evaluator_model` | "inherit" | Evaluator model for review roles (`inherit` = use IDE default) |
+| `native.evaluator_model` | "inherit" | Preferred default model for the 5 review roles; invalid or unavailable values fall back to IDE default |
 | `native.review_gate` | "eng" | Review gate strictness (`eng` = hard gate, `advisory` = log only) |
 | `native.plan_review_gate` | "auto" | Plan review gate (`human` / `ai` / `auto`) |
 | `native.gate_full_review_min` | 5 | Escalation score threshold for full human review |
 | `native.gate_summary_confirm_min` | 3 | Escalation score threshold for summary confirmation |
 | `native.retro_window_days` | 14 | Default retro analysis window (days) |
-| `native.role_models.*` | `{}` | Per-role model overrides: `architect`, `product_owner`, `engineer`, `qa`, `project_manager` |
+| `native.role_models.*` | `{}` | Per-role model overrides; takes precedence over `native.evaluator_model`, but invalid or unavailable values also fall back to IDE default |
 
 ---
 

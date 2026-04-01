@@ -106,7 +106,7 @@ harness init
 | **QA** | 测试策略、边界值、回归风险 | 测试覆盖、边界场景、CI 健康度 |
 | **项目经理** | 任务分解、并行度、scope | scope 漂移、计划完成度、交付风险 |
 
-被 2+ 角色发现的问题标注为**高置信度**。每个角色可通过 `[native.role_models]` 使用不同模型。
+被 2+ 角色发现的问题标注为**高置信度**。每个角色可通过 `[native.role_models]` 使用不同模型。若配置了无效模型，或本地 Cursor 状态里看不到该模型，生成 agent 模板时会自动回退到 IDE 默认模型，而不是把错误模型硬写进去。
 
 ### Fix-First 自动修复
 
@@ -127,13 +127,13 @@ harness init
 | `workflow.pass_threshold` | 7.0 | 评审通过阈值（1-10） |
 | `workflow.auto_merge` | true | 通过后自动合并分支 |
 | `workflow.branch_prefix` | "agent" | 任务分支前缀 |
-| `native.evaluator_model` | "inherit" | 评审角色使用的模型（`inherit` = 使用 IDE 默认模型） |
+| `native.evaluator_model` | "inherit" | 5 个评审角色的默认偏好模型；若无效或本地不可用则回退到 IDE 默认模型 |
 | `native.review_gate` | "eng" | 评审门禁（`eng` = 硬门禁，`advisory` = 仅记录） |
 | `native.plan_review_gate` | "auto" | 计划审阅门控（`human` / `ai` / `auto`） |
 | `native.gate_full_review_min` | 5 | 完整人工审查的升级分数阈值 |
 | `native.gate_summary_confirm_min` | 3 | 摘要确认的升级分数阈值 |
 | `native.retro_window_days` | 14 | 回顾分析窗口（天） |
-| `native.role_models.*` | `{}` | 每角色模型覆盖 |
+| `native.role_models.*` | `{}` | 每角色模型覆盖；优先级高于 `native.evaluator_model`，但无效或本地不可用时同样回退到 IDE 默认模型 |
 
 ---
 
