@@ -2,30 +2,15 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import jinja2
 import typer
 
 from harness.core.scanner import format_scan_report, scan_project
+from harness.core.model_selection import detect_cursor_recent_models, validate_model_name
 from harness.core.ui import get_ui
 from harness.i18n import set_lang, t
-
-_MODEL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*$")
-
-KNOWN_MODELS: list[tuple[str, str]] = [
-    ("claude-4.6-opus-high-thinking", "Anthropic"),
-    ("claude-4-opus", "Anthropic"),
-    ("claude-4-sonnet", "Anthropic"),
-    ("gpt-5.4-high", "OpenAI"),
-    ("gpt-4.1", "OpenAI"),
-    ("gpt-4.1-mini", "OpenAI"),
-    ("o3", "OpenAI"),
-    ("o4-mini", "OpenAI"),
-    ("gemini-2.5-pro", "Google"),
-    ("gemini-2.5-flash", "Google"),
-]
 
 
 def _load_template(name: str) -> jinja2.Template:
@@ -184,77 +169,33 @@ def _step_memverse(project_root: Path) -> tuple[bool, str]:
 
 # ── Step 5: Evaluator Model ───────────────────────────────────────
 
-def validate_model_name(value: str) -> bool:
-    """Return True if value is 'inherit' or a valid model identifier."""
-    if value == "inherit":
-        return True
-    return bool(_MODEL_RE.match(value))
-
-
-def _detect_cursor_model() -> str | None:
-    """Try to read the user's current Cursor model preference from local state."""
-    try:
-        import platform
-        import sqlite3
-
-        system = platform.system()
-        if system == "Darwin":
-            db_path = Path.home() / "Library/Application Support/Cursor/User/globalStorage/state.vscdb"
-        elif system == "Linux":
-            db_path = Path.home() / ".config/Cursor/User/globalStorage/state.vscdb"
-        elif system == "Windows":
-            import os as _os
-            appdata = Path(_os.environ.get("APPDATA", ""))
-            db_path = appdata / "Cursor/User/globalStorage/state.vscdb"
-        else:
-            return None
-
-        if not db_path.exists():
-            return None
-
-        conn = sqlite3.connect(str(db_path), timeout=2)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT value FROM ItemTable WHERE key = 'cursor/lastSingleModelPreference'",
-        )
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            import json
-            data = json.loads(row[0])
-            model = data.get("composer") or data.get("chat")
-            if model and validate_model_name(model):
-                return model
-    except Exception:
-        pass
-    return None
-
 
 def _step_evaluator_model() -> str:
-    """Prompt user to pick evaluator model from known list or custom input."""
+    """Prompt user to pick evaluator model from recent Cursor models or custom input."""
     console = get_ui().console
     _cyber_step(console, 5, 5, t("init.step_evaluator_label"))
     console.print(f"  [cyber.dim]{t('init.evaluator_desc')}[/]")
+    console.print(f"  [cyber.dim]{t('init.evaluator_fallback_note')}[/]")
 
-    detected = _detect_cursor_model()
-    if detected:
-        console.print(f"  [cyber.green]▸[/] {t('init.evaluator_detected', model=detected)}")
+    recent_models = detect_cursor_recent_models()
 
-    console.print(f"\n  [cyber.dim]1.[/] inherit [cyber.dim]({t('init.evaluator_inherit_hint')})[/]"
-                  f" [cyber.green]({t('init.recommended_label')})[/]")
+    console.print(
+        f"\n  [cyber.dim]1.[/] inherit [cyber.dim]({t('init.evaluator_inherit_hint')})[/]"
+        f" [cyber.green]({t('init.recommended_label')})[/]",
+    )
 
-    known_names = {name for name, _ in KNOWN_MODELS}
-    detected_in_list = detected and detected in known_names
+    next_index = 2
+    for model in recent_models:
+        console.print(
+            f"  [cyber.dim]{next_index}.[/] {model} "
+            f"[cyber.dim]({t('init.evaluator_detected_label')})[/]",
+        )
+        next_index += 1
 
-    offset = 2
-    if detected and not detected_in_list:
-        console.print(f"  [cyber.dim]{offset}.[/] {detected} [cyber.dim]({t('init.evaluator_detected_label')})[/]")
-        offset += 1
+    if not recent_models:
+        console.print(f"  [cyber.dim]{t('init.evaluator_detected_none')}[/]")
 
-    for i, (model, provider) in enumerate(KNOWN_MODELS, offset):
-        console.print(f"  [cyber.dim]{i}.[/] {model} [cyber.dim]({provider})[/]")
-
-    custom_idx = offset + len(KNOWN_MODELS)
+    custom_idx = next_index
     console.print(f"  [cyber.dim]{custom_idx}.[/] {t('init.custom_input_label')}")
 
     choice = _prompt_choice(t("init.choose"), custom_idx, default=1)
@@ -262,13 +203,9 @@ def _step_evaluator_model() -> str:
     if choice == 1:
         return "inherit"
 
-    if detected and not detected_in_list and choice == 2:
-        return detected
-
-    list_start = 3 if (detected and not detected_in_list) else 2
-    list_idx = choice - list_start
-    if 0 <= list_idx < len(KNOWN_MODELS):
-        selected = KNOWN_MODELS[list_idx][0]
+    list_idx = choice - 2
+    if 0 <= list_idx < len(recent_models):
+        selected = recent_models[list_idx]
         console.print(f"  [cyber.green]→[/] {selected}")
         return selected
 

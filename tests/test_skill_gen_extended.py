@@ -104,7 +104,8 @@ def test_build_context_has_role_models(tmp_path: Path):
     """_build_context includes role_models_* for all 5 roles."""
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
+        ctx = _build_context(cfg)
     for role in ("architect", "product_owner", "engineer", "qa", "project_manager"):
         assert f"role_models_{role}" in ctx
         assert ctx[f"role_models_{role}"] == ""
@@ -115,10 +116,81 @@ def test_build_context_role_models_from_config(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
     cfg.native.role_models = {"architect": "gpt-4.1", "qa": "o3-mini"}
-    ctx = _build_context(cfg)
+    with patch(
+        "harness.native.skill_gen.detect_cursor_recent_models",
+        return_value=["gpt-4.1", "o3-mini"],
+    ):
+        ctx = _build_context(cfg)
     assert ctx["role_models_architect"] == "gpt-4.1"
     assert ctx["role_models_qa"] == "o3-mini"
     assert ctx["role_models_engineer"] == ""
+
+
+def test_build_context_uses_evaluator_model_as_default_role_model(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.evaluator_model = "gpt-4.1"
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
+        ctx = _build_context(cfg)
+    assert ctx["role_models_architect"] == "gpt-4.1"
+    assert ctx["role_models_engineer"] == "gpt-4.1"
+    assert ctx["role_models_qa"] == "gpt-4.1"
+
+
+def test_build_context_keeps_valid_evaluator_model_when_discovery_unavailable(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.evaluator_model = "gpt-4.1"
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
+        ctx = _build_context(cfg)
+    assert ctx["evaluator_model"] == "gpt-4.1"
+    assert ctx["role_models_architect"] == "gpt-4.1"
+
+
+def test_build_context_role_override_beats_evaluator_model(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.evaluator_model = "gpt-4.1"
+    cfg.native.role_models = {"architect": "o3-mini"}
+    with patch(
+        "harness.native.skill_gen.detect_cursor_recent_models",
+        return_value=["gpt-4.1", "o3-mini"],
+    ):
+        ctx = _build_context(cfg)
+    assert ctx["role_models_architect"] == "o3-mini"
+    assert ctx["role_models_engineer"] == "gpt-4.1"
+
+
+def test_build_context_keeps_valid_role_override_when_discovery_unavailable(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.role_models = {"architect": "o3-mini"}
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
+        ctx = _build_context(cfg)
+    assert ctx["role_models_architect"] == "o3-mini"
+
+
+def test_build_context_invalid_evaluator_model_falls_back_to_default(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.evaluator_model = "bad model"
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
+        ctx = _build_context(cfg)
+    assert ctx["evaluator_model"] == "IDE default"
+    assert ctx["role_models_architect"] == ""
+
+
+def test_build_context_unavailable_evaluator_model_falls_back_to_default(tmp_path: Path):
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    cfg.native.evaluator_model = "gpt-4.1"
+    with patch(
+        "harness.native.skill_gen.detect_cursor_recent_models",
+        return_value=["claude-4.6-opus-high-thinking"],
+    ):
+        ctx = _build_context(cfg)
+    assert ctx["evaluator_model"] == "IDE default"
+    assert ctx["role_models_architect"] == ""
 
 
 # --- Resource deployment ---
@@ -415,6 +487,26 @@ def test_config_role_models_warns_on_unknown_keys():
     assert cfg.role_models["architect"] == "gpt-4.1"
 
 
+def test_config_invalid_evaluator_model_warns():
+    import warnings as _w
+    from harness.core.config import NativeModeConfig
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        NativeModeConfig(evaluator_model="bad model")
+    assert any("native.evaluator_model" in str(w.message) for w in caught)
+
+
+def test_config_invalid_role_model_warns():
+    import warnings as _w
+    from harness.core.config import NativeModeConfig
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        NativeModeConfig(role_models={"architect": "bad model"})
+    assert any("native.role_models.architect" in str(w.message) for w in caught)
+
+
 # --- StrictUndefined template validation ---
 
 
@@ -659,9 +751,19 @@ def test_role_model_override_in_agent(tmp_path: Path):
     """Per-role model config renders into agent template."""
     cfg = _make_cfg(tmp_path)
     cfg.native.role_models = {"architect": "gpt-4.1"}
-    generate_native_artifacts(tmp_path, cfg=cfg)
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
+        generate_native_artifacts(tmp_path, cfg=cfg)
     arch = (tmp_path / ".cursor" / "agents" / "harness-architect.md").read_text(encoding="utf-8")
     assert "gpt-4.1" in arch
+
+
+def test_agent_omits_model_frontmatter_when_using_default(tmp_path: Path):
+    cfg = _make_cfg(tmp_path)
+    with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
+        generate_native_artifacts(tmp_path, cfg=cfg)
+    arch = (tmp_path / ".cursor" / "agents" / "harness-architect.md").read_text(encoding="utf-8")
+    frontmatter = arch.split("---", 2)[1]
+    assert "model:" not in frontmatter
 
 
 # --- Recursive composition ---

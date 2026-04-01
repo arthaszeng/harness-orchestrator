@@ -26,9 +26,10 @@ MESSAGES: dict[str, str] = {
     "init.disable_label": "关闭",
     "init.domain_prefix": "  Domain prefix（用于区分项目）",
     "init.step_evaluator_label": "评估器模型",
-    "init.evaluator_desc": "评审角色使用的模型。'inherit' = 使用 IDE 默认模型。",
-    "init.evaluator_detected": "检测到 Cursor 当前模型: {model}",
-    "init.evaluator_detected_label": "来自 Cursor 检测",
+    "init.evaluator_desc": "5 个评审角色偏好的模型。'inherit' = 使用 IDE 默认模型。",
+    "init.evaluator_detected_label": "Cursor 最近使用",
+    "init.evaluator_detected_none": "本地未检测到最近使用的 Cursor 模型，选择 'inherit' 最稳妥。",
+    "init.evaluator_fallback_note": "这里只建议本地最近用过的 Cursor 模型。配置了无效或不可用模型时，生成 agent 模板会自动回退到 IDE 默认模型。",
     "init.evaluator_inherit_hint": "使用 IDE 默认模型",
     "init.evaluator_prompt": "  评估器模型",
     "init.evaluator_invalid": "无效的模型名称。请输入 'inherit' 或模型 ID（字母、数字、点、连字符、下划线）。",
@@ -55,7 +56,7 @@ MESSAGES: dict[str, str] = {
     # ── reinit mode ────────────────────────────────────────────────
     "init.reinit_title": "检测到已有配置 — 正在重新生成产物",
     "init.reinit_done": "已重新生成 {count} 个 native 产物",
-    "init.reinit_hint": "如需修改配置 → 编辑 .agents/config.toml → harness init",
+    "init.reinit_hint": "如需应用配置变更 → 编辑 .agents/config.toml → harness init --force",
     "init.reinit_config_error": "配置加载失败: {error}",
 
     # ── update command ─────────────────────────────────────────────

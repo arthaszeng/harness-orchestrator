@@ -79,6 +79,17 @@ def test_workflow_strips_removed_fields_from_toml(tmp_path: Path):
     assert cfg.workflow.pass_threshold == 7.0
 
 
+def test_native_adversarial_model_aliases_to_evaluator_model(tmp_path: Path):
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    (agents_dir / "config.toml").write_text(
+        '[native]\nadversarial_model = "gpt-4.1"\n',
+        encoding="utf-8",
+    )
+    cfg = HarnessConfig.load(tmp_path)
+    assert cfg.native.evaluator_model == "gpt-4.1"
+
+
 def test_role_model_config_roundtrip():
     m = RoleModelConfig(model="m", temperature=0.5)
     assert m.model == "m"

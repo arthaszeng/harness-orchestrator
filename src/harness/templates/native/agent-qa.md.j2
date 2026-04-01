@@ -5,7 +5,8 @@ description: >-
   strategy, coverage, regression risk, edge cases, and CI health.
   Only role that runs CI commands. Dispatched in parallel with other
   role-based reviewers.
-model: {{ role_models_qa }}
+{% if role_models_qa %}model: {{ role_models_qa }}
+{% endif %}
 ---
 
 # QA Engineer

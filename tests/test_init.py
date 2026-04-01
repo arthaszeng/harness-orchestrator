@@ -9,8 +9,6 @@ import pytest
 import typer
 
 from harness.commands.init import (
-    KNOWN_MODELS,
-    _detect_cursor_model,
     _load_template,
     _prompt_choice,
     _step_ci_command,
@@ -21,6 +19,7 @@ from harness.commands.init import (
     run_init,
     validate_model_name,
 )
+from harness.core.model_selection import detect_cursor_recent_models
 from harness.core.scanner import ProjectScan
 from harness.i18n import set_lang
 
@@ -171,51 +170,91 @@ class TestValidateModelName:
         assert validate_model_name("org/model") is False
 
 
-class TestDetectCursorModel:
-    def test_returns_none_when_no_db(self):
-        from pathlib import Path as _Path
-        with patch("harness.commands.init.Path.home", return_value=_Path("/nonexistent")):
-            assert _detect_cursor_model() is None
+class TestDetectCursorRecentModels:
+    def test_returns_empty_when_no_db(self):
+        with patch("harness.core.model_selection._cursor_state_db_path", return_value=None):
+            assert detect_cursor_recent_models() == []
 
-    def test_returns_none_on_error(self):
-        with patch("harness.commands.init.Path.home", side_effect=OSError("no home")):
-            assert _detect_cursor_model() is None
+    def test_returns_empty_on_sql_error(self):
+        with patch("harness.core.model_selection._cursor_state_db_path", return_value=MagicMock(exists=lambda: True)):
+            with patch("harness.core.model_selection.sqlite3.connect", side_effect=OSError("boom")):
+                assert detect_cursor_recent_models() == []
+
+    def test_reads_recent_models_from_sqlite(self, tmp_path):
+        import sqlite3
+
+        db_path = tmp_path / "state.vscdb"
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value BLOB)")
+        conn.execute(
+            "INSERT INTO ItemTable(key, value) VALUES (?, ?)",
+            ("cursor/lastSingleModelPreference", '{"composer":"claude-4.6-opus-high-thinking"}'),
+        )
+        conn.execute(
+            "INSERT INTO ItemTable(key, value) VALUES (?, ?)",
+            ("cursor/bestOfNEnsemblePreferences", '{"3":["claude-4.6-opus-high-thinking","gpt-5.4-high","o3"]}'),
+        )
+        conn.commit()
+        conn.close()
+
+        with patch("harness.core.model_selection._cursor_state_db_path", return_value=db_path):
+            assert detect_cursor_recent_models() == [
+                "claude-4.6-opus-high-thinking",
+                "gpt-5.4-high",
+                "o3",
+            ]
+
+    def test_reads_recent_models_from_sqlite_bytes(self, tmp_path):
+        import sqlite3
+
+        db_path = tmp_path / "state.vscdb"
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value BLOB)")
+        conn.execute(
+            "INSERT INTO ItemTable(key, value) VALUES (?, ?)",
+            ("cursor/lastSingleModelPreference", b'{"composer":"gpt-5.4-high"}'),
+        )
+        conn.commit()
+        conn.close()
+
+        with patch("harness.core.model_selection._cursor_state_db_path", return_value=db_path):
+            assert detect_cursor_recent_models() == ["gpt-5.4-high"]
 
 
 class TestStepEvaluatorModel:
     def test_choice_1_returns_inherit(self):
-        with patch("harness.commands.init._detect_cursor_model", return_value=None):
+        with patch("harness.commands.init.detect_cursor_recent_models", return_value=[]):
             with patch("harness.commands.init.typer.prompt", return_value="1"):
                 assert _step_evaluator_model() == "inherit"
 
-    def test_choice_known_model(self):
-        first_model = KNOWN_MODELS[0][0]
-        with patch("harness.commands.init._detect_cursor_model", return_value=None):
+    def test_choice_recent_model(self):
+        with patch("harness.commands.init.detect_cursor_recent_models", return_value=["gpt-4.1"]):
             with patch("harness.commands.init.typer.prompt", return_value="2"):
-                assert _step_evaluator_model() == first_model
+                assert _step_evaluator_model() == "gpt-4.1"
 
     def test_custom_input_valid(self):
-        custom_idx = str(2 + len(KNOWN_MODELS))
-        with patch("harness.commands.init._detect_cursor_model", return_value=None):
+        with patch("harness.commands.init.detect_cursor_recent_models", return_value=[]):
             with patch(
                 "harness.commands.init.typer.prompt",
-                side_effect=[custom_idx, "my-custom-model"],
+                side_effect=["2", "my-custom-model"],
             ):
                 assert _step_evaluator_model() == "my-custom-model"
 
     def test_custom_input_invalid_then_valid(self):
-        custom_idx = str(2 + len(KNOWN_MODELS))
-        with patch("harness.commands.init._detect_cursor_model", return_value=None):
+        with patch("harness.commands.init.detect_cursor_recent_models", return_value=[]):
             with patch(
                 "harness.commands.init.typer.prompt",
-                side_effect=[custom_idx, "", "gpt-4.1"],
+                side_effect=["2", "", "gpt-4.1"],
             ):
                 assert _step_evaluator_model() == "gpt-4.1"
 
-    def test_detected_model_appears_as_option(self):
-        with patch("harness.commands.init._detect_cursor_model", return_value="my-detected-v2"):
-            with patch("harness.commands.init.typer.prompt", return_value="2"):
-                assert _step_evaluator_model() == "my-detected-v2"
+    def test_recent_models_appear_as_options(self):
+        with patch(
+            "harness.commands.init.detect_cursor_recent_models",
+            return_value=["claude-4.6-opus-high-thinking", "gpt-5.4-high"],
+        ):
+            with patch("harness.commands.init.typer.prompt", return_value="3"):
+                assert _step_evaluator_model() == "gpt-5.4-high"
 
 
 class TestUpdateGitignore:

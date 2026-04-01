@@ -5,7 +5,8 @@ description: >-
   vision alignment, user value, acceptance criteria quality, and
   requirement coverage. Dispatched in parallel with other role-based
   reviewers.
-model: {{ role_models_product_owner }}
+{% if role_models_product_owner %}model: {{ role_models_product_owner }}
+{% endif %}
 ---
 
 # Product Owner

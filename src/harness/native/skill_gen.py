@@ -15,6 +15,7 @@ import jinja2
 import typer
 
 from harness.core.config import HarnessConfig
+from harness.core.model_selection import detect_cursor_recent_models, resolve_effective_model
 from harness.core.roles import NATIVE_REVIEW_ROLES
 from harness.i18n import get_lang, t
 
@@ -108,13 +109,20 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
     token noise (inspired by Claude Code's omitClaudeMd pattern).
     """
     rm = cfg.native.role_models
+    recent_models = detect_cursor_recent_models()
+    available_models = recent_models or None
+    effective_evaluator_model = resolve_effective_model(
+        cfg.native.evaluator_model,
+        available_models=available_models,
+    )
     ctx: dict[str, str] = {
         "ci_command": cfg.ci.command,
         "trunk_branch": cfg.workflow.trunk_branch,
         "branch_prefix": cfg.workflow.branch_prefix.rstrip("/"),
         "pass_threshold": str(cfg.workflow.pass_threshold),
         "max_iterations": str(cfg.workflow.max_iterations),
-        "evaluator_model": cfg.native.evaluator_model,
+        "evaluator_model": effective_evaluator_model or "IDE default",
+        "evaluator_model_requested": cfg.native.evaluator_model,
         "adversarial_mechanism": cfg.native.adversarial_mechanism,
         "planner_principles": _planner_principles(),
         "builder_principles": _builder_principles(),
@@ -131,7 +139,11 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
     }
 
     for rn in _ROLE_NAMES:
-        ctx[f"role_models_{rn}"] = rm.get(rn, "")
+        ctx[f"role_models_{rn}"] = resolve_effective_model(
+            rm.get(rn, ""),
+            cfg.native.evaluator_model,
+            available_models=available_models,
+        )
 
     if role == "planner":
         for key in ("builder_principles",):
