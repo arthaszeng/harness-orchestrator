@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "harness-orchestrator"
-version = "4.0.1"
+version = "4.0.2"
 description = "Cursor-native multi-agent development framework with 5-role review"
 readme = "README.md"
 license = "MIT"
