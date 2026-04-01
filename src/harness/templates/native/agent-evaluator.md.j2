@@ -67,3 +67,14 @@ FIX SUGGESTIONS (if ITERATE):
 
 Verdict: **PASS** if average >= {{ pass_threshold }}, else **ITERATE**.
 Any single dimension at 1 forces ITERATE regardless of average.
+
+## Output Validation
+
+Your output MUST satisfy these rules or it will be rejected:
+- The JSON object must be valid JSON (parseable)
+- `verdict` must be exactly `"PASS"` or `"ITERATE"` (no other values)
+- Each score in `scores` must be an integer between 1 and 5
+- `average` must equal the arithmetic mean of the four scores
+- `findings` array must exist (may be empty for PASS)
+- Each finding must have `path`, `summary`, and `severity` fields
+- Any single dimension score of 1 forces `"ITERATE"` regardless of average

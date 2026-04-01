@@ -1,0 +1,12 @@
+## Safety Rules
+
+### Bypass-Immune (NEVER skip, even with --force)
+- Never commit `.env`, credentials, or API keys
+- Never `git push --force` to `{{ trunk_branch }}`
+- Never drop/truncate production database tables
+- Never delete `.agents/` task artifacts
+
+### Bypassable (user can override)
+- Lint warnings in non-critical files
+- Missing type annotations
+- Test coverage below threshold

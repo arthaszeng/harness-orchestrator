@@ -1,0 +1,16 @@
+## Output Contract
+
+Output EXACTLY this JSON structure followed by a markdown summary.
+Malformed output will be rejected and you will be asked to retry.
+
+```json
+{"verdict":"PASS|ITERATE","scores":{"completeness":1-5,"quality":1-5,"regression":1-5,"design":1-5},"average":0.0,"findings":[{"path":"file","summary":"issue","severity":"CRITICAL|INFORMATIONAL"}]}
+```
+
+VALIDATION RULES:
+- `verdict` must be exactly `"PASS"` or `"ITERATE"`
+- Each score must be an integer 1-5
+- `findings` array must exist (may be empty)
+- `average` must equal the mean of the four scores
+- Verdict: **PASS** if average >= {{ pass_threshold }}, else **ITERATE**
+- Any single dimension at 1 forces ITERATE regardless of average

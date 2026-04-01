@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,9 @@ class NativeModeConfig(BaseModel):
     adversarial_model: str = "gpt-4.1"
     adversarial_mechanism: str = "auto"  # subagent / cli / auto
     review_gate: str = "eng"  # which review layers are hard gates
+    hooks_pre_build: str = ""
+    hooks_post_eval: str = ""
+    hooks_pre_ship: str = ""
 
 
 class WorkflowConfig(BaseModel):
@@ -109,7 +113,11 @@ class HarnessConfig(BaseModel):
 
     @classmethod
     def load(cls, project_root: Path | None = None) -> HarnessConfig:
-        """Load config from .agents/config.toml with cascading merge."""
+        """Load config from .agents/config.toml with cascading merge.
+
+        Priority chain (highest wins):
+            env vars (HARNESS_*) → project (.agents/) → global (~/.harness/) → defaults
+        """
         root = project_root or Path.cwd()
         config_path = root / ".agents" / "config.toml"
 
@@ -123,6 +131,11 @@ class HarnessConfig(BaseModel):
             global_data = tomllib.loads(global_path.read_text(encoding="utf-8"))
             # Project config takes priority over global
             data = _deep_merge(global_data, data)
+
+        # Environment variable overrides (highest priority)
+        env_data = _env_overrides()
+        if env_data:
+            data = _deep_merge(data, env_data)
 
         cfg = cls.model_validate(data)
         cfg.project_root = root
@@ -154,6 +167,31 @@ def resolve_role_temperature(role: str, models: ModelsConfig) -> float | None:
     """解析角色温度配置，无配置时返回 None。"""
     rc = models.role_configs.get(role)
     return rc.temperature if rc else None
+
+
+def _env_overrides() -> dict[str, Any]:
+    """Extract HARNESS_* environment variables as config overrides.
+
+    Mapping convention:
+        HARNESS_CI_COMMAND        → {"ci": {"command": "..."}}
+        HARNESS_WORKFLOW_PROFILE  → {"workflow": {"profile": "..."}}
+        HARNESS_MODELS_DEFAULT    → {"models": {"default": "..."}}
+
+    Only non-empty values are included. Nested keys use underscore separation
+    with the first segment as the section name.
+    """
+    PREFIX = "HARNESS_"
+    overrides: dict[str, Any] = {}
+    for key, value in os.environ.items():
+        if not key.startswith(PREFIX) or not value:
+            continue
+        parts = key[len(PREFIX) :].lower().split("_", 1)
+        if len(parts) == 2:
+            section, field = parts
+            overrides.setdefault(section, {})[field] = value
+        elif len(parts) == 1:
+            overrides[parts[0]] = value
+    return overrides
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

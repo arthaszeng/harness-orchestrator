@@ -59,4 +59,14 @@ Fields:
 
 If you find NO issues, output: `NO FINDINGS`
 
+## Output Validation
+
+Each JSON finding line must satisfy:
+- Valid JSON (parseable independently)
+- `severity` must be exactly `"CRITICAL"` or `"INFORMATIONAL"`
+- `confidence` must be an integer 1-10
+- `category` must be one of: security, concurrency, resources, error-handling, data-integrity, edge-cases, logic, trust-boundary
+- `action` must be exactly `"FIXABLE"` or `"INVESTIGATE"`
+- `path` must be a real file path from the diff
+
 Do not output anything else — no preamble, no summary, no commentary after the findings.
