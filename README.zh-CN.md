@@ -2,244 +2,126 @@
 
 # harness-orchestrator
 
-> 面向 Cursor 与 Codex 的契约驱动多智能体自主开发编排框架 — 支持 Cursor 原生模式，工作流完全在 IDE 内运行。
+> 契约驱动的多智能体开发框架 — 在 Cursor 内一条命令完成 计划-构建-评审-发布 全流程。
 
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-今天的 AI 编程工具擅长单次任务，但持续开发往往受目标漂移、上下文断裂、质量门禁缺失与过程不透明所困。harness-orchestrator 将多种 agent 能力组织成契约驱动、可审计、可恢复的工程闭环：
+AI 编程工具擅长单次任务，但持续开发需要更多：目标跟踪、质量门禁、对抗评审、审计轨迹。Harness 将这些组织成契约驱动的工程闭环，**直接运行在 Cursor IDE 内** — 无需独立编排进程，无需复杂配置。对于 CI/CD 和无头自动化场景，可选的[编排器模式](#进阶跨客户端编排器模式)通过外部 CLI 驱动 Cursor 和 Codex agent。
 
-- **需求按方法论推进** — Planner 分析需求产出 spec 并协商迭代契约，而不是直接跳到写代码
-- **实现与审查分离** — Builder 按契约实现；Evaluator 独立审查，以四维评分作为质量门禁
-- **三通道对抗评审** — Cursor 原生模式下，Claude 结构化评审 + Claude 对抗子代理 + 跨模型 GPT 审查器，跨通道高置信度综合
-- **Fix-First 自动修复** — 评审发现自动分类为 AUTO-FIX（立即修复）或 ASK（交由人类判断），保持反馈环紧凑
-- **自主但有边界** — Strategist 从 vision 中选任务，受迭代上限、通过阈值与停止信号约束
-- **全程可追溯** — 每轮迭代的 spec、contract、evaluation 以 Markdown + JSON 保存，便于审计、自动化与中断后恢复
-- **双模式** — **编排器模式**（外部 CLI 驱动 agent）或 **Cursor 原生模式**（IDE 内 skill + 子代理，无需外部进程）
+## 快速开始（Cursor 原生模式，3 分钟上手）
 
-> **设计思路**：核心架构受 GAN 对抗思想启发 — Builder（生成器）与 Evaluator（判别器）分离并迭代博弈，推动代码质量收敛；Planner 通过契约协议为双方建立共同基线。
-
-## 快速开始
-
-### 前置条件
-
-| 依赖 | 要求 | 说明 |
-|------------|-------------|-------|
-| **Python** | >= 3.9 | 运行 Harness CLI |
-| **Cursor CLI 和/或 Codex CLI** | 至少其一 | 提供实际 agent 能力 |
-| **Git** | 任意版本 | 项目须为 Git 仓库；Harness 依赖 Git 做分支与变更跟踪 |
-
-IDE CLI 配置：
-
-- **Cursor**：在 Cursor → 命令面板 → `Install 'cursor' command`，确保 `cursor` 在 PATH 中
-- **Codex**：通过 npm 或从 [GitHub](https://github.com/openai/codex) 安装，确保 `codex` 在 PATH 中
-
-> `auto` 模式下的默认路由是**可替换的经验默认**（Builder→Cursor，其余角色→Codex）。这不是 Harness 的核心价值 — 核心资产是契约协议、评审量表、状态机、工件链与中断恢复。可在 `.agents/config.toml` 中为每个角色配置驱动。若只安装一种 CLI，所有角色都会经由该驱动执行。
-
-### 安装
+### 1. 安装 harness
 
 ```bash
 git clone https://github.com/arthaszeng/harness-orchestrator.git
 cd harness-orchestrator
-./install.sh
+./install.sh        # 或: pip install -e .
+harness --version   # 验证（也可用: python3 -m harness --version）
 ```
 
-安装脚本会执行 `pip install -e .` 并自动配置 PATH。也可以用 `python3 -m harness` 代替 `harness` 命令。
-
-验证：
+### 2. 初始化你的项目
 
 ```bash
-harness --version
-# harness-orchestrator 1.8.2
-```
-
-### 五步上手
-
-```bash
-# 1. 将 agent 定义安装到本地 IDE
-harness install
-
-# 2. 在项目中初始化配置
 cd /path/to/your/project
 harness init
-
-# 3. 创建项目 vision
-harness vision
-
-# 4. 运行工作（任选其一）
-harness run "add user authentication"   # 单任务模式
-harness auto                            # 自主模式
-
-# 5. 查看进度 / 停止
-harness status
-harness stop
 ```
 
-下文展开每一步。
+向导会引导你完成配置。当询问 **工作流模式** 时，选择 **cursor-native**：
 
-> **Cursor 原生模式**：在 `harness init` 中选择 **cursor-native** 即可跳过外部 CLI 编排。Harness 会将 skill、子代理和规则生成到 `.cursor/` 中，你可在 IDE 内通过 `/harness-plan`、`/harness-build`、`/harness-eval` 和 `/harness-ship` 驱动整个工作流。详见 [Cursor 原生模式](#cursor-原生模式)。
+```
+Step 5/9  工作流模式
+  请选择工作流模式（cursor-native 模式无需 Cursor CLI）：
+  1. orchestrator -- 外部 CLI 进程驱动 cursor-agent（默认）
+  2. cursor-native -- 在 Cursor IDE 内通过 skills + subagents 驱动（无需外部进程）
+  选择 [2]: 2
+  → cursor-native 模式：将生成 skills、subagents 和 rules
+```
+
+这会将 skills、subagents 和 rules 直接生成到你的 `.cursor/` 目录。
+
+### 3. 在 Cursor 中使用
+
+在 Cursor 中打开项目，你现在拥有四个技能：
+
+| 技能 | 功能 |
+|-------|-------------|
+| `/harness-plan` | 分析需求，产出 spec 和契约，含对抗式评审 |
+| `/harness-build` | 按契约实现，运行 CI，分流失败，输出结构化构建日志 |
+| `/harness-eval` | 三通道对抗代码评审（Claude + Claude 对抗 + GPT 跨模型） |
+| `/harness-ship` | **一条命令走完全流程**：计划 → 构建 → 评审 → 修复 → 提交 → push → PR |
+
+**现在就试试** — 打开 Cursor 聊天窗口，输入：
+
+```
+/harness-ship 给用户注册接口添加输入校验
+```
+
+Harness 会规划工作、实现代码、跑三通道对抗评审、自动修复琐碎问题、创建可二分提交并开 PR — 全程不离开 IDE。
 
 ---
 
-## 初始化与配置
+## 背后发生了什么
 
-### harness install
-
-将角色定义文件安装到本地 IDE 目录（`~/.cursor/agents/` 和/或 `~/.codex/agents/`）。Harness 会检测已安装的 IDE，仅安装匹配的 agent 文件。使用 `--force` 可覆盖已有定义。
-
-### harness init
-
-在当前项目中启动交互式向导，共七步：
-
-1. **项目信息** — 名称与描述
-2. **IDE 环境** — 检测 Cursor/Codex，并可选择安装 agent 定义
-3. **驱动模式** — 选择 auto（推荐：Builder→Cursor，其余→Codex）、cursor 或 codex
-4. **工作流模式** — 选择 **orchestrator**（外部 CLI 驱动 agent）或 **cursor-native**（IDE 内 skill + 子代理）。仅当检测到 Cursor 时显示
-5. **CI 门禁** — 配置质量检查命令，可选 AI 建议
-6. **Memverse 集成** — 可选启用长期记忆，在反思阶段持久化关键决策
-7. **Vision** — 立即生成或稍后编辑
-
-初始化后，项目根目录会创建 `.agents/`：
-
-| 生成文件 | 用途 |
-|----------------|---------|
-| `.agents/config.toml` | 项目配置：驱动模式、CI 命令、工作流参数等 |
-| `.agents/vision.md` | 项目 vision（若在向导中选择生成） |
-| `.agents/state.json` | 运行时状态（首次任务运行时创建；建议加入 `.gitignore`） |
-
-使用 `--non-interactive` 跳过向导并使用默认值：
-
-```bash
-harness init --name my-project --ci "make test" -y
+```
+你输入 /harness-ship "添加功能 X"
+  → Rebase 到 main，运行测试
+  → 三通道对抗评审：
+      第一通道：Claude 结构化评审（4 个维度）
+      第二通道：Claude 对抗子代理（攻击面）
+      第三通道：GPT 跨模型评审（独立视角）
+  → Fix-First：自动修复琐碎问题，重要问题询问你
+  → 可二分提交 + push + PR
 ```
 
-### harness vision
+### 三通道对抗评审
 
-与 Advisor agent 交互式问答，将简短描述扩展为结构化 vision 文档并写入 `.agents/vision.md`。Vision 是自主模式下 Strategist 选取任务的主要输入。也可直接编辑该文件。
+每次代码变更经过三个独立审查者：
+
+1. **结构化评审** — Claude 在完整性、质量、回归、设计四个维度评分
+2. **Claude 对抗** — 全新上下文的 Claude 子代理搜寻安全漏洞、竞态条件、边界场景、资源泄漏
+3. **GPT 跨模型** — 基于 GPT 的审查器（默认 `gpt-4.1`）从不同模型族提供独立视角
+
+第二、三通道并行调度以加速。被 2+ 通道发现的问题标注为**高置信度**。对抗模型可在 `.agents/config.toml` 中配置。
+
+### Fix-First 自动修复
+
+评审发现在呈现前先分类：
+
+- **AUTO-FIX** — 高确定性、影响面小、可逆。立即修复并提交。
+- **ASK** — 安全发现、行为变更或低置信度。交由你决策。
+
+琐碎问题不阻断发布，重要决策始终由人类判断。
+
+### 优雅降级
+
+| 第一通道（结构化） | 第二通道（Claude） | 第三通道（GPT） | 行为 |
+|---------------------|-----------------|---------------|----------|
+| 正常 | 正常 | 正常 | 完整三通道综合 |
+| 正常 | 正常 | 失败 | 双通道，标记 `[claude-only]` |
+| 正常 | 失败 | 正常 | 双通道，无 Claude 子代理 |
+| 正常 | 失败 | 失败 | 单审查器模式 |
+| 失败 | — | — | 致命 — 无法评估 |
 
 ---
 
-## 核心工作流
-
-### 角色架构
-
-| 角色 | 职责 | `auto` 下默认后端 |
-|------|----------------|----------------------------|
-| **Planner** | 分析需求；产出 spec 与迭代契约 | Codex |
-| **Builder** | 按契约实现；提交变更 | Cursor |
-| **Evaluator** | 独立审查；四维评分（完整性 / 质量 / 回归 / 设计）；通过或迭代 | Codex |
-| **Alignment Evaluator** | 需求对齐：契约契合、需求覆盖、意图漂移检测（需 `dual_evaluation`） | Codex |
-| **Strategist** | 自主模式下，从 vision 与进度中选择下一任务 | Codex |
-| **Reflector** | 任务结束后，将经验提炼为长期记忆 | Codex/Cursor |
-
-**Advisor** 角色支持 `harness vision` 以及 `harness init` 期间的 AI 辅助分析。
-
-> 各角色后端可在 `[drivers.roles]` 下独立配置。上表反映 `auto` 模式偏好，非硬绑定。CLI 版本要求见 [docs/zh-CN/compatibility.md](docs/zh-CN/compatibility.md)。
-
-### 单任务流程（`harness run`）
-
-```
-User provides requirement
-  → Planner: produce spec (analysis, technical approach, impact, risks)
-  → Planner: negotiate iterative contract (deliverables, acceptance criteria, complexity)
-  → Builder: implement per contract and commit
-  → Evaluator: independent review, four-dimensional score
-      → Score ≥ threshold (default 3.5) → PASS, task done
-      → Score < threshold → feedback to Builder, next iteration
-  → Max iterations (default 3) reached without pass → task blocked
-```
-
-### 自主循环（`harness auto`）
-
-```
-Read .agents/vision.md
-  → Strategist: pick next task from vision and current progress
-  → Run single-task flow (as above)
-  → Reflector: distill this round's lessons
-  → Loop until:
-      - All tasks complete
-      - Stop signal (harness stop)
-      - Consecutive block limit (default 2)
-      - Per-session task limit (default 10)
-```
-
-### 选择 `run` 与 `auto`
-
-|  | `harness run` | `harness auto` |
-|---|---|---|
-| **适用场景** | 需求明确；完成一块工作 | 已有 vision，希望 Strategist 拆解任务 |
-| **任务来源** | 命令行 | Strategist 从 vision 与进度选取 |
-| **范围** | 单任务的 plan→build→eval 循环 | 跨多任务的持续循环 |
-| **前置条件** | 已完成 `init` | `init` + `vision` |
-| **如何停止** | 任务完成或达最大迭代 | 手动 `harness stop`、全部任务完成或安全阀 |
-
-两种模式均支持 `--resume`（从中断处继续）与 `--verbose`（完整 agent 输出）。
-
----
-
-## Cursor 原生模式
-
-Cursor 原生模式将整个 harness 工作流在 **Cursor IDE 内部**通过 skill、子代理和规则运行 — 无需外部 CLI 进程。在 `harness init` 时选择 **cursor-native** 即可启用。
-
-### 编排器模式 vs Cursor 原生模式
-
-|  | 编排器模式 | Cursor 原生模式 |
-|---|---|---|
-| **运行方式** | 外部 `harness` CLI 生成 `cursor-agent` 进程 | Cursor IDE 内 skill + 子代理 |
-| **入口** | `harness run` / `harness auto` | `/harness-plan`、`/harness-build`、`/harness-eval`、`/harness-ship` |
-| **跨模型评审** | 在 `[drivers.roles]` 中按角色配置 | 对抗子代理使用不同模型（如 GPT 审查 Claude 的产出） |
-| **适用场景** | CI/CD 流水线、无头自动化、多 IDE 场景 | 交互式开发、纯 Cursor 工作流、充分利用 Cursor 配额 |
-
-### 生成的工件
+## 生成的工件
 
 选择 cursor-native 模式后，`harness init` 会生成：
 
 | 工件 | 路径 | 用途 |
 |----------|------|---------|
-| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 规划与拆解任务，含对抗式 spec 评审循环 |
-| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | 自主构建：按契约实现、运行 CI、分流测试失败、输出结构化构建日志 |
-| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | 三通道评审（Claude + Claude 对抗 + 跨模型）+ Fix-First 自动修复 |
-| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | 全自动流水线：合并基线 → 测试 → 评审 → 对抗评估 → 修复循环 → 可二分提交 → push → PR |
-| 对抗审查器 | `.cursor/agents/harness-adversarial-reviewer.md` | 跨模型对抗代码审查器，输出结构化 JSON（`model:` 可配置，默认 `gpt-4.1`；`readonly: true`） |
-| 评估器 | `.cursor/agents/harness-evaluator.md` | 结构化代码评估器，输出 JSON 裁定（`model: inherit`，`readonly: true`） |
-| 信任边界 | `.cursor/rules/harness-trust-boundary.mdc` | 始终生效规则：Builder 产出视为不可信 |
-| Fix-First | `.cursor/rules/harness-fix-first.mdc` | 始终生效规则：评审发现先分类 AUTO-FIX 或 ASK 再呈现 |
-| 工作流约定 | `.cursor/rules/harness-workflow.mdc` | 提交格式、分支命名、任务状态管理 |
+| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 规划与拆解任务，含对抗式 spec 评审 |
+| `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | 构建：按契约实现、运行 CI、分流失败 |
+| `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | 三通道评审 + Fix-First 自动修复 |
+| `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | 全自动流水线：测试 → 评审 → 修复 → 提交 → PR |
+| 对抗审查器 | `.cursor/agents/harness-adversarial-reviewer.md` | 跨模型代码审查器（模型可配置，`readonly: true`） |
+| 评估器 | `.cursor/agents/harness-evaluator.md` | 结构化评估器，JSON 输出（`readonly: true`） |
+| 信任边界 | `.cursor/rules/harness-trust-boundary.mdc` | 始终生效：Builder 产出视为不可信 |
+| Fix-First | `.cursor/rules/harness-fix-first.mdc` | 始终生效：发现先分类再呈现 |
+| 工作流约定 | `.cursor/rules/harness-workflow.mdc` | 提交格式、分支命名、任务状态 |
 
-### 三通道对抗评审
-
-`/harness-eval` 和 `/harness-ship` 技能运行三通道评审流水线，并跨模型综合：
-
-1. **第一通道 — 结构化评审** — 主代理（Claude）在四个维度（完整性、质量、回归、设计）评分，以结构化 JSON 格式收集发现
-2. **第二通道 — Claude 对抗子代理** — 独立的 Claude 子代理以全新上下文搜寻安全漏洞、竞态条件、边界场景、资源泄漏与逻辑错误
-3. **第三通道 — 跨模型对抗** — 基于 GPT 的子代理（默认 `gpt-4.1`）从不同模型族提供独立视角
-
-**综合**：按指纹（`path:line:category`）去重。被 2+ 通道发现的问题标注为**高置信度**，置信分加权提升。
-
-对抗模型可在 `.agents/config.toml` 的 `[native] adversarial_model` 中配置。第二、三通道并行调度以加速。若任一子代理失败，评估优雅降级 — 见下方降级矩阵。
-
-### Fix-First 自动修复
-
-评审后，所有发现在呈现前先分类：
-
-- **AUTO-FIX** — 高确定性、影响面小、可逆。立即修复并自动提交，附带验证测试。
-- **ASK** — 安全发现、行为变更、架构变更或关键发现置信度较低。以批次呈现给用户决策。
-
-这使评审→修复反馈环保持紧凑：琐碎问题不阻断发布，重要决策始终由人类判断。
-
-### 优雅降级
-
-| 第一通道（结构化） | 第二通道（Claude 子代理） | 第三通道（GPT） | 行为 |
-|---------------------|-------------------------|---------------|--------|
-| 正常 | 正常 | 正常 | 完整三通道综合 |
-| 正常 | 正常 | 失败 | 无跨模型综合，标记 `[claude-only]` |
-| 正常 | 失败 | 正常 | 无 Claude 子代理综合 |
-| 正常 | 失败 | 失败 | 单审查器模式，记录在评估中 |
-| 失败 | — | — | 致命 — 无法评估 |
-
-### 重新生成工件
-
-如需重新生成全部原生模式工件（例如更新配置后）：
+更新配置后重新生成：
 
 ```bash
 harness install --force
@@ -247,59 +129,30 @@ harness install --force
 
 ---
 
-## 命令参考
-
-| 命令 | 说明 |
-|---------|-------------|
-| `harness install [--force / -f] [--lang / -l]` | 将 agent 定义安装到本地 IDE（Cursor / Codex） |
-| `harness init [--name / -n NAME] [--ci CMD] [--lang / -l] [--non-interactive / -y]` | 在当前项目中初始化 harness 配置（交互式向导） |
-| `harness vision` | 交互式创建或更新项目 vision（.agents/vision.md） |
-| `harness run <requirement> [--resume / -r] [--verbose / -V]` | 运行单次开发任务 |
-| `harness auto [--resume / -r] [--verbose / -V]` | 启动自主开发循环 |
-| `harness status` | 显示当前进度与状态 |
-| `harness stop` | 优雅停止当前运行中的任务 |
-| `harness --version / -v` | 显示版本并退出 |
-
-### 主要选项
-
-- **`--resume / -r`** — 从 `state.json` 恢复上次会话，从中断阶段继续而非重头开始。用于异常退出或终端关闭后。
-- **`--verbose / -V`** — 打印完整 agent 输入/输出以便调试。默认关闭以保持输出简洁。
-- **`--force / -f`**（install）— 覆盖已安装的 agent 定义文件（例如升级后）。
-- **`--lang / -l`**（init、install）— 提示与 agent 定义语言：`en`（默认）或 `zh`。install 省略时会回退到项目配置或 UI 语言。
-- **`--non-interactive / -y`**（init）— 跳过向导并使用默认值。可与 `--name`、`--ci` 组合指定项目名与 CI 命令。
-
----
-
 ## 配置
 
-项目设置位于 `.agents/config.toml`。重要键：
+项目设置位于 `.agents/config.toml`：
 
 | 键 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `workflow.mode` | "orchestrator" | 工作流模式：`orchestrator`（CLI 驱动）或 `cursor-native`（IDE 内 skill） |
-| `workflow.profile` | "standard" | 工作流配置：`lite` / `standard` / `autonomous`（见下） |
+| `workflow.mode` | "orchestrator" | `orchestrator` 或 `cursor-native` |
+| `workflow.profile` | "standard" | `lite` / `standard` / `autonomous` |
 | `workflow.max_iterations` | 3 | 每任务最大迭代次数 |
-| `workflow.pass_threshold` | 3.5 | Evaluator 通过阈值（满分 5） |
+| `workflow.pass_threshold` | 3.5 | 评审通过阈值（满分 5） |
 | `workflow.auto_merge` | true | 通过后自动合并分支 |
+| `workflow.dual_evaluation` | false | 质量评审后再跑对齐评审 |
 | `workflow.branch_prefix` | "agent" | 任务分支前缀 |
-| `workflow.dual_evaluation` | false | 双评审：质量评审后再跑对齐评审 |
-| `native.adversarial_model` | "gpt-4.1" | 跨模型对抗审查器模型（仅 cursor-native） |
-| `native.adversarial_mechanism` | "auto" | 对抗评审调度方式：`subagent` / `cli` / `auto` |
+| `native.adversarial_model` | "gpt-4.1" | 跨模型审查器模型 |
+| `native.adversarial_mechanism` | "auto" | 对抗评审调度：`subagent` / `cli` / `auto` |
 | `native.review_gate` | "eng" | 哪些评审层为硬门禁 |
 | `autonomous.max_tasks_per_session` | 10 | 每自主会话最大任务数 |
 | `autonomous.consecutive_block_limit` | 2 | 连续阻塞达到此次数后停止 |
 
-### 模型（可选，默认静默）
+### 模型（可选）
 
-可在 `[models]` 中为不同角色配置模型。仅当解析结果**非空**时，Harness 才会向 CLI 追加 `--model`；全部留空则继续沿用 IDE/CLI 的默认模型。
+在 `[models]` 下为不同角色配置模型。仅当解析结果非空时传递 `--model`。
 
-**解析优先级**（先命中者生效）：`role_overrides.<角色>` → `driver_defaults.<实际驱动名>` → `models.default` → 空字符串。
-
-其中「实际驱动名」由 `[drivers]` / `[drivers.roles]` 在当前角色上解析得到，因此 `driver_defaults` 总是针对真实使用的 Codex 或 Cursor，而不会出现“配了 codex 默认值却实际走 cursor”的错配。
-
-支持的角色名：`planner`、`builder`、`evaluator`、`alignment_evaluator`、`strategist`、`reflector`、`advisor`。
-
-示例（注释项按需启用；推荐将 `default` 留空）：
+**优先级**：`role_overrides.<角色>` → `driver_defaults.<驱动>` → `models.default` → 空。
 
 ```toml
 [models]
@@ -311,178 +164,157 @@ default = ""
 
 [models.role_overrides]
 # planner = "o3-pro"
-# alignment_evaluator = "o3"
-# builder = ""  # 显式指定该角色始终不传模型参数
+# builder = ""  # 显式指定始终不传模型参数
 ```
 
 ### 工作流配置
 
 | 配置 | 流程 | 适用场景 |
 |---------|------|-------------|
-| **lite** | planner → builder → eval（无 spec/contract 拆分；阈值上限 3.0；最多 2 轮） | 小改动、快速修复、探针 |
-| **standard** | planner → spec + contract → builder → eval（完整四维评审） | 日常开发（默认） |
+| **lite** | planner → builder → eval（无 spec/contract 拆分；阈值 3.0；最多 2 轮） | 小改动、快速修复 |
+| **standard** | planner → spec + contract → builder → eval（完整评审） | 日常开发（默认） |
 | **autonomous** | strategist → standard 循环 → reflector | 基于 vision 的自主开发 |
-
-在 `.agents/config.toml` 中设置：
-
-```toml
-[workflow]
-profile = "lite"  # or "standard" / "autonomous"
-```
 
 ---
 
 ## 任务工件
 
-Harness 在项目根目录的 `.agents/` 下保存所有工件：
+所有工件位于项目根目录的 `.agents/` 下：
 
 ```
 .agents/
-├── config.toml            # Project config (harness init)
-├── vision.md              # Vision (harness vision)
-├── state.json             # Runtime state
-├── .stop                  # Stop signal (harness stop; cleared when the task ends)
+├── config.toml            # 项目配置
+├── vision.md              # 项目 vision
+├── state.json             # 运行时状态
+├── .stop                  # 停止信号
 ├── runs/
 │   └── <session-id>/
-│       └── events.jsonl   # Structured events (agent calls, CI, state transitions)
+│       └── events.jsonl   # 结构化事件
 ├── tasks/
 │   └── task-001/
-│       ├── spec-r1.md     # Round 1 spec: analysis and technical plan
-│       ├── contract-r1.md # Round 1 contract (Markdown)
-│       ├── contract-r1.json # Round 1 contract (JSON sidecar, machine-friendly)
-│       ├── evaluation-r1.md # Round 1 review (Markdown)
-│       ├── evaluation-r1.json # Round 1 review (JSON sidecar: scores, verdict, feedback)
-│       ├── alignment-r1.md # Alignment review (only if dual_evaluation)
-│       ├── build-r1.log   # Builder log
-│       ├── spec-r2.md     # Round 2 (if iterating)
+│       ├── spec-r1.md     # Spec：分析与技术方案
+│       ├── contract-r1.md # 契约（Markdown）
+│       ├── contract-r1.json # 契约（JSON sidecar）
+│       ├── evaluation-r1.md # 评审（Markdown）
+│       ├── evaluation-r1.json # 评审（JSON sidecar）
+│       ├── alignment-r1.md # 对齐评审（如开启 dual_evaluation）
+│       ├── build-r1.log   # 构建日志
 │       └── ...
-└── archive/               # Archived completed sessions
+└── archive/               # 归档会话
 ```
 
-| 工件 | 产出方 | 说明 |
-|----------|-------------|-------------|
-| **spec** | Planner | 分析、技术方案、影响、风险 |
-| **contract**（.md + .json） | Planner | 迭代契约：交付物、验收标准、复杂度 |
-| **evaluation**（.md + .json） | Evaluator | 四维评分（完整性 / 质量 / 回归 / 设计）与反馈 |
-| **alignment** | Alignment Evaluator | 对齐评审（仅当开启 `dual_evaluation`） |
-| **events.jsonl** | 系统 | 每次 agent 调用、CI 运行、状态变更的结构化事件 |
-| **state.json** | 系统 | 会话状态；支持 `--resume` |
+每一步可追溯。JSON sidecar 适合自动化与 UI，无需正则解析 Markdown。
 
-每一步都可追溯 — 可回答谁做了什么、为何通过或阻塞。JSON 侧车适合自动化与 UI，无需正则解析 Markdown。
+**本地优先**：所有状态保留在磁盘，无云依赖。`.agents/` 树通常 gitignore。如需团队共享 `config.toml` 或 `vision.md`，使用 `git add -f .agents/config.toml`。
 
 ---
 
-## 仓库布局
+## 命令参考
 
-```
-harness-orchestrator/
-├── src/harness/
-│   ├── cli.py              # CLI entry (Typer)
-│   ├── __init__.py          # Package metadata
-│   ├── commands/            # Commands: subcommand implementations
-│   ├── orchestrator/        # Orchestration: workflow core
-│   ├── drivers/             # Drivers: IDE agent invocation abstraction
-│   ├── core/                # Core: state, config, UI, events
-│   ├── methodology/         # Methodology: evaluation, scoring, contracts
-│   ├── native/              # Cursor-native mode: skill/agent/rule generator
-│   ├── templates/           # Role prompt templates (orchestrator + native)
-│   │   └── native/          # Jinja2 templates for cursor-native artifacts
-│   └── integrations/        # Integrations: Git, Memverse
-├── agents/                  # Role definition templates (Cursor / Codex)
-├── tests/                   # Test suite (includes fixtures/)
-├── docs/                    # Docs (state machine, compatibility matrix)
-├── examples/                # Benchmarks and examples
-├── pyproject.toml           # Metadata, dependencies, build
-└── README.md
-```
-
-<details>
-<summary>模块职责</summary>
-
-- **`cli.py`** — 单一用户入口；用 Typer 注册子命令并委派到 `commands/`
-- **`commands/`** — 参数解析与流程启动；调用 `orchestrator/` 中的工作流逻辑
-- **`orchestrator/`** — 核心引擎：`workflow.py` 单任务循环，`autonomous.py` 自主循环，`vision_flow.py` vision，`safety.py` 安全阀
-- **`drivers/`** — 封装 Cursor 与 Codex CLI 细节；上层使用 `AgentDriver` 协议；`resolver.py` 按模式（auto/cursor/codex）路由角色；启动时 capability probe 检查版本与 flags
-- **`core/`** — 运行时状态（`state.py`）、项目配置（`config.py`）、终端 UI（`ui.py`）、结构化事件（`events.py`）、扫描、归档、索引
-- **`methodology/`** — 解析评审输出、计算四维分数、契约模板、JSON 侧车
-- **`native/`** — Cursor 原生模式生成器：读取 SSOT 角色 + 配置，渲染 Jinja2 模板为 `.cursor/skills/`、`.cursor/agents/`、`.cursor/rules/`
-- **`integrations/`** — Git 分支与 Memverse 长期记忆
-
-</details>
+| 命令 | 说明 |
+|---------|-------------|
+| `harness install [--force] [--lang]` | 安装 agent 定义到本地 IDE |
+| `harness init [--name] [--ci] [--lang] [-y]` | 初始化项目配置（交互式向导） |
+| `harness vision` | 创建或更新项目 vision |
+| `harness run <需求> [--resume] [--verbose]` | 运行单次开发任务 |
+| `harness auto [--resume] [--verbose]` | 启动自主开发循环 |
+| `harness status` | 显示当前进度 |
+| `harness stop` | 优雅停止当前任务 |
+| `harness --version` | 显示版本 |
 
 ---
 
-## 恢复、停止与排错
+## 进阶：跨客户端编排器模式
 
-### 恢复中断的工作
+Cursor 原生模式覆盖了大部分交互式开发场景。对于 **CI/CD 流水线**、**无头自动化**或**多 IDE 混合**（Cursor + Codex）场景，使用编排器模式。
 
-若运行意外停止，Harness 会在 `state.json` 中打点：
+### 前置条件
 
-```bash
-harness run "original requirement" --resume
-harness auto --resume
-```
+| 依赖 | 要求 | 说明 |
+|------------|-------------|-------|
+| **Python** | >= 3.9 | 运行 Harness CLI |
+| **Cursor CLI 和/或 Codex CLI** | 至少其一 | 提供 agent 能力 |
+| **Git** | 任意版本 | 项目须为 Git 仓库 |
 
-`--resume` 重新加载上次会话并从中断阶段继续。
-
-### 停止行为
-
-`harness stop` 不会杀进程；它写入 `.agents/.stop`。运行中的任务在完成**当前阶段**（plan/build/eval）后检测到信号并干净退出。要立即中止请用 `Ctrl+C`；Harness 在退出前会保存检查点。
-
-### 未找到 IDE CLI
-
-Harness 负责编排；agent 通过 Cursor 或 Codex CLI 运行。启动时 Harness 会执行 capability probe（版本与关键 flags）。不兼容环境可能记录警告，但执行仍会继续。
-
-若出现 `Neither Cursor nor Codex CLI detected`（或类似信息）：
+IDE CLI 配置：
 
 - **Cursor**：命令面板 → `Install 'cursor' command`
-- **Codex**：npm 或 [GitHub](https://github.com/openai/codex)
+- **Codex**：`npm install -g @openai/codex` 或从 [GitHub](https://github.com/openai/codex) 安装
 
-确保二进制在 PATH 中；至少需要其一。版本细节见 [docs/zh-CN/compatibility.md](docs/zh-CN/compatibility.md)。
+### 编排器 vs Cursor 原生
 
-### Codex 集成
+|  | 编排器模式 | Cursor 原生模式 |
+|---|---|---|
+| **运行方式** | 外部 `harness` CLI 生成 agent 进程 | Cursor IDE 内 skill + 子代理 |
+| **入口** | `harness run` / `harness auto` | `/harness-plan`、`/harness-build`、`/harness-eval`、`/harness-ship` |
+| **跨模型评审** | 按角色配置 | 对抗子代理使用不同模型 |
+| **适用场景** | CI/CD、无头自动化、多 IDE | 交互式开发、纯 Cursor 工作流 |
 
-对 Codex 角色，Harness 将各角色的 `developer_instructions` 拼入 `codex exec` 输入；不依赖已弃用的 `codex exec --agent`。
+### 角色架构
 
-### 本地优先
+| 角色 | 职责 | `auto` 下默认后端 |
+|------|----------------|-------------------------------|
+| **Planner** | 分析需求；产出 spec 与契约 | Codex |
+| **Builder** | 按契约实现；提交变更 | Cursor |
+| **Evaluator** | 独立评审；四维评分 | Codex |
+| **Alignment Evaluator** | 需求对齐与意图漂移检测 | Codex |
+| **Strategist** | 自主模式下选取下一任务 | Codex |
+| **Reflector** | 提炼经验到长期记忆 | Codex/Cursor |
 
-所有状态与工件保留在磁盘；无云依赖。通常整个 `.agents/` 树会 gitignore — 含本地运行时、`state.json`、任务工件与归档。若需团队共享 `config.toml` 或 `vision.md`，可按需使用 `git add -f .agents/config.toml` 等。
+各角色后端可在 `[drivers.roles]` 下独立配置。CLI 版本要求见 [docs/zh-CN/compatibility.md](docs/zh-CN/compatibility.md)。
 
----
-
-## 可观测性
-
-每个会话将结构化事件写入 `.agents/runs/<session-id>/events.jsonl`，每行一个 JSON 对象：
-
-```json
-{"ts": "2026-03-31T10:00:00.000Z", "event": "agent_end", "role": "planner", "driver": "codex", "exit_code": 0, "elapsed_ms": 12340, "output_len": 2048, "iteration": 1}
-```
-
-事件类型包括：
-
-| 事件 | 内容 |
-|-------|----------|
-| `agent_start` / `agent_end` | 角色、驱动、耗时、退出码、输出长度 |
-| `ci_result` | CI 命令、退出码、结论、耗时 |
-| `state_transition` | 从状态 → 到状态 |
-| `task_start` / `task_end` | 任务 ID、需求、分支、最终结论与分数 |
-
-查看日志：
+### 编排器配置
 
 ```bash
-cat .agents/runs/*/events.jsonl | python -m json.tool
+# 1. 安装 agent 定义到 IDE 目录
+harness install
+
+# 2. 初始化（选择 "orchestrator" 模式）
+cd /path/to/your/project
+harness init
+
+# 3. 创建项目 vision
+harness vision
+
+# 4. 运行
+harness run "添加用户认证"    # 单任务
+harness auto                  # 自主循环
+
+# 5. 监控
+harness status
+harness stop
 ```
 
----
+### 单任务流程（`harness run`）
 
-## 双评审器
+```
+需求
+  → Planner：spec + 迭代契约
+  → Builder：实现并提交
+  → Evaluator：四维评分
+      → 通过（≥ 3.5）→ 完成
+      → 不通过 → 反馈给 Builder，迭代
+  → 最大迭代（3）→ 阻塞
+```
 
-当 `workflow.dual_evaluation = true` 时，通过质量评审的任务还会经过对齐评审：
+### 自主循环（`harness auto`）
 
-- **质量 Evaluator**（默认）— 代码质量 + 回归；四维评分
-- **Alignment Evaluator** — 需求覆盖 + 契约契合 + 意图漂移
+```
+Vision
+  → Strategist：选取下一任务
+  → 单任务流程
+  → Reflector：提炼经验
+  → 循环直到：全部完成 / 停止信号 / 阻塞上限 / 任务上限
+```
 
-若对齐返回 `MISALIGNED`，任务回到 Builder；若 `CONTRACT_ISSUE`，反馈发给 Planner 而非 Builder。
+### 双评审器
+
+当 `workflow.dual_evaluation = true` 时，质量评审后再跑对齐评审：
+
+- **质量** — 代码质量 + 回归（四维评分）
+- **对齐** — 需求覆盖 + 契约契合 + 意图漂移
+
+若对齐返回 `MISALIGNED`，任务迭代回 Builder。若 `CONTRACT_ISSUE`，反馈发给 Planner 修订契约。
 
 ```toml
 [workflow]
@@ -491,13 +323,73 @@ dual_evaluation = true
 
 ---
 
-## 延伸阅读
+## 排错
 
-| 文档 | 说明 |
-|-----|-------------|
-| [docs/zh-CN/state-machine.md](docs/zh-CN/state-machine.md) | 任务状态机：合法转换、恢复、停止信号、BLOCKED |
-| [docs/zh-CN/compatibility.md](docs/zh-CN/compatibility.md) | 运行时矩阵：Cursor/Codex CLI 版本与已知限制 |
-| [examples/todo-api-benchmark/](examples/todo-api-benchmark/) | 基准：五个递增任务，三种模式（Codex / Cursor / Harness） |
+### 恢复中断的工作
+
+```bash
+harness run "原始需求" --resume
+harness auto --resume
+```
+
+`--resume` 从 `state.json` 恢复并从中断阶段继续。
+
+### 停止行为
+
+`harness stop` 写入 `.agents/.stop`。任务在完成当前阶段后干净退出。立即中止用 `Ctrl+C` — Harness 会保存检查点。
+
+### 未找到 IDE CLI
+
+出现 `Neither Cursor nor Codex CLI detected` 时：
+
+- **Cursor**：命令面板 → `Install 'cursor' command`
+- **Codex**：`npm install -g @openai/codex`
+
+确保二进制在 PATH 中。Cursor 原生模式下，Cursor CLI 是可选的 — harness 生成的文件直接在 IDE 内工作。
+
+### 重新安装
+
+如果 `harness install` 失败或安装异常：
+
+```bash
+harness install --force
+```
+
+会覆盖已有文件、重试 CLI 安装并重新生成原生工件。
+
+---
+
+## 可观测性
+
+每个会话将结构化事件写入 `.agents/runs/<session-id>/events.jsonl`：
+
+```json
+{"ts": "2026-03-31T10:00:00.000Z", "event": "agent_end", "role": "planner", "driver": "codex", "exit_code": 0, "elapsed_ms": 12340}
+```
+
+事件类型：`agent_start`/`agent_end`、`ci_result`、`state_transition`、`task_start`/`task_end`。
+
+---
+
+## 仓库布局
+
+```
+harness-orchestrator/
+├── src/harness/
+│   ├── cli.py              # CLI 入口（Typer）
+│   ├── commands/            # 子命令实现
+│   ├── orchestrator/        # 工作流核心
+│   ├── drivers/             # IDE agent 调用抽象
+│   ├── core/                # 状态、配置、UI、事件
+│   ├── methodology/         # 评审、评分、契约
+│   ├── native/              # Cursor 原生模式生成器
+│   ├── templates/           # 提示模板（编排器 + 原生）
+│   └── integrations/        # Git、Memverse
+├── agents/                  # 角色定义（Cursor / Codex）
+├── tests/                   # 测试套件
+├── docs/                    # 状态机、兼容性
+└── pyproject.toml
+```
 
 ---
 
@@ -505,55 +397,49 @@ dual_evaluation = true
 
 **适合：**
 
-- 已使用 Cursor 或 Codex，希望 agent 在清晰方法论下推进工作
-- 希望对 agent 输出有质量门禁，而非单次盲信
-- 希望在多步工作中保持连续性与可追溯性
+- 使用 Cursor，希望对 agent 输出有质量门禁而非单次盲信
+- 希望在多步工作中保持可追溯性
+- 希望对抗评审捕获单次评审遗漏的问题
 
 **不适合：**
 
 - 期望一键「全自动做完整个产品」
-- 需要企业审批、发布火车或与核心编码无关的数据编排
-- 无法安装本地 CLI（Cursor/Codex）的环境
+- 与编码无关的企业审批流程
+- 无法安装 Python 或任何支持的 agent CLI（Cursor/Codex）的环境
 
 ---
 
 ## 国际化
 
-Harness 支持英文（默认）和中文。在初始化时设置语言：
-
 ```bash
-harness init --lang zh    # 中文提示和生成文件
+harness init --lang zh    # 中文
 harness init --lang en    # 英文（默认）
 ```
 
-语言设置影响：
-
-- CLI 提示和消息
-- 发送给 LLM 的 Agent 提示
-- 生成的模板文件（vision.md、config.toml 注释）
-- 安装到 IDE 的 Agent 定义指令
-
-语言偏好存储在 `.agents/config.toml` 的 `[project] lang` 中。
+影响 CLI 消息、agent 提示、生成文件和安装的 agent 定义。存储在 `.agents/config.toml` 的 `[project] lang` 中。
 
 ---
 
 ## 开发
 
 ```bash
-# Dev install (pytest + ruff)
 pip install -e ".[dev]"
-
-# Tests
 pytest
-
-# Lint
 ruff check src/ tests/
-
-# Format
 ruff format src/ tests/
 ```
 
 Ruff 面向 Python 3.9，行宽 100。
+
+---
+
+## 延伸阅读
+
+| 文档 | 说明 |
+|-----|-------------|
+| [docs/zh-CN/state-machine.md](docs/zh-CN/state-machine.md) | 任务状态机 |
+| [docs/zh-CN/compatibility.md](docs/zh-CN/compatibility.md) | CLI 版本要求 |
+| [examples/todo-api-benchmark/](examples/todo-api-benchmark/) | 基准：五个任务，三种模式 |
 
 ---
 
