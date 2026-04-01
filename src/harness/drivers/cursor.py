@@ -499,7 +499,7 @@ class CursorDriver:
         if not role_file:
             return ""
 
-        agents_dir = Path(__file__).resolve().parents[3] / "agents" / "cursor"
+        agents_dir = Path(__file__).resolve().parent.parent / "agents" / "cursor"
         lang = get_lang()
 
         if lang != "en":

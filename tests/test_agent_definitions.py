@@ -16,7 +16,7 @@ from harness.core.config import KNOWN_MODEL_ROLES
 from harness.drivers.resolver import ROLE_AGENT_MAP
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_AGENTS_DIR = _REPO_ROOT / "agents"
+_AGENTS_DIR = _REPO_ROOT / "src" / "harness" / "agents"
 
 
 # ---------------------------------------------------------------------------

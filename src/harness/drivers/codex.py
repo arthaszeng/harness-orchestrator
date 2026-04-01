@@ -250,7 +250,7 @@ class CodexDriver:
         if not role_file:
             return ""
 
-        agents_dir = Path(__file__).resolve().parents[3] / "agents" / "codex"
+        agents_dir = Path(__file__).resolve().parent.parent / "agents" / "codex"
         lang = get_lang()
 
         if lang != "en":

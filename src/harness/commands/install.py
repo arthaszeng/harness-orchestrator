@@ -29,9 +29,9 @@ _CODEX_AGENTS = {
 
 
 def _agents_pkg_dir() -> Path:
-    """Return the packaged agents/ directory path."""
+    """Return the packaged agents/ directory path (inside the harness package)."""
     pkg = importlib.resources.files("harness")
-    return Path(str(pkg)).parent.parent / "agents"
+    return Path(str(pkg)) / "agents"
 
 
 def _resolve_install_lang(lang: str | None) -> str:

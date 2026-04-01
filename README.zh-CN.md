@@ -383,9 +383,9 @@ harness-orchestrator/
 │   ├── core/                # 状态、配置、UI、事件
 │   ├── methodology/         # 评审、评分、契约
 │   ├── native/              # Cursor 原生模式生成器
+│   ├── agents/              # 角色定义（Cursor / Codex）
 │   ├── templates/           # 提示模板（编排器 + 原生）
 │   └── integrations/        # Git、Memverse
-├── agents/                  # 角色定义（Cursor / Codex）
 ├── tests/                   # 测试套件
 ├── docs/                    # 状态机、兼容性
 └── pyproject.toml

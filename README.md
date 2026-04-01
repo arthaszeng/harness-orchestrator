@@ -383,9 +383,9 @@ harness-orchestrator/
 │   ├── core/                # State, config, UI, events
 │   ├── methodology/         # Evaluation, scoring, contracts
 │   ├── native/              # Cursor-native mode generator
+│   ├── agents/              # Role definitions (Cursor / Codex)
 │   ├── templates/           # Prompt templates (orchestrator + native)
 │   └── integrations/        # Git, Memverse
-├── agents/                  # Role definitions (Cursor / Codex)
 ├── tests/                   # Test suite
 ├── docs/                    # State machine, compatibility
 └── pyproject.toml
