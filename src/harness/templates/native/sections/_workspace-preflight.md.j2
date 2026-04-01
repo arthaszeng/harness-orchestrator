@@ -2,6 +2,7 @@
    Requires: {% with preflight_mode="entry"|"ship" %}
    Uses context vars: trunk_branch, branch_prefix
 #}
+{% set preflight_mode = preflight_mode | default("entry") %}
 ## Workspace Pre-flight
 
 {% if preflight_mode == "entry" %}
