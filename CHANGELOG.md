@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- **Project renamed** from `harness-orchestrator` to `harness-flow`. Install with `pip install harness-flow`. The Python package name (`harness`) and CLI command (`harness`) are unchanged.
+- **Migration:** If upgrading from `harness-orchestrator`, run `pip uninstall harness-orchestrator && pip install harness-flow`.
+
 ## 4.0.0 (2026-04-02)
 
 ### Breaking Changes
