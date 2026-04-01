@@ -23,6 +23,9 @@ MESSAGES: dict[str, str] = {
     # ── native mode selection ─────────────────────────────────────
     "init.step_mode_title": "\nStep 5/9  Workflow Mode",
     "init.mode_desc": "  Cursor detected. Choose how harness drives development:",
+    "init.mode_desc_no_cursor": "  Choose how harness drives development (cursor-native works without Cursor CLI):",
+    "init.no_ide_hint": "  No IDE CLI detected. You can still use cursor-native mode (generates files only).",
+    "init.no_ide_orchestrator_warn": "  Error: orchestrator mode requires at least one IDE CLI (cursor or codex).",
     "init.opt_orchestrator": "  1. orchestrator -- External CLI process drives cursor-agent (default)",
     "init.opt_native": "  2. cursor-native -- Skills + subagents inside Cursor IDE (no external process)",
     "init.mode_native_selected": "  → cursor-native mode: will generate skills, subagents, and rules",

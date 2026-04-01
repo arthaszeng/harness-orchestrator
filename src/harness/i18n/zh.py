@@ -23,6 +23,9 @@ MESSAGES: dict[str, str] = {
     # ── native mode selection ─────────────────────────────────────
     "init.step_mode_title": "\nStep 5/9  工作流模式",
     "init.mode_desc": "  检测到 Cursor。请选择 harness 如何驱动开发：",
+    "init.mode_desc_no_cursor": "  请选择工作流模式（cursor-native 模式无需 Cursor CLI）：",
+    "init.no_ide_hint": "  未检测到 IDE CLI。你仍可使用 cursor-native 模式（仅生成文件）。",
+    "init.no_ide_orchestrator_warn": "  错误：orchestrator 模式需要至少一个 IDE CLI（cursor 或 codex）。",
     "init.opt_orchestrator": "  1. orchestrator -- 外部 CLI 进程驱动 cursor-agent（默认）",
     "init.opt_native": "  2. cursor-native -- 在 Cursor IDE 内通过 skills + subagents 驱动（无需外部进程）",
     "init.mode_native_selected": "  → cursor-native 模式：将生成 skills、subagents 和 rules",

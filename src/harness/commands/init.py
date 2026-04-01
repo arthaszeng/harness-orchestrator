@@ -119,13 +119,13 @@ def _step_ide_setup(lang: str) -> dict[str, bool]:
             typer.echo(t("init.codex_status", status="ok"))
 
     if not any(ready.values()):
-        typer.echo(t("init.ide_error"), err=True)
-        raise typer.Exit(1)
+        typer.echo(t("init.no_ide_hint"))
 
-    do_install = typer.confirm(t("init.install_agents_confirm"), default=True)
-    if do_install:
-        from harness.commands.install import run_install
-        run_install(force=True, lang=lang)
+    if any(ready.values()):
+        do_install = typer.confirm(t("init.install_agents_confirm"), default=True)
+        if do_install:
+            from harness.commands.install import run_install
+            run_install(force=True, lang=lang)
 
     return ready
 
@@ -170,13 +170,17 @@ def _step_driver_mode(ides: dict[str, bool]) -> tuple[str, dict[str, str]]:
 def _step_workflow_mode(ides: dict[str, bool]) -> tuple[str, str]:
     """Return (workflow_mode, adversarial_model).
 
-    Only offers cursor-native when cursor is available.
+    cursor-native mode only generates skill/agent/rule files into .cursor/ —
+    it does NOT require the cursor desktop client or cursor-agent CLI.
+    Always offer it as an option.
     """
-    if not ides.get("cursor"):
-        return "orchestrator", ""
-
     typer.echo(t("init.step_mode_title"))
-    typer.echo(t("init.mode_desc"))
+
+    if ides.get("cursor"):
+        typer.echo(t("init.mode_desc"))
+    else:
+        typer.echo(t("init.mode_desc_no_cursor"))
+
     typer.echo(t("init.opt_orchestrator"))
     typer.echo(t("init.opt_native"))
     choice = _prompt_choice(t("init.choose"), 2, default=1)
@@ -187,6 +191,10 @@ def _step_workflow_mode(ides: dict[str, bool]) -> tuple[str, str]:
             t("init.native_adversarial_model"), default="gpt-4.1",
         )
         return "cursor-native", adv_model
+
+    if not ides.get("cursor") and not ides.get("codex"):
+        typer.echo(t("init.no_ide_orchestrator_warn"), err=True)
+        raise typer.Exit(1)
 
     typer.echo(t("init.mode_orchestrator_selected"))
     return "orchestrator", ""

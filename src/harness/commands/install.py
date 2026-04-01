@@ -316,27 +316,27 @@ def run_install(*, force: bool = False, lang: str | None = None) -> None:
     typer.echo(t("install.env_check"))
     _probe_ides(ides)
 
-    if not any(ides.values()):
+    native_count = _install_native_mode(Path.cwd(), lang=resolved)
+
+    if not any(ides.values()) and native_count == 0:
         typer.echo(t("install.no_ide"), err=True)
         raise typer.Exit(1)
 
     source_dir = _agents_pkg_dir()
-    if not source_dir.exists():
+    if not source_dir.exists() and any(ides.values()):
         typer.echo(t("install.no_source", path=source_dir), err=True)
         raise typer.Exit(1)
 
-    total = 0
+    total = native_count
     typer.echo()
 
-    if ides["cursor"]:
+    if ides["cursor"] and source_dir.exists():
         typer.echo(t("install.cursor_agents"))
         total += _install_cursor_agents(source_dir, force=force, lang=resolved)
 
-    if ides["codex"]:
+    if ides["codex"] and source_dir.exists():
         typer.echo(t("install.codex_agents"))
         total += _install_codex_agents(source_dir, force=force, lang=resolved)
-
-    total += _install_native_mode(Path.cwd(), lang=resolved)
 
     typer.echo(t("install.done", count=total))
 
