@@ -11,7 +11,7 @@ ok()    { printf "${GREEN}[harness]${NC} %s\n" "$*"; }
 warn()  { printf "${YELLOW}[harness]${NC} %s\n" "$*"; }
 
 # ── 1. Install the package ───────────────────────────────────────────────────
-info "Installing harness-orchestrator..."
+info "Installing harness-flow..."
 pip3 install -e . 2>&1 | tail -5
 echo
 
@@ -66,7 +66,7 @@ if [ -f "$RC_FILE" ] && grep -qF "$SCRIPT_DIR" "$RC_FILE" 2>/dev/null; then
     info "PATH entry already exists in ${RC_FILE}, skipping."
 else
     echo "" >> "$RC_FILE"
-    echo "# Added by harness-orchestrator installer" >> "$RC_FILE"
+    echo "# Added by harness-flow installer" >> "$RC_FILE"
     echo "$EXPORT_LINE" >> "$RC_FILE"
     ok "Added ${SCRIPT_DIR} to PATH in ${RC_FILE}"
 fi

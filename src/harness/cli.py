@@ -17,7 +17,7 @@ app = typer.Typer(
 
 def version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"harness-orchestrator {__version__}")
+        typer.echo(f"harness-flow {__version__}")
         raise typer.Exit()
 
 

@@ -120,7 +120,7 @@ do_full_release() {
 
     ok "Pushed v$new to main"
     ok "GitHub Actions CD will create tag, publish to PyPI, and create GitHub Release"
-    ok "Track at: https://github.com/arthaszeng/harness-orchestrator/actions"
+    ok "Track at: https://github.com/arthaszeng/harness-flow/actions"
 }
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────

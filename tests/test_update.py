@@ -19,7 +19,7 @@ class TestGetLatestVersion:
     def test_parses_version_from_pip_output(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "harness-orchestrator (2.3.0)\n"
+        mock_result.stdout = "harness-flow (2.3.0)\n"
         with patch("harness.commands.update.subprocess.run", return_value=mock_result):
             assert _get_latest_version() == "2.3.0"
 

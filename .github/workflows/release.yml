@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/harness-orchestrator
+      url: https://pypi.org/p/harness-flow
     steps:
       - uses: actions/checkout@v5
         with:

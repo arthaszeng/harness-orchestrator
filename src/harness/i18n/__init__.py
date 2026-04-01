@@ -1,4 +1,4 @@
-"""Lightweight i18n for harness-orchestrator.
+"""Lightweight i18n for harness-flow.
 
 Usage::
 
