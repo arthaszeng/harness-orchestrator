@@ -92,7 +92,7 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
     ctx: dict[str, str] = {
         "ci_command": cfg.ci.command,
         "trunk_branch": cfg.workflow.trunk_branch,
-        "branch_prefix": cfg.workflow.branch_prefix,
+        "branch_prefix": cfg.workflow.branch_prefix.rstrip("/"),
         "pass_threshold": str(cfg.workflow.pass_threshold),
         "max_iterations": str(cfg.workflow.max_iterations),
         "adversarial_model": cfg.native.adversarial_model,
