@@ -1,0 +1,131 @@
+---
+name: harness-vision
+description: >-
+  Vision-driven pipeline: clarify an incremental vision, generate a plan with
+  adversarial review, then auto-execute build/eval/ship/retro. Use when saying
+  "vision", "I want to build this direction", "this is what I need",
+  or "harness vision". (harness)
+---
+
+# Harness Vision — From Direction to PR
+
+You are running the `/harness-vision` workflow. The user has a **clear incremental
+direction** that needs clarification before becoming a plan.
+
+**Human interaction phases:** Vision Clarification + Plan Review Gate
+**Autonomous phases:** Build → Eval → Ship → Auto-Retro
+
+**Only stop for:**
+- Vision clarification (if the direction has ambiguity)
+- Review gate escalation (when plan_review_gate requires it)
+- ASK-classified review findings during eval
+
+**Never stop for:**
+- Implementation decisions (make them during build)
+- AUTO-FIX findings (fix silently)
+
+---
+
+## Phase 0: Vision Clarification
+
+### Step 1: Understand the Direction
+
+1. Read the user's vision input carefully
+2. Read `.agents/vision.md` (if it exists) to understand existing context
+3. Read `.agents/config.toml` for project config
+
+### Step 2: Clarify (if needed)
+
+If the vision has **ambiguous aspects**, ask **1–2 clarifying questions** in a single
+message. Do NOT multi-round question the user — keep it tight.
+
+Examples of when to clarify:
+- Scope is unclear (does "improve auth" mean add MFA, fix bugs, or refactor?)
+- Conflicting signals (vision says "keep it simple" but the ask is complex)
+- Missing context (references systems you haven't seen in the codebase)
+
+If the vision is clear enough to plan from, skip clarification and proceed.
+
+### Step 3: Update Vision
+
+1. Read `.agents/vision.md` (create if missing)
+2. Append the new direction as an incremental section:
+   ```markdown
+   ## [Date] — [Brief Title]
+   [2-3 sentence summary of the vision increment]
+   ```
+3. Write back to `.agents/vision.md`
+
+---
+
+## Phase 1: Plan Generation
+
+{{ planner_principles }}
+
+### Context Gathering
+
+1. Read the updated `.agents/vision.md` as the planning north star
+2. Scan project structure: key directories, languages, frameworks, existing patterns
+3. Run `git log --oneline -10` for recent activity
+4. Determine next task number: `ls .agents/tasks/`
+
+### Produce Spec + Contract
+
+Write to `.agents/tasks/task-NNN/plan.md`:
+
+```markdown
+# Spec
+
+## Analysis
+(What problem, why it matters — trace back to the vision)
+
+## Approach
+(Implementation approach derived from the vision direction)
+
+## Impact
+(Files affected, blast radius, dependencies)
+
+## Risks
+(Potential risks and mitigations)
+
+---
+
+# Contract
+
+## Deliverables
+- [ ] Deliverable 1: description + acceptance criteria
+- [ ] Deliverable 2: description + acceptance criteria
+
+## Acceptance Criteria
+- All tests pass
+- No regressions
+- (specific criteria)
+
+## Out of Scope
+- (explicitly list)
+```
+
+### Adversarial Review
+
+Dispatch a reviewer subagent to challenge the plan:
+
+- **subagent_type**: `"generalPurpose"`
+- Review on 5 dimensions: completeness, consistency, clarity, scope, feasibility
+- Max 3 review iterations, fix issues between rounds
+
+If plan has 5+ deliverables or touches 10+ files, also dispatch cross-model review
+via `harness-adversarial-reviewer` subagent.
+
+---
+
+{% with interaction_depth="medium" %}
+{% include 'sections/_review-gate.md.j2' %}
+{% endwith %}
+
+---
+
+{% include 'sections/_execution-pipeline.md.j2' %}
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}

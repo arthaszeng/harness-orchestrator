@@ -51,33 +51,42 @@ Step 5/9  工作流模式
 
 ### 3. 在 Cursor 中使用
 
-在 Cursor 中打开项目，你现在拥有八个技能（四个核心 + 四个辅助）：
+在 Cursor 中打开项目。你现在拥有 **三个主要入口**，覆盖从模糊想法到具体需求的所有任务体量：
 
-**核心流程技能：**
+**从这里开始 — 三个入口覆盖所有任务体量：**
 
-| 技能 | 功能 |
-|-------|-------------|
-| `/harness-plan` | 分析需求，产出 spec 和契约，含对抗式评审 |
-| `/harness-build` | 按契约实现，运行 CI，分流失败，输出结构化构建日志 |
-| `/harness-eval` | 三通道对抗代码评审（结构化评估器 + 主模型对抗 + 跨模型对抗） |
-| `/harness-ship` | 全自动流水线：测试 → 评审 → 修复 → 提交 → push → PR |
+| 技能 | 何时用 | 功能 |
+|-------|-------------|------|
+| `/harness-brainstorm` | "我有个想法" | 发散探索 → vision → 计划 → 审阅门控 → 自动构建/评审/发布/回顾 |
+| `/harness-vision` | "我有个方向" | 澄清 vision → 计划 → 审阅门控 → 自动构建/评审/发布/回顾 |
+| `/harness-plan` | "我有个需求" | 细化计划 + 对抗审查 → 审阅门控 → 自动构建/评审/发布/回顾 |
 
-**辅助技能：**
+三个入口共享同一自动执行管线：构建 → 评审 → 迭代 → 发布 → 轻量级自动回顾（含 Memverse 学习）。
+
+**工具类技能：**
 
 | 技能 | 功能 |
 |-------|-------------|
 | `/harness-investigate` | 系统化 bug 调查：复现 → 假设 → 验证 → 最小修复 |
 | `/harness-learn` | Memverse 知识管理：存储、检索、更新项目经验 |
-| `/harness-doc-release` | 文档同步：检测代码变更导致的文档过时 |
 | `/harness-retro` | 工程回顾：提交分析、热点检测、趋势追踪 |
+
+**高级技能**（细粒度控制）：
+
+| 技能 | 功能 |
+|-------|-------------|
+| `/harness-build` | 按契约实现，运行 CI，分流失败，输出结构化构建日志 |
+| `/harness-eval` | 三通道对抗代码评审（结构化评估器 + 主模型对抗 + 跨模型对抗） |
+| `/harness-ship` | 全自动流水线：测试 → 评审 → 修复 → 提交 → push → PR |
+| `/harness-doc-release` | 文档同步：检测代码变更导致的文档过时 |
 
 **现在就试试** — 打开 Cursor 聊天窗口，输入：
 
 ```
-/harness-ship 给用户注册接口添加输入校验
+/harness-plan 给用户注册接口添加输入校验
 ```
 
-Harness 会跑测试、三通道对抗评审、自动修复琐碎问题、创建可二分提交并开 PR — 全程不离开 IDE。
+Harness 会生成计划并对抗审查、应用审阅门控、构建、三通道对抗代码评审、自动修复琐碎问题、创建可二分提交并开 PR — 全程不离开 IDE。
 
 ### 更新
 
@@ -138,7 +147,9 @@ harness update --check  # 仅检查是否有新版本
 
 | 工件 | 路径 | 用途 |
 |----------|------|---------|
-| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 规划与拆解任务，含对抗式 spec 评审 |
+| `/harness-brainstorm` | `.cursor/skills/harness/harness-brainstorm/SKILL.md` | 发散探索 → vision → 计划 → 自动执行到 PR |
+| `/harness-vision` | `.cursor/skills/harness/harness-vision/SKILL.md` | 澄清 vision → 计划 → 自动执行到 PR |
+| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | 细化计划 + 对抗审查 → 自动执行到 PR |
 | `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | 构建：按契约实现、运行 CI、分流失败 |
 | `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | 三通道评审 + Fix-First 自动修复 |
 | `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | 全自动流水线：测试 → 评审 → 修复 → 提交 → PR |
@@ -177,6 +188,7 @@ harness install --force
 | `native.adversarial_model` | "gpt-4.1" | 跨模型审查器模型 |
 | `native.adversarial_mechanism` | "auto" | 对抗评审调度模式。允许值：`subagent`、`cli`、`auto` |
 | `native.review_gate` | "eng" | 评审门禁严格度。允许值：`eng`（硬门禁）、`advisory`（仅记录） |
+| `native.plan_review_gate` | "auto" | 计划审阅门控模式。允许值：`human`（始终暂停）、`ai`（自动批准）、`auto`（复杂度自适应） |
 | `native.retro_window_days` | 14 | 回顾分析默认时间窗口（天数，1–365） |
 | `autonomous.max_tasks_per_session` | 10 | 每自主会话最大任务数 |
 | `autonomous.consecutive_block_limit` | 2 | 连续阻塞达到此次数后停止 |
@@ -279,7 +291,7 @@ IDE CLI 配置：
 |  | 编排器模式 | Cursor 原生模式 |
 |---|---|---|
 | **运行方式** | 外部 `harness` CLI 生成 agent 进程 | Cursor IDE 内 skill + 子代理 |
-| **入口** | `harness run` / `harness auto` | `/harness-plan`、`/harness-build`、`/harness-eval`、`/harness-ship` |
+| **入口** | `harness run` / `harness auto` | `/harness-brainstorm`、`/harness-vision`、`/harness-plan` |
 | **跨模型评审** | 按角色配置 | 对抗子代理使用不同模型 |
 | **适用场景** | CI/CD、无头自动化、多 IDE | 交互式开发、纯 Cursor 工作流 |
 

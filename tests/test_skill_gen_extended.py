@@ -408,14 +408,16 @@ def test_eval_uses_minimal_interaction_wording(tmp_path: Path):
     assert "non-interactive" not in content
 
 
-def test_plan_uses_minimal_interaction_wording(tmp_path: Path):
-    """plan template says minimal-interaction, not non-interactive."""
+def test_plan_is_end_to_end(tmp_path: Path):
+    """plan template is end-to-end (includes execution pipeline), not plan-only."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
     content = plan.read_text(encoding="utf-8")
-    assert "minimal-interaction" in content
-    assert "non-interactive" not in content
+    assert "Autonomous Execution Pipeline" in content
+    assert "From Requirement to PR" in content
+    assert "Phase: Build" in content
+    assert "Phase: Ship" in content
 
 
 def test_ship_uses_minimal_interaction_wording(tmp_path: Path):
@@ -591,3 +593,179 @@ def test_templates_have_no_undefined_variables(tmp_path: Path):
             __import__("pytest").fail(
                 f"Undefined variable in {tmpl_name}: {exc}"
             )
+
+
+# --- v3.0: Three entry points + review gate + execution pipeline ---
+
+
+def test_brainstorm_has_divergent_phase(tmp_path: Path):
+    """brainstorm template includes Socratic exploration and approach options."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    bs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
+    content = bs.read_text(encoding="utf-8")
+    assert "Divergent Exploration" in content
+    assert "APPROACH OPTIONS" in content
+    assert "From Idea to PR" in content
+
+
+def test_brainstorm_updates_vision(tmp_path: Path):
+    """brainstorm template includes vision.md update step."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    bs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
+    content = bs.read_text(encoding="utf-8")
+    assert "vision.md" in content
+    assert "Converge on Vision" in content
+
+
+def test_brainstorm_includes_execution_pipeline(tmp_path: Path):
+    """brainstorm template includes the shared autonomous execution pipeline."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    bs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
+    content = bs.read_text(encoding="utf-8")
+    assert "Autonomous Execution Pipeline" in content
+    assert "Phase: Build" in content
+    assert "Phase: Eval" in content
+    assert "Phase: Ship" in content
+    assert "Phase: Auto-Retro" in content
+
+
+def test_vision_has_clarification_phase(tmp_path: Path):
+    """vision template includes clarification step for ambiguous direction."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    vs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-vision" / "SKILL.md")
+    content = vs.read_text(encoding="utf-8")
+    assert "Vision Clarification" in content
+    assert "From Direction to PR" in content
+
+
+def test_vision_includes_execution_pipeline(tmp_path: Path):
+    """vision template includes the shared autonomous execution pipeline."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    vs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-vision" / "SKILL.md")
+    content = vs.read_text(encoding="utf-8")
+    assert "Autonomous Execution Pipeline" in content
+    assert "Phase: Build" in content
+    assert "Phase: Auto-Retro" in content
+
+
+def test_all_three_entry_points_include_review_gate(tmp_path: Path):
+    """All 3 entry point skills include the review gate section."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+    for name in ("harness-brainstorm", "harness-vision", "harness-plan"):
+        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "Review Gate" in content, f"Missing Review Gate in {name}"
+
+
+def test_review_gate_auto_has_scoring_table(tmp_path: Path):
+    """auto mode review gate includes the escalation scoring table."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+    content = plan.read_text(encoding="utf-8")
+    assert "escalation score" in content
+    assert "FULL REVIEW" in content
+    assert "SUMMARY CONFIRM" in content
+    assert "AUTO PROCEED" in content
+
+
+def test_review_gate_auto_has_interaction_depth(tmp_path: Path):
+    """auto mode review gate shows the correct interaction depth per entry point."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+
+    bs = (skills_base / "harness-brainstorm" / "SKILL.md").read_text(encoding="utf-8")
+    assert "interaction depth: high" in bs
+
+    vs = (skills_base / "harness-vision" / "SKILL.md").read_text(encoding="utf-8")
+    assert "interaction depth: medium" in vs
+
+    pl = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "interaction depth: low" in pl
+
+
+def test_review_gate_human_has_stop(tmp_path: Path):
+    """human mode review gate tells agent to stop and wait."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.plan_review_gate = "human"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+    content = plan.read_text(encoding="utf-8")
+    assert "**STOP.**" in content
+    assert "SUMMARY CONFIRM" not in content
+
+
+def test_review_gate_ai_auto_proceeds(tmp_path: Path):
+    """ai mode review gate proceeds without human gate."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.plan_review_gate = "ai"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+    content = plan.read_text(encoding="utf-8")
+    assert "auto-approved after adversarial review" in content
+    assert "**STOP.**" not in content
+    assert "escalation score" not in content
+
+
+def test_execution_pipeline_has_auto_retro(tmp_path: Path):
+    """execution pipeline includes lightweight auto-retro phase."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+    content = plan.read_text(encoding="utf-8")
+    assert "Auto-Retro" in content
+    assert "add_memories" in content
+    assert "cycles.jsonl" in content
+    assert "< 30 seconds" in content
+
+
+def test_execution_pipeline_has_hooks(tmp_path: Path):
+    """execution pipeline renders hook points when configured."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.hooks_pre_build = "scripts/pre-build.sh"
+    cfg.native.hooks_pre_ship = "scripts/pre-ship.sh"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+    content = plan.read_text(encoding="utf-8")
+    assert "scripts/pre-build.sh" in content
+    assert "scripts/pre-ship.sh" in content
+
+
+def test_config_plan_review_gate_literal(tmp_path: Path):
+    """NativeModeConfig rejects invalid plan_review_gate values."""
+    import pydantic
+    from harness.core.config import NativeModeConfig
+    with __import__("pytest").raises(pydantic.ValidationError):
+        NativeModeConfig(plan_review_gate="invalid_value")
+
+
+def test_config_plan_review_gate_defaults_to_auto():
+    """plan_review_gate defaults to 'auto'."""
+    from harness.core.config import NativeModeConfig
+    cfg = NativeModeConfig()
+    assert cfg.plan_review_gate == "auto"
+
+
+def test_build_context_has_plan_review_gate(tmp_path: Path):
+    """_build_context includes plan_review_gate in the template context."""
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    ctx = _build_context(cfg)
+    assert "plan_review_gate" in ctx
+    assert ctx["plan_review_gate"] == "auto"
+
+
+def test_total_skill_count_is_ten(tmp_path: Path):
+    """10 skills are generated (3 primary + 7 existing)."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    skills_dir = tmp_path / ".cursor" / "skills" / "harness"
+    skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    assert len(skill_dirs) == 10

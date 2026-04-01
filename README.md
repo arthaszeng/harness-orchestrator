@@ -51,33 +51,42 @@ This generates skills, subagents, and rules directly into your `.cursor/` direct
 
 ### 3. Use it in Cursor
 
-Open your project in Cursor. You now have eight skills (four core + four auxiliary):
+Open your project in Cursor. You now have **three primary entry points** that cover all task sizes — from vague ideas to specific requirements:
 
-**Core workflow skills:**
+**Start here — three entry points for all task sizes:**
 
-| Skill | What it does |
-|-------|-------------|
-| `/harness-plan` | Analyze a requirement, produce a spec and contract with adversarial review |
-| `/harness-build` | Implement the contract, run CI, triage failures, write a structured build log |
-| `/harness-eval` | Three-pass adversarial code review (evaluator + primary adversarial + cross-model) |
-| `/harness-ship` | Full pipeline: test → review → fix → commit → push → PR |
+| Skill | When to use | What it does |
+|-------|-------------|--------------|
+| `/harness-brainstorm` | "I have an idea" | Divergent exploration → vision → plan → review gate → auto build/eval/ship/retro |
+| `/harness-vision` | "I have a direction" | Clarify vision → plan → review gate → auto build/eval/ship/retro |
+| `/harness-plan` | "I have a requirement" | Refine plan + adversarial review → review gate → auto build/eval/ship/retro |
 
-**Auxiliary skills:**
+All three share the same autonomous execution pipeline after plan approval: build → eval → iterate → ship → lightweight auto-retro with Memverse learning.
+
+**Utility skills:**
 
 | Skill | What it does |
 |-------|-------------|
 | `/harness-investigate` | Systematic bug investigation: reproduce → hypothesize → verify → minimal fix |
 | `/harness-learn` | Memverse knowledge management: store, retrieve, update project learnings |
-| `/harness-doc-release` | Documentation sync: detect stale docs after code changes |
 | `/harness-retro` | Engineering retrospective: commit analytics, hotspot detection, trend tracking |
+
+**Advanced skills** (for granular control):
+
+| Skill | What it does |
+|-------|-------------|
+| `/harness-build` | Implement the contract, run CI, triage failures, write a structured build log |
+| `/harness-eval` | Three-pass adversarial code review (evaluator + primary adversarial + cross-model) |
+| `/harness-ship` | Full pipeline: test → review → fix → commit → push → PR |
+| `/harness-doc-release` | Documentation sync: detect stale docs after code changes |
 
 **Try it now** — open Cursor chat and type:
 
 ```
-/harness-ship add input validation to the user registration endpoint
+/harness-plan add input validation to the user registration endpoint
 ```
 
-Harness will run tests, a three-pass adversarial review, auto-fix trivial issues, create bisectable commits, and open a PR — all without leaving your IDE.
+Harness will plan with adversarial review, apply a review gate, build, run three-pass adversarial code review, auto-fix trivial issues, create bisectable commits, and open a PR — all without leaving your IDE.
 
 ### Updating
 
@@ -138,7 +147,9 @@ When you choose cursor-native mode, `harness init` generates:
 
 | Artifact | Path | Purpose |
 |----------|------|---------|
-| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | Plan and decompose a task with adversarial spec review |
+| `/harness-brainstorm` | `.cursor/skills/harness/harness-brainstorm/SKILL.md` | Divergent exploration → vision → plan → auto-execute to PR |
+| `/harness-vision` | `.cursor/skills/harness/harness-vision/SKILL.md` | Clarify vision → plan → auto-execute to PR |
+| `/harness-plan` | `.cursor/skills/harness/harness-plan/SKILL.md` | Refine plan + adversarial review → auto-execute to PR |
 | `/harness-build` | `.cursor/skills/harness/harness-build/SKILL.md` | Build: implement contract, run CI, triage failures |
 | `/harness-eval` | `.cursor/skills/harness/harness-eval/SKILL.md` | Three-pass review with Fix-First auto-remediation |
 | `/harness-ship` | `.cursor/skills/harness/harness-ship/SKILL.md` | Full pipeline: test → review → fix → commit → PR |
@@ -177,6 +188,7 @@ Project settings live in `.agents/config.toml`:
 | `native.adversarial_model` | "gpt-4.1" | Cross-model reviewer model |
 | `native.adversarial_mechanism` | "auto" | Adversarial dispatch mode. Allowed: `subagent`, `cli`, `auto` |
 | `native.review_gate` | "eng" | Review gate strictness. Allowed: `eng` (hard gate), `advisory` (log only) |
+| `native.plan_review_gate` | "auto" | Plan review gate mode. Allowed: `human` (always stop), `ai` (auto-approve), `auto` (complexity-adaptive) |
 | `native.retro_window_days` | 14 | Default retro analysis window in days (1–365) |
 | `autonomous.max_tasks_per_session` | 10 | Max tasks per autonomous session |
 | `autonomous.consecutive_block_limit` | 2 | Stop after this many consecutive blocks |
@@ -279,7 +291,7 @@ IDE CLI setup:
 |  | Orchestrator | Cursor-native |
 |---|---|---|
 | **How it runs** | External `harness` CLI spawns agent processes | Skills + subagents inside Cursor IDE |
-| **Entry point** | `harness run` / `harness auto` | `/harness-plan`, `/harness-build`, `/harness-eval`, `/harness-ship` |
+| **Entry point** | `harness run` / `harness auto` | `/harness-brainstorm`, `/harness-vision`, `/harness-plan` |
 | **Cross-model review** | Configurable per role | Adversarial subagent with a different model |
 | **When to use** | CI/CD, headless, multi-IDE | Interactive development, Cursor-only |
 

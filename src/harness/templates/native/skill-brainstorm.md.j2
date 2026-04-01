@@ -1,0 +1,147 @@
+---
+name: harness-brainstorm
+description: >-
+  Divergent exploration to PR: help the user think through a vague idea via
+  Socratic questioning, converge on a vision update and plan, then auto-execute
+  build/eval/ship/retro. Use when saying "brainstorm", "I have an idea",
+  "help me think", "explore this", or "harness brainstorm". (harness)
+---
+
+# Harness Brainstorm — From Idea to PR
+
+You are running the `/harness-brainstorm` workflow. The user has a **vague idea**
+that needs divergent exploration before converging into a plan.
+
+**Human interaction phases:** Divergent Exploration + Vision + Plan Review Gate
+**Autonomous phases:** Build → Eval → Ship → Auto-Retro
+
+**Only stop for:**
+- Socratic exploration (the whole point of brainstorm — engage the user)
+- Review gate escalation (when plan_review_gate requires it)
+- ASK-classified review findings during eval
+
+**Never stop for:**
+- Implementation decisions (make them during build)
+- AUTO-FIX findings (fix silently)
+
+---
+
+## Phase 0: Divergent Exploration
+
+This is the core differentiator of brainstorm. Take time here — this is where value is created.
+
+### Step 1: Understand the Idea
+
+Ask the user **2–3 questions** to understand the problem space (do NOT ask all at once):
+
+Round 1:
+- What problem are you trying to solve? For whom?
+- What does the current situation look like? What's the pain?
+
+Round 2 (after user responds):
+- What would success look like? What constraints exist?
+- Have you tried anything already? What worked or didn't?
+
+### Step 2: Generate Options
+
+Based on the user's answers, generate **2–3 approach options**:
+
+```
+APPROACH OPTIONS
+═══════════════════════════════════════════════════
+  #  Approach                  Pros                      Cons              Complexity
+  1  [name]                    [short]                   [short]           Low/Med/High
+  2  [name]                    [short]                   [short]           Low/Med/High
+  3  [name]                    [short]                   [short]           Low/Med/High
+═══════════════════════════════════════════════════
+Which approach resonates? Or combine/remix ideas?
+```
+
+Let the user pick, combine, or propose alternatives. This is a conversation, not a quiz.
+
+### Step 3: Converge on Vision
+
+Once the direction is clear:
+
+1. Read `.agents/vision.md` (if it exists)
+2. Synthesize the brainstorm conclusion into a vision delta
+3. Append the new direction as an incremental section:
+   ```markdown
+   ## [Date] — [Brief Title]
+   [2-3 sentence summary of the direction chosen and why]
+   ```
+4. Write back to `.agents/vision.md` (create if missing)
+
+---
+
+## Phase 1: Plan Generation
+
+{{ planner_principles }}
+
+### Context Gathering
+
+1. Read `.agents/config.toml` and the updated `.agents/vision.md`
+2. Scan project structure: key directories, languages, frameworks, existing patterns
+3. Run `git log --oneline -10` for recent activity
+4. Determine next task number: `ls .agents/tasks/`
+
+### Produce Spec + Contract
+
+Write to `.agents/tasks/task-NNN/plan.md`:
+
+```markdown
+# Spec
+
+## Analysis
+(What problem, why it matters — reference the brainstorm exploration)
+
+## Approach
+(The chosen approach from Phase 0, with implementation details)
+
+## Impact
+(Files affected, blast radius, dependencies)
+
+## Risks
+(Potential risks and mitigations)
+
+---
+
+# Contract
+
+## Deliverables
+- [ ] Deliverable 1: description + acceptance criteria
+- [ ] Deliverable 2: description + acceptance criteria
+
+## Acceptance Criteria
+- All tests pass
+- No regressions
+- (specific criteria)
+
+## Out of Scope
+- (explicitly list)
+```
+
+### Adversarial Review
+
+Dispatch a reviewer subagent to challenge the plan (same as harness-plan Step 3):
+
+- **subagent_type**: `"generalPurpose"`
+- Review on 5 dimensions: completeness, consistency, clarity, scope, feasibility
+- Max 3 review iterations, fix issues between rounds
+
+If plan has 5+ deliverables or touches 10+ files, also dispatch cross-model review
+via `harness-adversarial-reviewer` subagent.
+
+---
+
+{% with interaction_depth="high" %}
+{% include 'sections/_review-gate.md.j2' %}
+{% endwith %}
+
+---
+
+{% include 'sections/_execution-pipeline.md.j2' %}
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}

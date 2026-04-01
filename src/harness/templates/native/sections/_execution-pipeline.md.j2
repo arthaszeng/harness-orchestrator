@@ -1,0 +1,137 @@
+## Autonomous Execution Pipeline
+
+Everything below runs **without human interaction**. Execute straight through.
+
+**Only stop for:**
+- In-branch test failures surviving 3 fix attempts
+- Evaluation score below {{ pass_threshold }} after {{ max_iterations }} iterations
+- ASK-classified review findings that need user judgment
+
+**Never stop for:**
+- Implementation approach decisions (make them, note in build log)
+- AUTO-FIX review findings (fix and commit silently)
+- Version bump choice (auto PATCH)
+- PR content or commit messages (auto-generate)
+
+---
+
+### Phase: Build
+{% if hooks_pre_build %}
+
+Before building, execute: `{{ hooks_pre_build }}`
+If it exits non-zero, report the error and stop.
+{% endif %}
+
+{{ builder_principles }}
+
+1. Read `plan.md` from the task directory (and `evaluation-rN.md` if iterating)
+2. Search the existing codebase for patterns before writing new code
+3. Implement each deliverable with tests
+4. Run `{{ ci_command }}` — triage pre-existing vs in-branch failures (max 3 fix attempts)
+5. Write `build-rN.log` to the task directory
+6. Commit with conventional format: `<type>(scope): description`
+
+---
+
+### Phase: Eval
+{% if hooks_post_eval %}
+
+After eval completes, execute: `{{ hooks_post_eval }}`
+{% endif %}
+
+Dispatch parallel review passes (mechanism: **{{ adversarial_mechanism }}**):
+{% if adversarial_mechanism == "subagent" %}
+
+**Wave A** (dispatch in one message, parallel):
+- **Pass 1**: `harness-evaluator` subagent — structured review + scoring
+- **Pass 2**: `generalPurpose` subagent — adversarial code review over `git diff {{ trunk_branch }}..HEAD`
+- **Pass 3**: `harness-adversarial-reviewer` subagent — cross-model review ({{ adversarial_model }})
+- **Specialists** (if diff >= 50 lines): testing + security + performance via `generalPurpose` (model: fast)
+
+**Wave B** (after Pass 1 returns):
+- If Pass 1 has any CRITICAL finding OR diff > 200 LOC → dispatch red-team subagent
+
+Subagent failures → that pass is marked **FAILED**, no inline fallback.
+{% elif adversarial_mechanism == "cli" %}
+
+Do NOT use Task tool for adversarial reviews. Use external CLI instead.
+Run structured review inline, then invoke CLI for adversarial passes.
+{% else %}
+
+**Wave A** (dispatch in one message, parallel):
+- **Pass 1**: `harness-evaluator` subagent — structured review + scoring
+- **Pass 2**: `generalPurpose` subagent — adversarial code review
+- **Pass 3**: `harness-adversarial-reviewer` subagent — cross-model review ({{ adversarial_model }})
+- **Specialists** (if diff >= 50 lines): testing + security + performance
+
+**Wave B** (after Pass 1 returns):
+- If Pass 1 has any CRITICAL finding OR diff > 200 LOC → dispatch red-team subagent
+
+Try subagents first. If a subagent fails, degrade gracefully (run that pass inline).
+{% endif %}
+
+**Synthesis**: Cross-reference all pass results. Deduplicate findings. Calculate weighted score.
+
+**Fix-First**:
+- **AUTO-FIX**: high certainty + small blast radius + reversible → fix immediately, commit
+- **ASK**: security, behavior change, architecture, low confidence → batch and present to user
+
+**Verdict**: Average weighted score vs **{{ pass_threshold }}**.
+- **PASS** → continue to Ship
+- **ITERATE** → loop back to Build with eval feedback
+
+Write `evaluation-rN.md` and `evaluation-rN.json` to the task directory.
+
+---
+
+### Phase: Iterate
+
+If verdict = **ITERATE** and iteration < **{{ max_iterations }}**:
+1. Read evaluation feedback
+2. Return to Build phase with feedback as additional context
+3. Increment iteration counter
+
+If **BLOCKED** after {{ max_iterations }} iterations: write investigation report and stop.
+
+---
+
+### Phase: Ship
+{% if hooks_pre_ship %}
+
+Before shipping, execute: `{{ hooks_pre_ship }}`
+If it exits non-zero, report the error and stop.
+{% endif %}
+
+If verdict = **PASS**:
+
+1. **Rebase** onto `{{ trunk_branch }}` — resolve conflicts if possible, stop if not
+2. **Re-run CI**: `{{ ci_command }}` — confirm tests still pass after rebase
+3. **Bisectable commits**: group changes by logical unit
+4. **Push**: `git push -u origin HEAD`
+5. **Create PR**: `gh pr create` with summary derived from plan + eval results
+6. **Doc reconciliation**: check all `.md` files against the diff, auto-fix factual errors
+
+---
+
+### Phase: Auto-Retro
+
+After PR creation, capture cycle learnings (**< 30 seconds**, no git analysis):
+
+1. **Collect** cycle metadata:
+   - Iterations: N, Final score: X/10
+   - Finding types and counts from eval
+   - Auto-fixes applied: N
+
+2. **Generate** 2–3 actionable learnings as bullets:
+   - Patterns that worked well
+   - Pitfalls to avoid next time
+   - Conventions discovered or confirmed
+
+3. **Persist** to Memverse (if available):
+   - Call `add_memories` with domain `"{{ project_name }}"`
+   - Each learning as a separate memory with type: pattern / pitfall / preference
+
+4. **Log** to `.agents/retros/cycles.jsonl`:
+   ```json
+   {"date": "YYYY-MM-DD", "task": "task-NNN", "iterations": N, "score": X, "learnings": ["..."]}
+   ```

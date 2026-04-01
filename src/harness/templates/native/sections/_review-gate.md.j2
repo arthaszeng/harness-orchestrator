@@ -1,0 +1,59 @@
+## Review Gate — {{ plan_review_gate }}
+{% if plan_review_gate == "human" %}
+
+**STOP.** Present the complete plan and adversarial review report to the user.
+
+Display:
+1. The full plan (spec + contract)
+2. Adversarial review summary (rounds, issues, score)
+3. Any unresolved reviewer concerns
+
+Wait for user response:
+- **approve** → continue to Execution Pipeline
+- **edit: [feedback]** → return to planning phase, re-generate with feedback
+- **reject** → terminate the workflow
+{% elif plan_review_gate == "auto" %}
+
+Assess whether the plan needs human review by calculating an **escalation score**.
+
+**This entry point's interaction depth: {{ interaction_depth | default("low") }}**
+
+| Signal | Condition | Score |
+|--------|-----------|-------|
+| Interaction depth | high (brainstorm) | **-2** |
+| Interaction depth | medium (vision) | **-1** |
+| Interaction depth | low (plan) | **+0** |
+| Scale | deliverables > 5 | +2 |
+| Scale | estimated files to modify > 10 | +2 |
+| Risk | security, authentication, or authorization changes | +3 |
+| Risk | data model or schema changes | +3 |
+| Risk | public API surface changes | +2 |
+| Quality | adversarial review score < 7/10 | +2 |
+| Type | new feature (not fix or refactor) | +1 |
+
+**Score >= 5 → FULL REVIEW**
+Present the complete plan + adversarial review report. Wait for:
+- **approve** → continue
+- **edit: [feedback]** → re-plan
+- **reject** → terminate
+
+**Score 3–4 → SUMMARY CONFIRM**
+Show a concise summary:
+```
+PLAN SUMMARY
+═══════════════════════════════════════════
+  Task:          task-NNN
+  Deliverables:  N items
+  Files:         ~N estimated
+  Risk flags:    [list or "none"]
+  Review score:  X/10
+  Gate score:    N (SUMMARY CONFIRM)
+═══════════════════════════════════════════
+Continue? [approve / edit / reject]
+```
+
+**Score < 3 → AUTO PROCEED**
+Log: `"Plan auto-approved (gate score N, review score X/10)"` and continue.
+{% else %}
+Plan is auto-approved after adversarial review completes. Continue immediately.
+{% endif %}

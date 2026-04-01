@@ -21,6 +21,8 @@ from harness.i18n import t
 _TEMPLATE_DIR = "native"
 
 _SKILL_TEMPLATES = [
+    ("skill-brainstorm.md.j2", "harness-brainstorm"),
+    ("skill-vision.md.j2", "harness-vision"),
     ("skill-plan.md.j2", "harness-plan"),
     ("skill-build.md.j2", "harness-build"),
     ("skill-eval.md.j2", "harness-eval"),
@@ -95,6 +97,7 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
         "hooks_post_eval": cfg.native.hooks_post_eval,
         "hooks_pre_ship": cfg.native.hooks_pre_ship,
         "review_gate": cfg.native.review_gate,
+        "plan_review_gate": cfg.native.plan_review_gate,
         "retro_window_days": str(cfg.native.retro_window_days),
     }
 

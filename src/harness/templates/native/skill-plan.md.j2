@@ -1,29 +1,37 @@
 ---
 name: harness-plan
 description: >-
-  Plan and decompose tasks with adversarial spec review. Analyzes requirements,
-  produces a technical spec and iterative contract, then runs an adversarial
-  review loop to harden the plan. Use when starting a new task, saying "plan
-  this", "break this down", or "harness plan". (harness)
+  End-to-end from requirement to PR: refine a plan with adversarial review,
+  then auto-execute build/eval/ship/retro. Use when saying "plan", "do this",
+  "implement", "build this feature", "harness plan", or providing a specific
+  requirement. (harness)
 ---
 
-# Harness Plan
+# Harness Plan — From Requirement to PR
 
-You are running the `/harness-plan` workflow. This is a **minimal-interaction** planning
-pipeline. Produce the plan, run adversarial review, and output the final hardened plan.
+You are running the `/harness-plan` workflow. The user has a **specific requirement**
+that needs planning and execution.
+
+**Human interaction phases:** Plan Refinement + Review Gate
+**Autonomous phases:** Build → Eval → Ship → Auto-Retro
 
 **Only stop for:**
 - Ambiguous requirements (ask for clarification ONCE, then proceed with best interpretation)
-- Taste decisions or user challenges identified by dual-model review (Step 5)
+- Taste decisions or user challenges identified by adversarial review
+- Review gate escalation (when plan_review_gate requires it)
+- ASK-classified review findings during eval
 
 **Never stop for:**
 - Plan format approval
 - Confirmation before writing to disk
-- Spec review findings (auto-fix them)
+- Implementation decisions (make them during build)
+- AUTO-FIX findings (fix silently)
 
 ---
 
-## Core Principles
+## Phase 0: Plan Refinement
+
+### Core Principles
 
 {{ planner_principles }}
 
@@ -57,9 +65,7 @@ Every decision during planning falls into one of three categories:
   NEVER auto-decide. Always present to the user with evidence.
   Example: "User wants to add a cache layer, but the bottleneck is CPU-bound."
 
----
-
-## Step 1: Context Gathering
+### Context Gathering
 
 1. Read the user's requirement carefully
 2. Read `.agents/config.toml` and `.agents/vision.md` (if they exist)
@@ -67,9 +73,7 @@ Every decision during planning falls into one of three categories:
 4. Run `git log --oneline -10` for recent activity context
 5. Check existing task directories: `ls .agents/tasks/` to determine the next task number
 
----
-
-## Step 2: Produce Spec + Contract
+### Produce Spec + Contract
 
 Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed).
 
@@ -114,134 +118,37 @@ Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed).
 **Quality bar**: Every deliverable MUST have acceptance criteria. Vague deliverables
 like "improve the code" are not acceptable — make them specific and testable.
 
----
+### Adversarial Review Loop
 
-## Step 3: Spec Review Loop (adversarial)
-
-After writing the plan to disk, dispatch an adversarial reviewer subagent to challenge it.
-
-### Iteration 1: Dispatch reviewer
+After writing the plan to disk, dispatch an adversarial reviewer subagent:
 
 **Dispatch via Task tool:**
 - **subagent_type**: `"generalPurpose"`
-- **prompt**: (construct from template below)
 - **description**: `"Adversarial plan review"`
+- Review on 5 dimensions: completeness, consistency, clarity, scope, feasibility
+- Score 1-10, list specific issues with fixes
 
-Prompt template:
-```
-Read the plan file at .agents/tasks/task-NNN/plan.md.
-Review it on 5 dimensions. For each dimension, note PASS or list specific
-issues with suggested fixes. At the end, output a quality score (1-10)
-across all dimensions.
+**Iteration loop** (max 3 rounds):
+1. Fix issues found by reviewer in the plan file
+2. Re-dispatch reviewer with updated plan
+3. Stop if PASS or same issues recur (convergence guard)
 
-Dimensions:
-1. **Completeness** — Are all requirements addressed? Missing edge cases?
-2. **Consistency** — Do parts of the plan agree with each other? Contradictions?
-3. **Clarity** — Could an engineer implement this without asking questions? Ambiguous language?
-4. **Scope** — Does the plan creep beyond the original problem? YAGNI violations?
-5. **Feasibility** — Can this actually be built with the stated approach? Hidden complexity?
+Persist unresolved issues as `## Reviewer Concerns` in the plan file.
 
-Output format:
-- Quality score (1-10)
-- PASS if no issues, or a numbered list of issues with dimension, description, and fix
-```
-
-### Iteration 2+: Fix and re-dispatch
-
-If the reviewer returns issues:
-1. Fix each issue in the plan file on disk
-2. Re-dispatch the reviewer subagent with the updated plan
-3. Maximum 3 iterations total
-
-**Convergence guard:** If the reviewer returns the same issues on consecutive iterations
-(the fix didn't resolve them), stop the loop and persist those issues as a
-"## Reviewer Concerns" section in the plan file.
-
-### Report
-
-After the loop completes (PASS, max iterations, or convergence):
-
-Output: "Plan survived N rounds of adversarial review. M issues caught and fixed.
-Quality score: X/10."
-
-If issues remain after max iterations, add to the plan:
-```markdown
-## Reviewer Concerns
-- [unresolved issue 1]
-- [unresolved issue 2]
-```
+**Cross-model review** (if plan has 5+ deliverables or touches 10+ files):
+- Dispatch `harness-adversarial-reviewer` subagent for independent perspective
+- Build consensus table comparing both reviewers
+- Mark disagreements as `[TASTE DECISION]`
 
 ---
 
-## Step 4: Cross-Model Review (optional, for complex plans)
-
-If the plan has 5+ deliverables OR touches 10+ files, also dispatch a cross-model reviewer:
-
-**Dispatch via Task tool:**
-- **subagent_type**: `"harness-adversarial-reviewer"`
-- **prompt**: "Read the plan at .agents/tasks/task-NNN/plan.md. You are a brutally honest
-  technical reviewer. Find: logical gaps, unstated assumptions, overcomplexity (is there
-  a fundamentally simpler approach?), feasibility risks, missing dependencies. No
-  compliments. Just the problems."
-- **description**: `"Cross-model plan review"`
-
-Present findings under a `CROSS-MODEL REVIEW:` header.
-
-**Build a Consensus Table** comparing both reviewers:
-
-```
-PLAN DUAL VOICES — CONSENSUS TABLE
-═══════════════════════════════════════════════════
-  Dimension       Primary   Cross-Model   Consensus
-  Completeness    PASS      PASS          CONFIRMED
-  Consistency     PASS      ISSUE         DISAGREE → [TASTE DECISION]
-  Clarity         PASS      PASS          CONFIRMED
-  Scope           PASS      PASS          CONFIRMED
-  Feasibility     ISSUE     PASS          DISAGREE → [TASTE DECISION]
-  Architecture    PASS      PASS          CONFIRMED
-═══════════════════════════════════════════════════
-```
-
-- **CONFIRMED**: both agree → proceed with confidence
-- **DISAGREE**: → mark as taste decision, present to final approval gate
-
-If the subagent fails: skip the consensus table and note single-reviewer mode.
+{% with interaction_depth="low" %}
+{% include 'sections/_review-gate.md.j2' %}
+{% endwith %}
 
 ---
 
-## Step 5: Final Approval Gate
-
-Before finalizing the plan, present a summary for user approval:
-
-1. List all **automatic decisions** (Mechanical) — for transparency only
-2. List all **taste decisions** — with rationale and rejected alternatives
-3. List all **user challenges** — where both models suggest reconsidering the user's direction
-
-```
-PLAN APPROVAL GATE
-═══════════════════════════════════════════════════
-  Automatic decisions:  N (logged in audit trail)
-  Taste decisions:      M (need your call)
-  User challenges:      K (both models flagged)
-
-  [If M > 0 or K > 0:]
-  For each taste/challenge decision:
-    #N: [description]
-    Options: A) Accept plan's choice  B) Override to [alternative]  C) Discuss further
-═══════════════════════════════════════════════════
-```
-
-If no taste decisions or user challenges: proceed directly — "Plan approved (all decisions mechanical)."
-
----
-
-## Constraints
-
-- Do NOT implement code — only plan
-- Do NOT modify existing files outside `.agents/tasks/`
-- Write the plan to disk BEFORE running the review loop
-- The plan must be self-contained: an engineer reading only the plan file should be
-  able to implement it without additional context
+{% include 'sections/_execution-pipeline.md.j2' %}
 
 ---
 
