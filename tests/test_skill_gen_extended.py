@@ -2,12 +2,14 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
     _build_context,
     _detect_project_lang,
     generate_native_artifacts,
+    resolve_native_lang,
 )
 
 
@@ -889,3 +891,36 @@ def test_worktrees_json_count_incremented(tmp_path: Path):
     count_without = generate_native_artifacts(tmp_path, cfg=cfg, force=False)
 
     assert count_with == count_without + 1
+
+
+# --- resolve_native_lang ---
+
+
+class TestResolveNativeLang:
+    def test_explicit_en_zh(self):
+        assert resolve_native_lang(lang="en") == "en"
+        assert resolve_native_lang(lang="zh") == "zh"
+
+    def test_explicit_other_defaults_en(self):
+        assert resolve_native_lang(lang="fr") == "en"
+
+    def test_from_config(self, tmp_path: Path):
+        agents_dir = tmp_path / ".agents"
+        agents_dir.mkdir(parents=True)
+        (agents_dir / "config.toml").write_text(
+            '[project]\nname = "x"\nlang = "zh"\n',
+            encoding="utf-8",
+        )
+        assert resolve_native_lang(tmp_path) == "zh"
+
+    def test_config_load_failure_falls_through(self, tmp_path: Path):
+        assert resolve_native_lang(tmp_path) == "en"
+
+    @patch("harness.native.skill_gen.HarnessConfig.load", side_effect=OSError("no config"))
+    @patch("harness.native.skill_gen.get_lang", return_value="zh")
+    def test_fallback_ui_lang(self, _mock_lang, _mock_load, tmp_path: Path):
+        assert resolve_native_lang(tmp_path) == "zh"
+
+    @patch("harness.native.skill_gen.get_lang", return_value="invalid")
+    def test_fallback_invalid_ui_lang_defaults_en(self, _mock_lang):
+        assert resolve_native_lang(None) == "en"

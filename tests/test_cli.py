@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from typer.testing import CliRunner
 
 from harness.cli import app
@@ -21,3 +22,21 @@ class TestVersionOutput:
         assert result.exit_code == 0
         assert "harness-flow" in result.output
         assert "harness-orchestrator" not in result.output
+
+
+class TestHelpOutput:
+    def test_help_lists_three_commands(self):
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "init" in result.output
+        assert "status" in result.output
+        assert "update" in result.output
+
+    def test_help_does_not_list_install(self):
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        lines = result.output.lower().splitlines()
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("install") and "completion" not in stripped:
+                pytest.fail(f"'install' command found in help: {line}")

@@ -16,7 +16,26 @@ import typer
 
 from harness.core.config import HarnessConfig
 from harness.core.roles import NATIVE_REVIEW_ROLES
-from harness.i18n import t
+from harness.i18n import get_lang, t
+
+
+def resolve_native_lang(project_root: Path | None = None, lang: str | None = None) -> str:
+    """Resolve language for native artifact generation.
+
+    Priority: explicit arg → config.project.lang → current i18n lang → "en".
+    """
+    if lang is not None:
+        return lang if lang in ("en", "zh") else "en"
+    if project_root is not None:
+        try:
+            cfg = HarnessConfig.load(project_root)
+            pl = cfg.project.lang
+            if pl in ("en", "zh"):
+                return pl
+        except Exception:
+            pass
+    gl = get_lang()
+    return gl if gl in ("en", "zh") else "en"
 
 
 _TEMPLATE_DIR = "native"

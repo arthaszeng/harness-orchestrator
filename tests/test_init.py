@@ -26,7 +26,7 @@ class TestLoadTemplate:
         tmpl = _load_template("config.toml.j2")
         assert isinstance(tmpl, jinja2.Template)
         src = tmpl.render(project_name="x", description="", lang="en", ci_command="make test")
-        assert "name = \"x\"" in src
+        assert 'name = "x"' in src
         assert "make test" in src
 
     def test_nonexistent_template_raises(self):
@@ -195,21 +195,46 @@ class TestRunInitNonInteractive:
         assert ".agents/state.json" in gi.read_text(encoding="utf-8")
 
 
-class TestRunInitDeclineOverwrite:
-    @patch("harness.native.skill_gen.generate_native_artifacts")
-    def test_raises_exit_zero_when_user_declines(
-        self, mock_gen, monkeypatch, tmp_path,
-    ):
+class TestRunInitReinit:
+    """When .agents/config.toml exists, init skips wizard and regenerates artifacts."""
+
+    @patch("harness.native.skill_gen.generate_native_artifacts", return_value=42)
+    def test_reinit_skips_wizard_regenerates(self, mock_gen, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         agents = tmp_path / ".agents"
         agents.mkdir(parents=True)
-        (agents / "config.toml").write_text("[project]\nname = old\n", encoding="utf-8")
+        (agents / "config.toml").write_text(
+            '[project]\nname = "existing"\nlang = "zh"\n'
+            '[ci]\ncommand = "make test"\n'
+            '[workflow]\ntrunk_branch = "main"\n',
+            encoding="utf-8",
+        )
+        run_init(non_interactive=True)
+        mock_gen.assert_called_once()
+        call_kwargs = mock_gen.call_args.kwargs
+        assert call_kwargs.get("force") is True
 
-        with patch("harness.commands.init.typer.confirm", return_value=False):
-            with patch("harness.commands.init.typer.echo"):
-                with pytest.raises(typer.Exit) as excinfo:
-                    run_init(non_interactive=True)
+    @patch("harness.native.skill_gen.generate_native_artifacts", return_value=10)
+    def test_reinit_uses_config_lang(self, mock_gen, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".agents"
+        agents.mkdir(parents=True)
+        (agents / "config.toml").write_text(
+            '[project]\nname = "zh-proj"\nlang = "zh"\n'
+            '[ci]\ncommand = "make test"\n'
+            '[workflow]\ntrunk_branch = "main"\n',
+            encoding="utf-8",
+        )
+        run_init()
+        mock_gen.assert_called_once()
+        call_kwargs = mock_gen.call_args.kwargs
+        assert call_kwargs.get("lang") == "zh"
 
-        assert excinfo.value.exit_code == 0
-        mock_gen.assert_not_called()
-
+    def test_reinit_bad_config_exits_with_error(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".agents"
+        agents.mkdir(parents=True)
+        (agents / "config.toml").write_text("this is not valid toml [[[", encoding="utf-8")
+        with pytest.raises(typer.Exit) as exc_info:
+            run_init()
+        assert exc_info.value.exit_code == 1

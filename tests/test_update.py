@@ -93,8 +93,8 @@ class TestRunUpdate:
                 run_update(check=True)
             assert exc_info.value.exit_code == 1
 
-    def test_up_to_date_skips_install(self):
-        """When already at latest version, run_install should NOT be called."""
+    def test_up_to_date_skips_artifact_generation(self):
+        """When already at latest version, generate_native_artifacts should NOT be called."""
         from harness import __version__
         with (
             patch("harness.commands.update._get_latest_version", return_value=__version__),
@@ -102,65 +102,59 @@ class TestRunUpdate:
             patch("harness.commands.update.Path") as mock_path_cls,
         ):
             mock_path_cls.cwd.return_value = Path("/fake")
-            with patch.dict("sys.modules", {"harness.commands.install": MagicMock()}):
-                import harness.commands.install as mock_install_mod
-                with patch.object(mock_install_mod, "run_install", create=True) as mock_install:
-                    run_update(check=False, force=False)
-                    mock_install.assert_not_called()
+            run_update(check=False, force=False)
 
-    def test_upgrade_runs_install(self):
-        """After a successful pip upgrade, run_install SHOULD be called."""
+    def test_upgrade_runs_artifact_generation(self):
+        """After a successful pip upgrade, artifacts SHOULD be regenerated."""
+        mock_gen = MagicMock(return_value=10)
         with (
             patch("harness.commands.update._get_latest_version", return_value="99.0.0"),
             patch("harness.commands.update._pip_upgrade", return_value=True),
             patch("harness.commands.update._migrate_config", return_value=0),
             patch("harness.commands.update.Path") as mock_path_cls,
+            patch("harness.native.skill_gen.generate_native_artifacts", mock_gen),
+            patch("harness.native.skill_gen.resolve_native_lang", return_value="en"),
+            patch("harness.core.config.HarnessConfig.load", return_value=MagicMock()),
         ):
             mock_path_cls.cwd.return_value = Path("/fake")
-            mock_run_install = MagicMock()
-            with patch("harness.commands.install.run_install", mock_run_install, create=True):
-                run_update(check=False, force=False)
-            mock_run_install.assert_called_once_with(force=True, lang=None)
+            run_update(check=False, force=False)
+        mock_gen.assert_called_once()
+        assert mock_gen.call_args.kwargs.get("force") is True
 
-    def test_force_runs_install_when_up_to_date(self):
-        """With --force, run_install should be called even when already at latest."""
+    def test_force_runs_artifact_generation_when_up_to_date(self):
+        """With --force, artifacts should be regenerated even when already at latest."""
         from harness import __version__
+        mock_gen = MagicMock(return_value=10)
         with (
             patch("harness.commands.update._get_latest_version", return_value=__version__),
             patch("harness.commands.update._migrate_config", return_value=0),
             patch("harness.commands.update.Path") as mock_path_cls,
+            patch("harness.native.skill_gen.generate_native_artifacts", mock_gen),
+            patch("harness.native.skill_gen.resolve_native_lang", return_value="en"),
+            patch("harness.core.config.HarnessConfig.load", return_value=MagicMock()),
         ):
             mock_path_cls.cwd.return_value = Path("/fake")
-            mock_run_install = MagicMock()
-            with patch("harness.commands.install.run_install", mock_run_install, create=True):
-                run_update(check=False, force=True)
-            mock_run_install.assert_called_once_with(force=True, lang=None)
+            run_update(check=False, force=True)
+        mock_gen.assert_called_once()
+        assert mock_gen.call_args.kwargs.get("force") is True
 
-    def test_pypi_unreachable_skips_install_runs_migration(self):
-        """When PyPI is unreachable (non-check mode), skip install but run config migration."""
+    def test_pypi_unreachable_skips_generation_runs_migration(self):
+        """When PyPI is unreachable (non-check mode), skip generation but run config migration."""
         with (
             patch("harness.commands.update._get_latest_version", return_value=None),
             patch("harness.commands.update._migrate_config", return_value=0) as mock_migrate,
             patch("harness.commands.update.Path") as mock_path_cls,
         ):
             mock_path_cls.cwd.return_value = Path("/fake")
-            with patch.dict("sys.modules", {"harness.commands.install": MagicMock()}):
-                import harness.commands.install as mock_install_mod
-                with patch.object(mock_install_mod, "run_install", create=True) as mock_install:
-                    run_update(check=False, force=False)
-                    mock_install.assert_not_called()
+            run_update(check=False, force=False)
             mock_migrate.assert_called_once()
 
-    def test_pip_upgrade_failure_does_not_install(self):
-        """When pip upgrade fails, run_install should NOT be called and exit with code 1."""
+    def test_pip_upgrade_failure_does_not_generate(self):
+        """When pip upgrade fails, artifacts should NOT be generated and exit with code 1."""
         with (
             patch("harness.commands.update._get_latest_version", return_value="99.0.0"),
             patch("harness.commands.update._pip_upgrade", return_value=False),
         ):
-            with patch.dict("sys.modules", {"harness.commands.install": MagicMock()}):
-                import harness.commands.install as mock_install_mod
-                with patch.object(mock_install_mod, "run_install", create=True) as mock_install:
-                    with pytest.raises(typer.Exit) as exc_info:
-                        run_update(check=False, force=False)
-                    assert exc_info.value.exit_code == 1
-                    mock_install.assert_not_called()
+            with pytest.raises(typer.Exit) as exc_info:
+                run_update(check=False, force=False)
+            assert exc_info.value.exit_code == 1

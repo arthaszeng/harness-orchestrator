@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 
 import typer
+from rich.panel import Panel
 
 from harness import __version__
+from harness.core.ui import get_ui
 from harness.i18n import t
 
 
@@ -30,18 +32,19 @@ def _get_latest_version() -> str | None:
 
 def _pip_upgrade() -> bool:
     """Run pip install --upgrade harness-flow."""
-    typer.echo(t("update.upgrading"))
+    console = get_ui().console
+    console.print(f"  [cyber.magenta]▸[/] {t('update.upgrading')}")
     result = subprocess.run(
         [sys.executable, "-m", "pip", "install", "--upgrade", "harness-flow"],
         capture_output=True, text=True, timeout=120,
     )
     if result.returncode == 0:
-        typer.echo(t("update.upgrade_ok"))
+        console.print(f"  [cyber.green]✓[/] {t('update.upgrade_ok')}")
         return True
-    typer.echo(t("update.upgrade_fail"))
+    console.print(f"  [cyber.fail]✗[/] {t('update.upgrade_fail')}")
     if result.stderr:
         for line in result.stderr.strip().splitlines()[-3:]:
-            typer.echo(f"    {line}")
+            console.print(f"    [cyber.dim]{line}[/]")
     return False
 
 
@@ -51,6 +54,8 @@ def _migrate_config(project_root: Path) -> int:
     if not config_path.exists():
         return 0
 
+    console = get_ui().console
+
     try:
         if sys.version_info >= (3, 11):
             import tomllib
@@ -58,7 +63,7 @@ def _migrate_config(project_root: Path) -> int:
             import tomli as tomllib
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
     except Exception:
-        typer.echo(t("update.config_parse_error", path=str(config_path)))
+        console.print(f"  [cyber.warn]![/] {t('update.config_parse_error', path=str(config_path))}")
         return 1
 
     warnings = 0
@@ -70,12 +75,12 @@ def _migrate_config(project_root: Path) -> int:
     }
     for section, desc in recommended_sections.items():
         if section not in data:
-            typer.echo(t("update.config_missing_section", section=section, desc=desc))
+            console.print(
+                f"  [cyber.dim]ℹ[/] {t('update.config_missing_section', section=section, desc=desc)}"
+            )
             warnings += 1
 
-    deprecated: list[tuple[str, str, str]] = [
-        # ("old_section.old_key", "replacement", "version"),
-    ]
+    deprecated: list[tuple[str, str, str]] = []
     for old_key, replacement, since_version in deprecated:
         parts = old_key.split(".")
         section_data = data
@@ -87,42 +92,55 @@ def _migrate_config(project_root: Path) -> int:
                 found = False
                 break
         if found:
-            typer.echo(t("update.config_deprecated", config_key=old_key, replacement=replacement, version=since_version))
+            console.print(
+                f"  [cyber.warn]![/] Deprecated key [cyber.cyan]{old_key}[/] "
+                f"→ use [cyber.cyan]{replacement}[/] [cyber.dim](since {since_version})[/]"
+            )
             warnings += 1
 
     if warnings == 0:
-        typer.echo(t("update.config_ok"))
+        console.print(f"  [cyber.green]✓[/] {t('update.config_ok')}")
 
     return warnings
 
 
 def run_update(*, check: bool = False, force: bool = False) -> None:
     """Execute the harness update workflow."""
-    typer.echo(t("update.title"))
-    typer.echo(t("update.current_version", version=__version__))
+    project_root = Path.cwd()
+    ui = get_ui()
+    console = ui.console
+
+    console.print()
+    console.print(Panel(
+        f"  [cyber.label]VERSION[/]  [cyber.cyan]{__version__}[/]",
+        title="[cyber.header]HARNESS UPDATE[/]",
+        border_style="cyber.border",
+        padding=(0, 1),
+    ))
 
     # Step 1: Check for new version
-    typer.echo(t("update.checking"))
+    console.print()
+    console.print(f"  [cyber.magenta]▸[/] {t('update.checking')}")
     latest = _get_latest_version()
 
     upgraded = False
     pypi_unreachable = False
 
     if latest is None:
-        typer.echo(t("update.check_failed"))
+        console.print(f"  [cyber.warn]![/] {t('update.check_failed')}")
         pypi_unreachable = True
         if check:
             raise typer.Exit(1)
     elif latest == __version__:
-        typer.echo(t("update.up_to_date"))
+        console.print(f"  [cyber.green]✓[/] {t('update.up_to_date')}")
         if check:
             raise typer.Exit(0)
     else:
-        typer.echo(t("update.new_version", version=latest))
+        console.print(f"  [cyber.cyan]▸[/] {t('update.new_version', version=latest)}")
         if check:
             raise typer.Exit(0)
         if not _pip_upgrade():
-            typer.echo(t("update.skip_reinstall"))
+            console.print(f"  [cyber.dim]{t('update.skip_reinstall')}[/]")
             raise typer.Exit(1)
         upgraded = True
 
@@ -131,17 +149,35 @@ def run_update(*, check: bool = False, force: bool = False) -> None:
 
     # Step 2: Reinstall agent definitions (only after upgrade or with --force)
     if upgraded or force:
-        typer.echo(t("update.reinstall"))
-        from harness.commands.install import run_install
-        run_install(force=True, lang=None)
+        console.print()
+        console.print(f"  [cyber.magenta]▸[/] {t('update.reinstall')}")
+        from harness.native.skill_gen import generate_native_artifacts, resolve_native_lang
+        resolved_lang = resolve_native_lang(project_root)
+        try:
+            from harness.core.config import HarnessConfig
+            cfg = HarnessConfig.load(project_root)
+        except Exception:
+            cfg = None
+        generate_native_artifacts(project_root, lang=resolved_lang, cfg=cfg, force=True)
     elif pypi_unreachable:
-        typer.echo(t("update.skip_reinstall_unreachable"))
+        console.print(
+            f"  [cyber.warn]![/] {t('update.skip_reinstall_unreachable')}"
+        )
     else:
-        typer.echo(t("update.skip_reinstall_up_to_date"))
+        console.print(
+            f"  [cyber.green]✓[/] {t('update.skip_reinstall_up_to_date')}"
+        )
 
     # Step 3: Config migration (always runs as lightweight health check)
-    typer.echo(t("update.migrate_title"))
-    project_root = Path.cwd()
+    console.print()
+    console.print(f"  [cyber.magenta]▸[/] {t('update.migrate_title')}")
     warning_count = _migrate_config(project_root)
 
-    typer.echo(t("update.done", warnings=warning_count))
+    console.print()
+    status = "[cyber.green]✓[/] clean" if warning_count == 0 else f"[cyber.warn]{warning_count}[/] warning(s)"
+    console.print(Panel(
+        f"  Status: {status}",
+        title="[cyber.header]UPDATE COMPLETE[/]",
+        border_style="cyber.border",
+        padding=(0, 1),
+    ))
