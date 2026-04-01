@@ -29,6 +29,12 @@ that needs planning and execution.
 
 ---
 
+{% with preflight_mode="entry" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
+---
+
 ## Phase 0: Requirement Understanding
 
 Read the user's requirement. If ambiguous, ask for clarification **once** —

@@ -1,0 +1,87 @@
+{# Workspace Pre-flight — shared section included by entry-point and ship skills.
+   Requires: {% with preflight_mode="entry"|"ship" %}
+   Uses context vars: trunk_branch, branch_prefix
+#}
+## Workspace Pre-flight
+
+{% if preflight_mode == "entry" %}
+Before any planning or exploration, ensure the workspace is ready for a new task.
+
+### 1. Clean Check
+
+```bash
+git status --porcelain
+```
+
+If the output is **non-empty**, **ABORT** immediately:
+- List the dirty files
+- Guide the user: "工作区有未提交的变更，请先处理再运行 harness workflow："
+  - `git stash -u` to stash everything (including untracked)
+  - `git commit` to commit current work
+  - `git checkout -- .` to discard changes
+- Do NOT proceed. Do NOT auto-stash.
+
+### 2. Worktree Detection
+
+```bash
+COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
+GITDIR=$(git rev-parse --git-dir 2>/dev/null)
+```
+
+If `$COMMON` ≠ `$GITDIR`, you are in a **Cursor parallel-agent worktree**.
+The worktree was created with `.cursor/` and `.agents/` already copied
+(via `worktrees.json`). **Skip steps 3–5** — the worktree is already on the
+correct feature branch. Proceed to the next phase.
+
+### 3. Branch Check
+
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+```
+
+- If `$CURRENT_BRANCH` starts with `{{ branch_prefix }}`: you are **resuming an existing task**.
+  Inform the user: "当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
+  **Skip steps 4–5.** Proceed to the next phase.
+- If `$CURRENT_BRANCH` is `HEAD` (detached): **ABORT** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
+- Otherwise: continue to step 4.
+
+### 4. Trunk Alignment
+
+```bash
+git checkout {{ trunk_branch }}
+git pull origin {{ trunk_branch }}
+```
+
+If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't exist):
+**ABORT** — show the error output and guide: "无法更新 `{{ trunk_branch }}`，请手动解决后重新运行。"
+
+### 5. Create Feature Branch
+
+1. Determine the next task number:
+   ```bash
+   mkdir -p .agents/tasks
+   ls .agents/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
+   ```
+   If no tasks exist, start with `001`. Otherwise increment the max by 1, zero-padded to 3 digits.
+
+2. Extract a short description from the user's requirement (max 4 hyphenated lowercase keywords).
+
+3. Create the branch:
+   ```bash
+   git checkout -b {{ branch_prefix }}task-NNN-<short-desc>
+   ```
+   If the branch already exists: **ABORT** — "分支 `{{ branch_prefix }}task-NNN-<short-desc>` 已存在，请确认是否要 resume 该任务或选择其他名称。"
+
+{% elif preflight_mode == "ship" %}
+Before shipping, ensure the base branch is up to date.
+
+### 0. Fetch Trunk
+
+```bash
+git fetch origin {{ trunk_branch }}
+```
+
+This ensures rebase (Step 2) operates against the latest remote state.
+If fetch fails (network error): warn but continue — rebase will use the last-fetched state.
+
+{% endif %}

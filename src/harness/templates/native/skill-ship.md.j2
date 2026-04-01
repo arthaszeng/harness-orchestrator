@@ -27,6 +27,10 @@ Run straight through and output the PR URL at the end.
 
 ---
 
+{% with preflight_mode="ship" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
 ## Step 1: Pre-flight
 
 1. Check the current branch. If on `{{ trunk_branch }}`, **abort**: "You're on the trunk branch. Ship from a feature branch."
