@@ -1,1 +1,1 @@
-"""Shared utilities for harness-orchestrator."""
+"""Shared utilities for harness-flow."""

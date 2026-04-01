@@ -1,6 +1,6 @@
 # Historical Documentation
 
-> This file archives documentation from harness-orchestrator versions prior to v4.0.0.
+> This file archives documentation from versions prior to v4.0.0 (when the project was published as `harness-orchestrator`; now `harness-flow`).
 > These features have been **removed** — the project now operates exclusively in cursor-native mode.
 
 ---

@@ -1,8 +1,10 @@
 [中文](README.zh-CN.md)
 
-# harness-orchestrator
+# harness-flow
 
 > **Cursor-native AI engineering framework** — plan, build, review, and ship inside Cursor with structured quality gates.
+>
+> Install: `pip install harness-flow` · Import: `import harness` · CLI: `harness`
 
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -16,7 +18,7 @@ AI coding tools excel at single-shot tasks. Continuous development needs more: g
 ### 1. Install
 
 ```bash
-pip install harness-orchestrator
+pip install harness-flow
 harness --version
 ```
 
@@ -24,8 +26,8 @@ harness --version
 <summary>Install from source (contributors)</summary>
 
 ```bash
-git clone https://github.com/arthaszeng/harness-orchestrator.git
-cd harness-orchestrator
+git clone https://github.com/arthaszeng/harness-flow.git
+cd harness-flow
 pip install -e ".[dev]"
 ```
 
@@ -199,7 +201,7 @@ All task state lives under `.agents/`:
 ## Repository layout
 
 ```
-harness-orchestrator/
+harness-flow/
 ├── src/harness/
 │   ├── cli.py              # CLI entry (Typer)
 │   ├── commands/            # init, install, update, status

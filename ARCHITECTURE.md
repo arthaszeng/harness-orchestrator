@@ -1,6 +1,6 @@
 # Architecture (v4.0.0 — native-only)
 
-This document explains **why** harness-orchestrator is structured the way it is after the native-only refactor. Execution lives in **Cursor**: the Python package bootstraps configuration, generates IDE artifacts, and maintains local state—not an external orchestration loop.
+This document explains **why** harness-flow is structured the way it is after the native-only refactor. Execution lives in **Cursor**: the Python package bootstraps configuration, generates IDE artifacts, and maintains local state—not an external orchestration loop.
 
 For module-level behavior, read the code and docstrings. For day-to-day usage, see `README.md`.
 
@@ -70,7 +70,7 @@ Loads **`SessionState`** from `.agents/state.json` and renders progress via **Ri
 
 ### `update.py`
 
-Queries PyPI for newer versions, runs **`pip install --upgrade harness-orchestrator`** when requested, reinstalls native artifacts, and runs lightweight **config migration** checks with user-visible warnings.
+Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, reinstalls native artifacts, and runs lightweight **config migration** checks with user-visible warnings.
 
 ---
 

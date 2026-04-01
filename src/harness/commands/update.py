@@ -13,15 +13,15 @@ from harness.i18n import t
 
 
 def _get_latest_version() -> str | None:
-    """Query PyPI for the latest harness-orchestrator version."""
+    """Query PyPI for the latest harness-flow version."""
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "index", "versions", "harness-orchestrator"],
+            [sys.executable, "-m", "pip", "index", "versions", "harness-flow"],
             capture_output=True, text=True, timeout=15,
         )
         if result.returncode == 0:
             for line in result.stdout.splitlines():
-                if "harness-orchestrator" in line and "(" in line:
+                if "harness-flow" in line and "(" in line:
                     return line.split("(")[1].split(")")[0].strip()
     except Exception:
         pass
@@ -29,10 +29,10 @@ def _get_latest_version() -> str | None:
 
 
 def _pip_upgrade() -> bool:
-    """Run pip install --upgrade harness-orchestrator."""
+    """Run pip install --upgrade harness-flow."""
     typer.echo(t("update.upgrading"))
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "harness-orchestrator"],
+        [sys.executable, "-m", "pip", "install", "--upgrade", "harness-flow"],
         capture_output=True, text=True, timeout=120,
     )
     if result.returncode == 0:

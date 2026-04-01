@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "harness-orchestrator"
+name = "harness-flow"
 version = "4.0.3"
 description = "Cursor-native multi-agent development framework with 5-role review"
 readme = "README.md"
@@ -45,10 +45,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/arthaszeng/harness-orchestrator"
-Repository = "https://github.com/arthaszeng/harness-orchestrator"
-Issues = "https://github.com/arthaszeng/harness-orchestrator/issues"
-Changelog = "https://github.com/arthaszeng/harness-orchestrator/releases"
+Homepage = "https://github.com/arthaszeng/harness-flow"
+Repository = "https://github.com/arthaszeng/harness-flow"
+Issues = "https://github.com/arthaszeng/harness-flow/issues"
+Changelog = "https://github.com/arthaszeng/harness-flow/releases"
 
 [project.scripts]
 harness = "harness.cli:app"
