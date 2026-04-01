@@ -2,25 +2,84 @@ name: Release to PyPI
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    paths: [pyproject.toml]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
   id-token: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(python3 -c "
+          import re
+          with open('pyproject.toml') as f:
+              m = re.search(r'version\s*=\s*\"([^\"]+)\"', f.read())
+              print(m.group(1))
+          ")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" --json tagName &>/dev/null; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists — skipping"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "No release for $TAG — will create"
+          fi
+
   ci:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     uses: ./.github/workflows/ci.yml
 
-  publish:
-    needs: ci
+  release:
+    needs: [check-version, ci]
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/harness-orchestrator
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Create tag if missing
+        run: |
+          TAG="${{ needs.check-version.outputs.tag }}"
+          if git tag -l "$TAG" | grep -q .; then
+            echo "Tag $TAG already exists"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Created and pushed tag $TAG"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -33,18 +92,18 @@ jobs:
       - name: Build package
         run: python -m build
 
-      - name: Verify version matches tag
+      - name: Verify package version
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          EXPECTED="${{ needs.check-version.outputs.version }}"
           PKG_VERSION=$(python -c "
           import re
           with open('pyproject.toml') as f:
               m = re.search(r'version\s*=\s*\"([^\"]+)\"', f.read())
               print(m.group(1))
           ")
-          echo "Tag: $TAG_VERSION, Package: $PKG_VERSION"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) does not match package version ($PKG_VERSION)"
+          echo "Expected: $EXPECTED, Package: $PKG_VERSION"
+          if [ "$EXPECTED" != "$PKG_VERSION" ]; then
+            echo "::error::Expected version ($EXPECTED) does not match package version ($PKG_VERSION)"
             exit 1
           fi
 
@@ -54,5 +113,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.check-version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: dist/*

@@ -64,13 +64,14 @@ info "Linting..."
 ruff check src/ tests/ || die "Lint failed — aborting release"
 ok "Lint passed"
 
-# ── Commit, tag, push ────────────────────────────────────────────────────────
-info "Committing and tagging v$NEW..."
+# ── Commit and push ──────────────────────────────────────────────────────────
+# Tag creation and PyPI publish are handled by GitHub Actions (release.yml)
+# when this push lands on main with the pyproject.toml version change.
+info "Committing v$NEW..."
 git add pyproject.toml
 git commit -m "chore: release v$NEW"
-git tag "v$NEW"
-git push origin main --tags
+git push origin main
 
-ok "Released v$NEW"
-ok "PyPI publish will be triggered by GitHub Actions"
+ok "Pushed v$NEW to main"
+ok "GitHub Actions will create tag, publish to PyPI, and create GitHub Release"
 ok "Track at: https://github.com/arthaszeng/harness-orchestrator/actions"
