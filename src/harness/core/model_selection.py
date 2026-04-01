@@ -49,7 +49,11 @@ def detect_cursor_recent_models(limit: int = 6) -> list[str]:
                     continue
             if isinstance(raw_value, str):
                 rows.append((key, raw_value))
-    except Exception:
+    except Exception:  # noqa: BLE001 — intentional broad catch for best-effort detection
+        import logging
+        logging.getLogger("harness.model_selection").debug(
+            "Failed to read Cursor models from state.vscdb", exc_info=True,
+        )
         return []
     finally:
         if conn is not None:

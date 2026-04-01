@@ -1,10 +1,6 @@
 ---
 name: harness-qa
-description: >-
-  QA reviewer for plan and code evaluation phases. Evaluates test
-  strategy, coverage, regression risk, edge cases, and CI health.
-  Only role that runs CI commands. Dispatched in parallel with other
-  role-based reviewers.
+description: "QA reviewer for plan and code evaluation phases. Evaluates test strategy, coverage, regression risk, edge cases, and CI health. Only role that runs CI commands. Dispatched in parallel with other role-based reviewers."
 {% if role_models_qa %}model: {{ role_models_qa }}
 {% endif %}
 ---
