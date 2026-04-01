@@ -36,10 +36,14 @@ def init(
     non_interactive: bool = typer.Option(
         False, "--non-interactive", "-y", help="Skip interactive wizard, use defaults",
     ),
+    force: bool = typer.Option(
+        False, "--force", "-f",
+        help="Skip wizard and regenerate artifacts from existing config",
+    ),
 ) -> None:
-    """Initialize or reinitialize harness in the current project."""
+    """Initialize harness in the current project (interactive wizard)."""
     from harness.commands.init import run_init
-    run_init(name=name, ci_command=ci_command, non_interactive=non_interactive)
+    run_init(name=name, ci_command=ci_command, non_interactive=non_interactive, force=force)
 
 
 @app.command()

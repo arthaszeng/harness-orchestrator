@@ -2,6 +2,8 @@
 
 MESSAGES: dict[str, str] = {
     # ── init command ──────────────────────────────────────────────
+    "init.config_exists": ".agents/config.toml 已存在，是否覆盖？",
+    "init.cancelled": "已取消。使用 --force 可跳过向导直接重新生成 artifacts。",
     "init.enter_range": "  请输入 1-{n} 之间的数字",
     "init.step1_label": "项目信息",
     "init.project_name": "  项目名称",

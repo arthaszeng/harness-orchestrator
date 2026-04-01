@@ -16,6 +16,7 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.live import Live
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.style import Style
 from rich.text import Text
 from rich.theme import Theme
 
@@ -41,13 +42,23 @@ CYBER_THEME = Theme({
 
 # ── ASCII Banner ──────────────────────────────────────────────────
 
-_BANNER = r"""
- [cyber.cyan]██╗  ██╗ █████╗ ██████╗ ███╗   ██╗███████╗███████╗███████╗[/]
- [cyber.cyan]██║  ██║██╔══██╗██╔══██╗████╗  ██║██╔════╝██╔════╝██╔════╝[/]
- [cyber.magenta]███████║███████║██████╔╝██╔██╗ ██║█████╗  ███████╗███████╗[/]
- [cyber.magenta]██╔══██║██╔══██║██╔══██╗██║╚██╗██║██╔══╝  ╚════██║╚════██║[/]
- [cyber.cyan]██║  ██║██║  ██║██║  ██║██║ ╚████║███████╗███████║███████║[/]
- [cyber.dim]╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚══════╝[/]"""
+_BANNER_LINES = [
+    r" ██╗  ██╗ █████╗ ██████╗ ███╗   ██╗███████╗███████╗███████╗",
+    r" ██║  ██║██╔══██╗██╔══██╗████╗  ██║██╔════╝██╔════╝██╔════╝",
+    r" ███████║███████║██████╔╝██╔██╗ ██║█████╗  ███████╗███████╗",
+    r" ██╔══██║██╔══██║██╔══██╗██║╚██╗██║██╔══╝  ╚════██║╚════██║",
+    r" ██║  ██║██║  ██║██║  ██║██║ ╚████║███████╗███████║███████║",
+    r" ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚══════╝",
+]
+
+_GRADIENT_STOPS = [
+    (192, 0, 255),   # #c000ff — purple
+    (160, 0, 255),   # #a000ff
+    (96, 0, 255),    # #6000ff — blue-purple
+    (0, 128, 255),   # #0080ff — blue
+    (0, 200, 255),   # #00c8ff — cyan-blue
+    (0, 255, 255),   # #00ffff — cyan
+]
 
 _TAIL_LINES = 5
 
@@ -90,10 +101,15 @@ class HarnessUI:
 
     # ── Banner & Session ──
 
-    def banner(self, mode: str, version: str) -> None:
-        self.console.print(_BANNER)
+    def banner(self, command: str, version: str) -> None:
+        """Print gradient purple→cyan ASCII logo with command/version subtitle."""
+        self.console.print()
+        for line, (r, g, b) in zip(_BANNER_LINES, _GRADIENT_STOPS, strict=True):
+            txt = Text(line)
+            txt.stylize(Style(color=f"rgb({r},{g},{b})", bold=True))
+            self.console.print(txt)
         self.console.print(
-            f"                    [cyber.dim]v{version} // {mode} mode[/]",
+            f"                    [cyber.dim]v{version} · {command}[/]",
         )
         self.console.print()
 

@@ -223,25 +223,34 @@ def run_init(
     name: str = "",
     ci_command: str = "",
     non_interactive: bool = False,
+    force: bool = False,
 ) -> None:
-    """Run the initialization wizard, or reinit if config already exists."""
+    """Run the initialization wizard, or reinit with --force."""
+    from harness import __version__
+
     project_root = Path.cwd()
     agents_dir = project_root / ".agents"
+    config_exists = (agents_dir / "config.toml").exists()
 
-    if (agents_dir / "config.toml").exists():
+    ui = get_ui()
+    console = ui.console
+    ui.banner("init", __version__)
+
+    if force and config_exists:
         _run_reinit(project_root)
         return
+
+    if config_exists and not non_interactive:
+        overwrite = typer.confirm(t("init.config_exists"), default=False)
+        if not overwrite:
+            console.print(f"  [cyber.dim]{t('init.cancelled')}[/]")
+            raise typer.Exit(0)
 
     if non_interactive:
         lang_norm = "en"
         set_lang(lang_norm)
     else:
         lang_norm = _step_language()
-
-    ui = get_ui()
-    console = ui.console
-
-    ui.banner("init", __import__("harness").__version__)
 
     if non_interactive:
         proj_name = name or project_root.name

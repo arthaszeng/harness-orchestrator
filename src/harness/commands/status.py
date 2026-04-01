@@ -34,8 +34,12 @@ def _load_pass_threshold() -> float:
 
 def run_status() -> None:
     """Load state.json and render a Rich panel."""
+    from harness import __version__
+
     ui = get_ui()
     console = ui.console
+
+    ui.banner("status", __version__)
 
     agents_dir = Path.cwd() / ".agents"
     state = SessionState.load(agents_dir)

@@ -110,13 +110,7 @@ def run_update(*, check: bool = False, force: bool = False) -> None:
     ui = get_ui()
     console = ui.console
 
-    console.print()
-    console.print(Panel(
-        f"  [cyber.label]VERSION[/]  [cyber.cyan]{__version__}[/]",
-        title="[cyber.header]HARNESS UPDATE[/]",
-        border_style="cyber.border",
-        padding=(0, 1),
-    ))
+    ui.banner("update", __version__)
 
     # Step 1: Check for new version
     console.print()

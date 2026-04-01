@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from typer.testing import CliRunner
 
 from harness.cli import app
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 runner = CliRunner()
 
@@ -40,3 +44,9 @@ class TestHelpOutput:
             stripped = line.strip()
             if stripped.startswith("install") and "completion" not in stripped:
                 pytest.fail(f"'install' command found in help: {line}")
+
+    def test_init_help_has_force_option(self):
+        result = runner.invoke(app, ["init", "--help"])
+        assert result.exit_code == 0
+        clean = _ANSI_RE.sub("", result.output)
+        assert "--force" in clean
