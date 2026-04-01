@@ -189,10 +189,12 @@ Project settings live in `.agents/config.toml`:
 | `workflow.mode` | "orchestrator" | `orchestrator` or `cursor-native` |
 | `workflow.profile` | "standard" | `lite` / `standard` / `autonomous` |
 | `workflow.max_iterations` | 3 | Max iterations per task |
-| `workflow.pass_threshold` | 3.5 | Evaluator pass threshold (out of 5) |
+| `workflow.pass_threshold` | 7.0 | Evaluator pass threshold (out of 10) |
 | `workflow.auto_merge` | true | Auto-merge branch after pass |
 | `workflow.dual_evaluation` | false | Add alignment review after quality review |
 | `workflow.branch_prefix` | "agent" | Task branch prefix |
+| `native.gate_full_review_min` | 5 | Escalation score for full human review |
+| `native.gate_summary_confirm_min` | 3 | Escalation score for summary confirmation |
 | `native.adversarial_model` | "gpt-4.1" | Cross-model reviewer model |
 | `native.adversarial_mechanism` | "auto" | Adversarial dispatch mode. Allowed: `subagent`, `cli`, `auto` |
 | `native.review_gate` | "eng" | Review gate strictness. Allowed: `eng` (hard gate), `advisory` (log only) |
@@ -346,7 +348,7 @@ Requirement
   → Planner: spec + iterative contract
   → Builder: implement and commit
   → Evaluator: four-dimensional score
-      → Pass (≥ 3.5) → done
+      → Pass (≥ 7.0) → done
       → Fail → feedback to Builder, iterate
   → Max iterations (3) → blocked
 ```

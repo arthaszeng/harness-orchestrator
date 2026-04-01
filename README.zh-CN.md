@@ -189,10 +189,12 @@ harness install --force
 | `workflow.mode` | "orchestrator" | `orchestrator` 或 `cursor-native` |
 | `workflow.profile` | "standard" | `lite` / `standard` / `autonomous` |
 | `workflow.max_iterations` | 3 | 每任务最大迭代次数 |
-| `workflow.pass_threshold` | 3.5 | 评审通过阈值（满分 5） |
+| `workflow.pass_threshold` | 7.0 | 评审通过阈值（满分 10） |
 | `workflow.auto_merge` | true | 通过后自动合并分支 |
 | `workflow.dual_evaluation` | false | 质量评审后再跑对齐评审 |
 | `workflow.branch_prefix` | "agent" | 任务分支前缀 |
+| `native.gate_full_review_min` | 5 | 完整人工审查的升级分数阈值 |
+| `native.gate_summary_confirm_min` | 3 | 摘要确认的升级分数阈值 |
 | `native.adversarial_model` | "gpt-4.1" | 跨模型审查器模型 |
 | `native.adversarial_mechanism` | "auto" | 对抗评审调度模式。允许值：`subagent`、`cli`、`auto` |
 | `native.review_gate` | "eng" | 评审门禁严格度。允许值：`eng`（硬门禁）、`advisory`（仅记录） |
@@ -346,7 +348,7 @@ harness stop
   → Planner：spec + 迭代契约
   → Builder：实现并提交
   → Evaluator：四维评分
-      → 通过（≥ 3.5）→ 完成
+      → 通过（≥ 7.0）→ 完成
       → 不通过 → 反馈给 Builder，迭代
   → 最大迭代（3）→ 阻塞
 ```
