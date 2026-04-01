@@ -9,7 +9,7 @@ For module-level behavior, read the code and docstrings. For day-to-day usage, s
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  harness CLI (Typer)                                             │
-│  init · install · status · update                                │
+│  init · status · update                                          │
 └────────────────────────────┬────────────────────────────────────┘
                              │
          ┌───────────────────┼───────────────────┐
@@ -34,12 +34,11 @@ For module-level behavior, read the code and docstrings. For day-to-day usage, s
 
 ## CLI layer (`src/harness/cli.py`)
 
-Built with **Typer**. Four commands:
+Built with **Typer**. Three commands:
 
 | Command   | Purpose |
 |-----------|---------|
-| `init`    | Interactive project bootstrap (see below). |
-| `install` | Regenerate `.cursor/` native artifacts from current config. |
+| `init`    | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
 | `status`  | Load session state and render a Rich dashboard. |
 | `update`  | Check PyPI, optional pip upgrade, reinstall artifacts, config migration hints. |
 
@@ -49,20 +48,12 @@ Built with **Typer**. Four commands:
 
 ### `init.py`
 
-Wizard (interactive by default; `--non-interactive` / `-y` for defaults):
+Two modes:
 
-1. **Language** — `en` or `zh`; drives i18n for the session.
-2. **Project info** — name and description.
-3. **Trunk branch** — detected from git when possible, user-confirmed.
-4. **CI** — project scan (`scanner`) suggests commands; user picks or enters a custom gate command.
-5. **Memverse** — enable/disable and domain prefix for the Memverse MCP integration.
-6. **Vision** — optional immediate vision flow vs. deferred (placeholder file still created when skipped).
+- **Wizard mode** (no `.agents/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → vision), writes config, generates artifacts.
+- **Reinit mode** (`.agents/config.toml` exists): loads existing config, regenerates all `.cursor/` artifacts with `force=True`.
 
 **Writes:** `.agents/config.toml` (from `templates/config.toml.j2`), `.agents/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files (e.g. `.agents/state.json`, `.agents/.stop`).
-
-### `install.py`
-
-Resolves language (CLI flag or project config), loads `HarnessConfig`, calls **`generate_native_artifacts()`** with optional `--force` to overwrite generated files.
 
 ### `status.py`
 

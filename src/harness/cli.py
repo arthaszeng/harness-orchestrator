@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
 from harness import __version__
@@ -32,24 +30,6 @@ def main(
 
 
 @app.command()
-def install(
-    force: bool = typer.Option(
-        False, "--force", "-f",
-        help="Overwrite existing files and regenerate native artifacts",
-    ),
-    lang: Optional[str] = typer.Option(
-        None,
-        "--lang",
-        "-l",
-        help="Language for generated artifacts (en/zh); default from project config",
-    ),
-) -> None:
-    """Generate native mode artifacts (.cursor/ skills, agents, rules)."""
-    from harness.commands.install import run_install
-    run_install(force=force, lang=lang)
-
-
-@app.command()
 def init(
     name: str = typer.Option("", "--name", "-n", help="Project name"),
     ci_command: str = typer.Option("", "--ci", help="CI command (e.g. make test)"),
@@ -57,7 +37,7 @@ def init(
         False, "--non-interactive", "-y", help="Skip interactive wizard, use defaults",
     ),
 ) -> None:
-    """Initialize harness configuration in the current project (interactive wizard)"""
+    """Initialize or reinitialize harness in the current project."""
     from harness.commands.init import run_init
     run_init(name=name, ci_command=ci_command, non_interactive=non_interactive)
 

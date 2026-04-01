@@ -1,4 +1,4 @@
-"""harness init — smart project initialization wizard"""
+"""harness init — project initialization wizard + reinit mode"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import jinja2
 import typer
 
 from harness.core.scanner import format_scan_report, scan_project
+from harness.core.ui import get_ui
 from harness.i18n import set_lang, t
 
 
@@ -31,13 +32,25 @@ def _prompt_choice(prompt_text: str, n_options: int, default: int = 1) -> int:
         typer.echo(t("init.enter_range", n=n_options))
 
 
+def _cyber_step(console, step: int, total: int, title: str) -> None:
+    """Print a cyberpunk-styled step header."""
+    from rich.rule import Rule
+    console.print()
+    console.print(Rule(
+        f"[cyber.magenta]◆ Step {step}/{total}[/]  [cyber.cyan]{title}[/]",
+        style="cyber.dim",
+    ))
+
+
 # ── Step 0: language selection ────────────────────────────────────
 
 def _step_language() -> str:
     """Prompt user to choose language; returns 'en' or 'zh'."""
-    typer.echo("\n  Language / 语言:")
-    typer.echo("  1. English (default)")
-    typer.echo("  2. 中文")
+    console = get_ui().console
+    console.print()
+    console.print("  [cyber.cyan]Language / 语言:[/]")
+    console.print("  [cyber.dim]1.[/] English [cyber.dim](default)[/]")
+    console.print("  [cyber.dim]2.[/] 中文")
     choice = _prompt_choice("  Choose / 选择", 2, default=1)
     lang = "zh" if choice == 2 else "en"
     set_lang(lang)
@@ -49,7 +62,8 @@ def _step_language() -> str:
 def _step_project_info(
     project_root: Path, *, name_override: str = "",
 ) -> tuple[str, str]:
-    typer.echo(t("init.step1_title"))
+    console = get_ui().console
+    _cyber_step(console, 1, 5, t("init.step1_label"))
     name = name_override or typer.prompt(
         t("init.project_name"), default=project_root.name,
     )
@@ -63,7 +77,8 @@ def _step_trunk_branch(project_root: Path) -> str:
     """Detect the current git branch and let the user confirm or change it."""
     import subprocess
 
-    typer.echo(t("init.step_trunk_title"))
+    console = get_ui().console
+    _cyber_step(console, 2, 5, t("init.step_trunk_label"))
 
     detected = "main"
     try:
@@ -90,40 +105,40 @@ def _step_ci_command(
     if ci_override:
         return ci_override
 
-    typer.echo(t("init.step4_title"))
-    typer.echo(t("init.scanning"))
+    console = get_ui().console
+    _cyber_step(console, 3, 5, t("init.step4_label"))
+    console.print(f"  [cyber.dim]{t('init.scanning')}[/]")
 
     scan = scan_project(project_root)
     report = format_scan_report(scan)
 
     if report:
         for line in report:
-            typer.echo(t("init.found", line=line))
+            console.print(f"    [cyber.green]▸[/] {line}")
     else:
-        typer.echo(t("init.no_ci_found"))
+        console.print(f"  [cyber.dim]{t('init.no_ci_found')}[/]")
 
     suggestions = scan.suggested_commands
     if suggestions:
-        typer.echo(t("init.recommended_ci"))
+        console.print(f"\n  [cyber.cyan]{t('init.recommended_ci')}[/]")
         for i, (cmd, desc) in enumerate(suggestions, 1):
-            label = t("init.recommended_label") if i == 1 else ""
-            typer.echo(f"  {i}. {cmd} -- {desc}{label}")
+            label = f" [cyber.green]{t('init.recommended_label')}[/]" if i == 1 else ""
+            console.print(f"  [cyber.dim]{i}.[/] {cmd} [cyber.dim]-- {desc}[/]{label}")
 
         custom_idx = len(suggestions) + 1
-        typer.echo(t("init.custom_input", idx=custom_idx))
+        console.print(f"  [cyber.dim]{custom_idx}.[/] {t('init.custom_input_label')}")
 
         choice = _prompt_choice(t("init.choose"), custom_idx, default=1)
 
         if choice <= len(suggestions):
             selected = suggestions[choice - 1][0]
-            typer.echo(f"  -> {selected}")
+            console.print(f"  [cyber.green]→[/] {selected}")
             return selected
         return typer.prompt(t("init.enter_ci"))
 
-    typer.echo(t("init.no_suggestions"))
-    typer.echo(t("init.custom_input", idx=1))
-    skip_label = t("init.opt_skip").replace("3.", "2.", 1)
-    typer.echo(skip_label)
+    console.print(f"\n  [cyber.dim]{t('init.no_suggestions')}[/]")
+    console.print(f"  [cyber.dim]1.[/] {t('init.custom_input_label')}")
+    console.print(f"  [cyber.dim]2.[/] {t('init.skip_label')}")
 
     choice = _prompt_choice(t("init.choose"), 2, default=2)
 
@@ -136,10 +151,11 @@ def _step_ci_command(
 
 def _step_memverse(project_root: Path) -> tuple[bool, str]:
     """Return (enabled, domain_prefix)."""
-    typer.echo(t("init.step5_title"))
-    typer.echo(t("init.memverse_desc"))
-    typer.echo(t("init.opt_enable"))
-    typer.echo(t("init.opt_disable"))
+    console = get_ui().console
+    _cyber_step(console, 4, 5, t("init.step5_label"))
+    console.print(f"  [cyber.dim]{t('init.memverse_desc')}[/]")
+    console.print(f"  [cyber.dim]1.[/] {t('init.enable_label')}")
+    console.print(f"  [cyber.dim]2.[/] {t('init.disable_label')} [cyber.dim](default)[/]")
     choice = _prompt_choice(t("init.choose"), 2, default=2)
 
     if choice == 2:
@@ -154,11 +170,50 @@ def _step_memverse(project_root: Path) -> tuple[bool, str]:
 
 def _step_vision(agents_dir: Path) -> bool:
     """Return True if the user chose to generate vision now."""
-    typer.echo(t("init.step6_title"))
-    typer.echo(t("init.opt_vision_now"))
-    typer.echo(t("init.opt_vision_later"))
+    console = get_ui().console
+    _cyber_step(console, 5, 5, t("init.step6_label"))
+    console.print(f"  [cyber.dim]1.[/] {t('init.vision_now_label')} [cyber.green](recommended)[/]")
+    console.print(f"  [cyber.dim]2.[/] {t('init.vision_later_label')}")
     choice = _prompt_choice(t("init.choose"), 2, default=1)
     return choice == 1
+
+
+# ── Reinit mode ───────────────────────────────────────────────────
+
+def _run_reinit(project_root: Path) -> None:
+    """Config exists — skip wizard, regenerate artifacts from existing config."""
+    from rich.panel import Panel
+
+    from harness.core.config import HarnessConfig
+    from harness.native.skill_gen import generate_native_artifacts, resolve_native_lang
+
+    ui = get_ui()
+    console = ui.console
+
+    try:
+        cfg = HarnessConfig.load(project_root)
+    except Exception as exc:
+        console.print(f"  [cyber.fail]✗[/] {t('init.reinit_config_error', error=str(exc))}")
+        raise typer.Exit(1) from exc
+
+    lang = resolve_native_lang(project_root)
+    set_lang(lang)
+
+    console.print()
+    console.print(Panel(
+        f"[cyber.cyan]{t('init.reinit_title')}[/]",
+        border_style="cyber.border",
+        padding=(0, 1),
+    ))
+    count = generate_native_artifacts(project_root, lang=lang, cfg=cfg, force=True)
+    console.print()
+    console.print(Panel(
+        f"  [cyber.green]✓[/] {t('init.reinit_done', count=count)}\n"
+        f"  [cyber.dim]{t('init.reinit_hint')}[/]",
+        title="[cyber.header]REINIT COMPLETE[/]",
+        border_style="cyber.border",
+        padding=(0, 1),
+    ))
 
 
 # ── Main flow ─────────────────────────────────────────────────────
@@ -169,9 +224,13 @@ def run_init(
     ci_command: str = "",
     non_interactive: bool = False,
 ) -> None:
-    """Run the smart initialization wizard."""
+    """Run the initialization wizard, or reinit if config already exists."""
     project_root = Path.cwd()
     agents_dir = project_root / ".agents"
+
+    if (agents_dir / "config.toml").exists():
+        _run_reinit(project_root)
+        return
 
     if non_interactive:
         lang_norm = "en"
@@ -179,15 +238,10 @@ def run_init(
     else:
         lang_norm = _step_language()
 
-    if (agents_dir / "config.toml").exists():
-        overwrite = typer.confirm(
-            t("init.config_exists"), default=False,
-        )
-        if not overwrite:
-            typer.echo(t("init.cancelled"))
-            raise typer.Exit(0)
+    ui = get_ui()
+    console = ui.console
 
-    typer.echo(t("init.wizard_title"))
+    ui.banner("init", __import__("harness").__version__)
 
     if non_interactive:
         proj_name = name or project_root.name
@@ -230,29 +284,47 @@ def run_init(
         vision_path.write_text(vision_content, encoding="utf-8")
 
     from harness.native.skill_gen import generate_native_artifacts
-    generate_native_artifacts(project_root, lang=lang_norm)
+    count = generate_native_artifacts(project_root, lang=lang_norm)
 
     _update_gitignore(project_root)
 
-    typer.echo(t("init.done"))
-    typer.echo(t("init.config_generated"))
+    from rich.panel import Panel
+    summary_lines = [
+        "  [cyber.green]✓[/] .agents/config.toml  [cyber.dim]generated[/]",
+    ]
     if not launch_vision and vision_path.exists():
-        typer.echo(t("init.vision_generated"))
-    typer.echo(t("init.gitignore_updated"))
-    typer.echo(t("native.init_hint"))
-    typer.echo(t("native.hint_brainstorm"))
-    typer.echo(t("native.hint_vision"))
-    typer.echo(t("native.hint_plan"))
-    typer.echo(t("native.hint_build"))
-    typer.echo(t("native.hint_eval"))
-    typer.echo(t("native.hint_ship"))
-    typer.echo(t("native.hint_parallel"))
+        summary_lines.append(
+            "  [cyber.green]✓[/] .agents/vision.md    [cyber.dim]generated[/]",
+        )
+    summary_lines.append(
+        "  [cyber.green]✓[/] .gitignore           [cyber.dim]updated[/]",
+    )
+    summary_lines.append(
+        f"  [cyber.green]✓[/] [cyber.cyan]{count}[/] native artifacts  [cyber.dim]generated[/]",
+    )
+    console.print()
+    console.print(Panel(
+        "\n".join(summary_lines),
+        title="[cyber.header]INIT COMPLETE[/]",
+        border_style="cyber.border",
+        padding=(0, 1),
+    ))
+
+    console.print()
+    console.print("  [cyber.cyan]Cursor-native mode ready![/] Use these skills in Cursor IDE:")
+    console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
+    console.print("  [cyber.magenta]/harness-brainstorm[/]  [cyber.dim]Full creative flow: brainstorm → vision → plan → ship[/]")
+    console.print("  [cyber.magenta]/harness-vision[/]      [cyber.dim]From vision: vision → plan → ship[/]")
+    console.print("  [cyber.magenta]/harness-plan[/]        [cyber.dim]Plan a task, then ship (recommended for defined tasks)[/]")
+    console.print("  [cyber.magenta]/harness-build[/]       [cyber.dim]Implement according to plan[/]")
+    console.print("  [cyber.magenta]/harness-eval[/]        [cyber.dim]5-role parallel code review[/]")
+    console.print("  [cyber.magenta]/harness-ship[/]        [cyber.dim]Direct ship: test → eval → fix → commit → push → PR[/]")
+    console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
 
     if launch_vision:
-        typer.echo(t("init.launch_vision"))
-        typer.echo(t("native.hint_vision"))
-
-    # harness vision CLI removed; native flow uses Cursor skills (see hint above)
+        console.print()
+        console.print("  [cyber.yellow]▸[/] Edit [cyber.cyan].agents/vision.md[/] to set your project vision,")
+        console.print("    then use [cyber.magenta]/harness-vision[/] in Cursor.")
 
 
 def _update_gitignore(project_root: Path) -> None:
