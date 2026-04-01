@@ -40,7 +40,7 @@ cd /path/to/your/project
 harness init
 ```
 
-The wizard walks you through setup: project info, trunk branch, CI command, and optional Memverse integration. It generates skills, subagents, and rules directly into `.cursor/`.
+The wizard walks you through setup: project info, trunk branch, CI command, Memverse integration, and evaluator model. It generates skills, subagents, and rules directly into `.cursor/`.
 
 ### 3. Start building
 
@@ -106,7 +106,7 @@ The same 5 specialized roles review both **plans** and **code**, dispatched in p
 | **QA** | Test strategy, boundary values, regression risk | Test coverage, edge cases, CI health |
 | **Project Manager** | Task decomposition, parallelism, scope | Scope drift, plan completion, delivery risk |
 
-Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.agents/config.toml`.
+Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.agents/config.toml`. Invalid or locally unavailable model pins are dropped during artifact generation so agents fall back to the IDE default model instead of hard-failing on a bad config.
 
 ### Fix-First auto-remediation
 
@@ -140,7 +140,7 @@ Review findings are classified before presenting:
 To regenerate after config changes:
 
 ```bash
-harness install --force
+harness init --force
 ```
 
 ---
@@ -155,13 +155,13 @@ Project settings live in `.agents/config.toml`:
 | `workflow.pass_threshold` | 7.0 | Evaluator pass threshold (1-10) |
 | `workflow.auto_merge` | true | Auto-merge branch after pass |
 | `workflow.branch_prefix` | "agent" | Task branch prefix |
-| `native.adversarial_model` | "gpt-4.1" | Cross-model reviewer model |
+| `native.evaluator_model` | "inherit" | Preferred default model for the 5 review roles; invalid or unavailable values fall back to IDE default |
 | `native.review_gate` | "eng" | Review gate strictness (`eng` = hard gate, `advisory` = log only) |
 | `native.plan_review_gate` | "auto" | Plan review gate (`human` / `ai` / `auto`) |
 | `native.gate_full_review_min` | 5 | Escalation score threshold for full human review |
 | `native.gate_summary_confirm_min` | 3 | Escalation score threshold for summary confirmation |
 | `native.retro_window_days` | 14 | Default retro analysis window (days) |
-| `native.role_models.*` | `{}` | Per-role model overrides: `architect`, `product_owner`, `engineer`, `qa`, `project_manager` |
+| `native.role_models.*` | `{}` | Per-role model overrides; takes precedence over `native.evaluator_model`, but invalid or unavailable values also fall back to IDE default |
 
 ---
 
@@ -169,8 +169,7 @@ Project settings live in `.agents/config.toml`:
 
 | Command | Description |
 |---------|-------------|
-| `harness init [--name] [--ci] [-y]` | Initialize project (interactive wizard) |
-| `harness install [--force] [--lang]` | Regenerate `.cursor/` artifacts |
+| `harness init [--name] [--ci] [-y] [--force]` | Initialize project (interactive wizard); `--force` regenerates artifacts |
 | `harness status` | Show current task progress |
 | `harness update [--check] [--force]` | Self-update and reinstall artifacts |
 | `harness --version` | Show version |
@@ -204,7 +203,7 @@ All task state lives under `.agents/`:
 harness-flow/
 ├── src/harness/
 │   ├── cli.py              # CLI entry (Typer)
-│   ├── commands/            # init, install, update, status
+│   ├── commands/            # init, update, status
 │   ├── core/                # Config, state, UI, events
 │   ├── native/              # Cursor-native artifact generator
 │   ├── templates/           # Jinja2 templates

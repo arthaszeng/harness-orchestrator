@@ -5,7 +5,8 @@ description: >-
   implementation feasibility, code quality, DRY compliance, performance,
   and pattern consistency. Dispatched in parallel with other role-based
   reviewers.
-model: {{ role_models_engineer }}
+{% if role_models_engineer %}model: {{ role_models_engineer }}
+{% endif %}
 ---
 
 # Engineer

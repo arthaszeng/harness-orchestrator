@@ -25,9 +25,14 @@ MESSAGES: dict[str, str] = {
     "init.enable_label": "Enable",
     "init.disable_label": "Disable",
     "init.domain_prefix": "  Domain prefix (to distinguish projects)",
-    "init.step6_label": "Vision",
-    "init.vision_now_label": "Generate now",
-    "init.vision_later_label": "Skip, edit .agents/vision.md later",
+    "init.step_evaluator_label": "Evaluator Model",
+    "init.evaluator_desc": "Preferred model for the 5 eval reviewers. 'inherit' = use the IDE default model.",
+    "init.evaluator_detected_label": "recently used in Cursor",
+    "init.evaluator_detected_none": "No recent Cursor models detected locally. 'inherit' is the safest choice.",
+    "init.evaluator_fallback_note": "Only recent local Cursor models are suggested. Invalid or unavailable configured models fall back to the IDE default during artifact generation.",
+    "init.evaluator_inherit_hint": "use IDE default",
+    "init.evaluator_prompt": "  Evaluator model",
+    "init.evaluator_invalid": "Invalid model name. Use 'inherit' or a model ID (letters, digits, dots, hyphens, underscores).",
 
     # ── native mode generation ────────────────────────────────────
     "native.generating": "  Generating Cursor-native mode artifacts...",
@@ -50,7 +55,7 @@ MESSAGES: dict[str, str] = {
     # ── reinit mode ────────────────────────────────────────────────
     "init.reinit_title": "Config detected — regenerating artifacts",
     "init.reinit_done": "{count} artifact(s) regenerated",
-    "init.reinit_hint": "To change settings → edit .agents/config.toml → harness init",
+    "init.reinit_hint": "To apply config changes → edit .agents/config.toml → harness init --force",
     "init.reinit_config_error": "Failed to load config: {error}",
 
     # ── update command ─────────────────────────────────────────────

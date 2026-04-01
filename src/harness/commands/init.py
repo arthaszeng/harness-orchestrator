@@ -8,6 +8,7 @@ import jinja2
 import typer
 
 from harness.core.scanner import format_scan_report, scan_project
+from harness.core.model_selection import detect_cursor_recent_models, validate_model_name
 from harness.core.ui import get_ui
 from harness.i18n import set_lang, t
 
@@ -166,16 +167,53 @@ def _step_memverse(project_root: Path) -> tuple[bool, str]:
     return True, domain
 
 
-# ── Step 5: Vision ────────────────────────────────────────────────
+# ── Step 5: Evaluator Model ───────────────────────────────────────
 
-def _step_vision(agents_dir: Path) -> bool:
-    """Return True if the user chose to generate vision now."""
+
+def _step_evaluator_model() -> str:
+    """Prompt user to pick evaluator model from recent Cursor models or custom input."""
     console = get_ui().console
-    _cyber_step(console, 5, 5, t("init.step6_label"))
-    console.print(f"  [cyber.dim]1.[/] {t('init.vision_now_label')} [cyber.green](recommended)[/]")
-    console.print(f"  [cyber.dim]2.[/] {t('init.vision_later_label')}")
-    choice = _prompt_choice(t("init.choose"), 2, default=1)
-    return choice == 1
+    _cyber_step(console, 5, 5, t("init.step_evaluator_label"))
+    console.print(f"  [cyber.dim]{t('init.evaluator_desc')}[/]")
+    console.print(f"  [cyber.dim]{t('init.evaluator_fallback_note')}[/]")
+
+    recent_models = detect_cursor_recent_models()
+
+    console.print(
+        f"\n  [cyber.dim]1.[/] inherit [cyber.dim]({t('init.evaluator_inherit_hint')})[/]"
+        f" [cyber.green]({t('init.recommended_label')})[/]",
+    )
+
+    next_index = 2
+    for model in recent_models:
+        console.print(
+            f"  [cyber.dim]{next_index}.[/] {model} "
+            f"[cyber.dim]({t('init.evaluator_detected_label')})[/]",
+        )
+        next_index += 1
+
+    if not recent_models:
+        console.print(f"  [cyber.dim]{t('init.evaluator_detected_none')}[/]")
+
+    custom_idx = next_index
+    console.print(f"  [cyber.dim]{custom_idx}.[/] {t('init.custom_input_label')}")
+
+    choice = _prompt_choice(t("init.choose"), custom_idx, default=1)
+
+    if choice == 1:
+        return "inherit"
+
+    list_idx = choice - 2
+    if 0 <= list_idx < len(recent_models):
+        selected = recent_models[list_idx]
+        console.print(f"  [cyber.green]→[/] {selected}")
+        return selected
+
+    while True:
+        value = typer.prompt(t("init.evaluator_prompt"), default="inherit").strip()
+        if validate_model_name(value):
+            return value
+        console.print(f"  [cyber.fail]{t('init.evaluator_invalid')}[/]")
 
 
 # ── Reinit mode ───────────────────────────────────────────────────
@@ -258,13 +296,13 @@ def run_init(
         trunk_branch = "main"
         ci = ci_command or "make test"
         memverse_enabled, memverse_domain = False, ""
-        launch_vision = False
+        evaluator_model = "inherit"
     else:
         proj_name, description = _step_project_info(project_root, name_override=name)
         trunk_branch = _step_trunk_branch(project_root)
         ci = _step_ci_command(project_root, ci_override=ci_command)
         memverse_enabled, memverse_domain = _step_memverse(project_root)
-        launch_vision = _step_vision(agents_dir)
+        evaluator_model = _step_evaluator_model()
 
     agents_dir.mkdir(parents=True, exist_ok=True)
     (agents_dir / "tasks").mkdir(exist_ok=True)
@@ -276,7 +314,7 @@ def run_init(
         description=description,
         lang=lang_norm,
         ci_command=ci,
-        adversarial_model="gpt-4.1",
+        evaluator_model=evaluator_model,
         trunk_branch=trunk_branch,
         gate_full_review_min=5,
         gate_summary_confirm_min=3,
@@ -286,7 +324,7 @@ def run_init(
     (agents_dir / "config.toml").write_text(config_content, encoding="utf-8")
 
     vision_path = agents_dir / "vision.md"
-    if not vision_path.exists() and not launch_vision:
+    if not vision_path.exists():
         vision_tmpl_name = "vision.zh.md.j2" if lang_norm == "zh" else "vision.md.j2"
         tmpl = _load_template(vision_tmpl_name)
         vision_content = tmpl.render(project_name=proj_name)
@@ -301,7 +339,7 @@ def run_init(
     summary_lines = [
         "  [cyber.green]✓[/] .agents/config.toml  [cyber.dim]generated[/]",
     ]
-    if not launch_vision and vision_path.exists():
+    if vision_path.exists():
         summary_lines.append(
             "  [cyber.green]✓[/] .agents/vision.md    [cyber.dim]generated[/]",
         )
@@ -330,10 +368,9 @@ def run_init(
     console.print("  [cyber.magenta]/harness-ship[/]        [cyber.dim]Direct ship: test → eval → fix → commit → push → PR[/]")
     console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
 
-    if launch_vision:
-        console.print()
-        console.print("  [cyber.yellow]▸[/] Edit [cyber.cyan].agents/vision.md[/] to set your project vision,")
-        console.print("    then use [cyber.magenta]/harness-vision[/] in Cursor.")
+    console.print()
+    console.print("  [cyber.yellow]▸[/] Edit [cyber.cyan].agents/vision.md[/] to set your project vision,")
+    console.print("    then use [cyber.magenta]/harness-vision[/] in Cursor.")
 
 
 def _update_gitignore(project_root: Path) -> None:

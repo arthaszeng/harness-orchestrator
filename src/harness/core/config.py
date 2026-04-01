@@ -15,6 +15,7 @@ else:
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from harness.core.model_selection import validate_model_name
 from harness.core.roles import NATIVE_REVIEW_ROLES
 
 
@@ -44,7 +45,7 @@ class ModelsConfig(BaseModel):
 
 class NativeModeConfig(BaseModel):
     """Native IDE workflow settings (eval, ship, skills)."""
-    adversarial_model: str = "gpt-4.1"
+    evaluator_model: str = "inherit"
     adversarial_mechanism: Literal["subagent", "cli", "auto"] = "auto"
     review_gate: Literal["eng", "advisory"] = "eng"
     plan_review_gate: Literal["human", "ai", "auto"] = "auto"
@@ -84,6 +85,21 @@ class NativeModeConfig(BaseModel):
                 UserWarning,
                 stacklevel=2,
             )
+        if not validate_model_name(self.evaluator_model):
+            warnings.warn(
+                "Invalid native.evaluator_model; generated review agents will fall back "
+                "to the IDE default model.",
+                UserWarning,
+                stacklevel=2,
+            )
+        for role_name, model in self.role_models.items():
+            if model and not validate_model_name(model):
+                warnings.warn(
+                    f"Invalid native.role_models.{role_name}; generated review agents "
+                    "will fall back to the IDE default model for that role.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         return self
 
 
@@ -143,6 +159,14 @@ class HarnessConfig(BaseModel):
         env_data = _env_overrides()
         if env_data:
             data = _deep_merge(data, env_data)
+
+        native_data = data.get("native")
+        if (
+            isinstance(native_data, dict)
+            and "evaluator_model" not in native_data
+            and "adversarial_model" in native_data
+        ):
+            native_data["evaluator_model"] = native_data["adversarial_model"]
 
         cfg = cls.model_validate(data)
         cfg.project_root = root

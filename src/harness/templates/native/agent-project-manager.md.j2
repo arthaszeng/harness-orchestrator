@@ -4,7 +4,8 @@ description: >-
   Project management reviewer for plan and code evaluation phases. Evaluates
   task decomposition, parallelism, delivery risk, scope management, and
   plan completion. Dispatched in parallel with other role-based reviewers.
-model: {{ role_models_project_manager }}
+{% if role_models_project_manager %}model: {{ role_models_project_manager }}
+{% endif %}
 ---
 
 # Project Manager

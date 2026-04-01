@@ -50,7 +50,7 @@ Built with **Typer**. Three commands:
 
 Two modes:
 
-- **Wizard mode** (no `.agents/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → vision), writes config, generates artifacts.
+- **Wizard mode** (no `.agents/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → evaluator model), writes config, generates artifacts.
 - **Reinit mode** (`.agents/config.toml` exists): loads existing config, regenerates all `.cursor/` artifacts with `force=True`.
 
 **Writes:** `.agents/config.toml` (from `templates/config.toml.j2`), `.agents/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files (e.g. `.agents/state.json`, `.agents/.stop`).
@@ -132,7 +132,7 @@ Structured **JSONL** event logging for observability of harness-adjacent activit
   - **Eval resources** (checklist and specialist docs) under `.cursor/skills/harness/harness-eval/`
   - **`.cursor/worktrees.json`** for parallel worktree setup (skipped if the file already exists unless `force`)
 
-Idempotent by default for `worktrees.json`; skills/agents/rules are regenerated according to `install`/`force` behavior.
+Idempotent by default for `worktrees.json`; skills/agents/rules are regenerated according to `init --force` behavior.
 
 ---
 
@@ -193,7 +193,7 @@ Module-level catalogs (`i18n/en.py`, `i18n/zh.py`) expose `t(key, **kwargs)`. Mi
 
 ## Testing orientation
 
-Tests are organized around **fast, local behavior**: configuration loading (including env overrides), state/progress, scanner suggestions, skill generation output, install/update flows, git helpers, registry, and UI pieces—without requiring a live Cursor session. Template and config drift is caught by tests that assert on generated files or loaded models.
+Tests are organized around **fast, local behavior**: configuration loading (including env overrides), state/progress, scanner suggestions, skill generation output, init/update flows, git helpers, registry, and UI pieces—without requiring a live Cursor session. Template and config drift is caught by tests that assert on generated files or loaded models.
 
 ---
 
@@ -201,7 +201,7 @@ Tests are organized around **fast, local behavior**: configuration loading (incl
 
 ### Why generate `.cursor/` instead of shipping static files?
 
-Project-specific **CI command**, **trunk branch**, **review gates**, and **hooks** must flow into prompts. Templating from `HarnessConfig` keeps one SSOT and allows `harness install` to refresh IDE assets after config edits.
+Project-specific **CI command**, **trunk branch**, **review gates**, and **hooks** must flow into prompts. Templating from `HarnessConfig` keeps one SSOT and allows `harness init --force` to refresh IDE assets after config edits.
 
 ### Why keep `ALL_ROLES` empty?
 

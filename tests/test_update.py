@@ -71,6 +71,17 @@ class TestMigrateConfig:
         (agents_dir / "config.toml").write_text("this is not valid toml [[[")
         assert _migrate_config(tmp_path) == 1
 
+    def test_deprecated_adversarial_model_warns(self, tmp_path: Path):
+        agents_dir = tmp_path / ".agents"
+        agents_dir.mkdir()
+        (agents_dir / "config.toml").write_text(
+            '[project]\nname = "t"\n[ci]\ncommand = "t"\n'
+            '[workflow]\ntrunk_branch = "main"\n'
+            '[native]\nadversarial_model = "gpt-4.1"\n'
+        )
+        warnings = _migrate_config(tmp_path)
+        assert warnings >= 1
+
 
 class TestRunUpdate:
     def test_check_mode_up_to_date(self):

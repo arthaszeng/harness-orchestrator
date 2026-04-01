@@ -5,7 +5,8 @@ description: >-
   architectural feasibility, module boundaries, dependency direction,
   interface design, and security posture. Dispatched in parallel with
   other role-based reviewers.
-model: {{ role_models_architect }}
+{% if role_models_architect %}model: {{ role_models_architect }}
+{% endif %}
 ---
 
 # Architect

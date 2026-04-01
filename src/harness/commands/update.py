@@ -80,7 +80,9 @@ def _migrate_config(project_root: Path) -> int:
             )
             warnings += 1
 
-    deprecated: list[tuple[str, str, str]] = []
+    deprecated: list[tuple[str, str, str]] = [
+        ("native.adversarial_model", "native.evaluator_model", "0.4.0"),
+    ]
     for old_key, replacement, since_version in deprecated:
         parts = old_key.split(".")
         section_data = data
