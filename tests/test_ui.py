@@ -65,10 +65,9 @@ class TestHarnessUI:
 
     def test_system_status_shows_ide(self):
         ui, buf = self._make_ui()
-        ui.system_status({"cursor": True, "codex": False})
+        ui.system_status()
         output = buf.getvalue()
         assert "Cursor" in output
-        assert "Codex" in output
 
     def test_task_panel_shows_info(self):
         ui, buf = self._make_ui()
