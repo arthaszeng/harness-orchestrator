@@ -3,6 +3,8 @@
 Provides a single ``with tracker.track(...):`` block for any agent invocation.
 Both the SQLite registry and the append-only JSONL log are written on every
 call, keeping the two systems in sync.
+
+In cursor-native mode the driver is always "cursor".
 """
 
 from __future__ import annotations
@@ -11,6 +13,8 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
+
+from harness.core.roles import DEFAULT_DRIVER
 
 if TYPE_CHECKING:
     from harness.core.events import EventEmitter, NullEventEmitter
@@ -41,8 +45,8 @@ class RunTracker:
     def track(
         self,
         role: str,
-        driver_name: str,
-        agent_name: str,
+        driver_name: str = DEFAULT_DRIVER,
+        agent_name: str = "unknown",
         iteration: int | None = None,
         *,
         readonly: bool = False,
@@ -54,11 +58,10 @@ class RunTracker:
 
         Usage::
 
-            with tracker.track("planner", "cursor", "harness-planner", 1, readonly=True, prompt=p) as run:
-                result = driver.invoke(...)
-                run.exit_code = result.exit_code
-                run.output_len = len(result.output)
-                run.success = result.success
+            with tracker.track("architect", agent_name="harness-architect", iteration=1, readonly=True, prompt=p) as run:
+                run.exit_code = 0
+                run.output_len = 42
+                run.success = True
         """
         run_id = self.registry.register(
             role=role,

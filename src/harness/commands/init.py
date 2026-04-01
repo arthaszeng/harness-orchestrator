@@ -134,8 +134,8 @@ def _step_ci_command(
 
 # ── Step 4: Memverse ──────────────────────────────────────────────
 
-def _step_memverse(project_root: Path) -> tuple[bool, str, str]:
-    """Return (enabled, driver, domain_prefix). Native-only: driver is always cursor."""
+def _step_memverse(project_root: Path) -> tuple[bool, str]:
+    """Return (enabled, domain_prefix)."""
     typer.echo(t("init.step5_title"))
     typer.echo(t("init.memverse_desc"))
     typer.echo(t("init.opt_enable"))
@@ -143,11 +143,11 @@ def _step_memverse(project_root: Path) -> tuple[bool, str, str]:
     choice = _prompt_choice(t("init.choose"), 2, default=2)
 
     if choice == 2:
-        return False, "cursor", ""
+        return False, ""
 
     domain = typer.prompt(t("init.domain_prefix"), default=project_root.name)
 
-    return True, "cursor", domain
+    return True, domain
 
 
 # ── Step 5: Vision ────────────────────────────────────────────────
@@ -194,15 +194,13 @@ def run_init(
         description = ""
         trunk_branch = "main"
         ci = ci_command or "make test"
-        memverse_enabled, memverse_driver, memverse_domain = False, "cursor", ""
+        memverse_enabled, memverse_domain = False, ""
         launch_vision = False
     else:
         proj_name, description = _step_project_info(project_root, name_override=name)
         trunk_branch = _step_trunk_branch(project_root)
         ci = _step_ci_command(project_root, ci_override=ci_command)
-        memverse_enabled, memverse_driver, memverse_domain = _step_memverse(
-            project_root,
-        )
+        memverse_enabled, memverse_domain = _step_memverse(project_root)
         launch_vision = _step_vision(agents_dir)
 
     agents_dir.mkdir(parents=True, exist_ok=True)
@@ -215,13 +213,11 @@ def run_init(
         description=description,
         lang=lang_norm,
         ci_command=ci,
-        workflow_mode="cursor-native",
         adversarial_model="gpt-4.1",
         trunk_branch=trunk_branch,
         gate_full_review_min=5,
         gate_summary_confirm_min=3,
         memverse_enabled="true" if memverse_enabled else "false",
-        memverse_driver=memverse_driver,
         memverse_domain=memverse_domain,
     )
     (agents_dir / "config.toml").write_text(config_content, encoding="utf-8")

@@ -139,7 +139,6 @@ def _render_agents(console, state: SessionState, agents_dir: Path) -> None:
     )
     table.add_column("#", style="dim", width=5)
     table.add_column("Role", min_width=10)
-    table.add_column("Driver", min_width=6)
     table.add_column("Status", min_width=9)
     table.add_column("Elapsed", justify="right", min_width=7)
     table.add_column("Detail", style="dim")
@@ -161,7 +160,6 @@ def _render_agents(console, state: SessionState, agents_dir: Path) -> None:
         table.add_row(
             f"#{r.id}",
             r.role,
-            r.driver,
             f"[{status_style}]{r.status}[/{status_style}]" if status_style else r.status,
             elapsed_str,
             detail,

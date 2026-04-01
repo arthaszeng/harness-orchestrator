@@ -10,6 +10,9 @@ from __future__ import annotations
 # No orchestrator-routed roles in native-only mode.
 ALL_ROLES: frozenset[str] = frozenset()
 
+# Default driver value for registry/events/tracker (cursor-native only).
+DEFAULT_DRIVER: str = "cursor"
+
 # Cursor-native five review subagents (template / native.role_models keys).
 NATIVE_REVIEW_ROLES: frozenset[str] = frozenset(
     ("architect", "product_owner", "engineer", "qa", "project_manager")

@@ -57,7 +57,7 @@ class SessionStats(BaseModel):
 
 
 class StopContext(BaseModel):
-    """Structured context captured when the autonomous loop stops."""
+    """Structured context captured when a task is stopped."""
     stop_kind: str = ""
     threshold_snapshot: dict[str, Any] = Field(default_factory=dict)
     stop_reason: str = ""

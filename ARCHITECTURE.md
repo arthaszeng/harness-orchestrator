@@ -95,7 +95,8 @@ Minimal constants only:
 
 - **`ALL_ROLES`** — empty `frozenset` (no orchestrator-routed roles in native-only mode).
 - **`NATIVE_REVIEW_ROLES`** — the five native review roles: `architect`, `product_owner`, `engineer`, `qa`, `project_manager`.
-- **`SCORING_DIMENSIONS`** — evaluation dimensions used in templates and scoring copy.
+- **`SCORING_DIMENSIONS`** — evaluation dimension labels (used by tests for validation).
+- **`DEFAULT_DRIVER`** — default driver value (`"cursor"`) for registry/events/tracker.
 
 ### `state.py`
 

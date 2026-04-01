@@ -40,7 +40,7 @@ correct feature branch. Proceed to the next phase.
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 ```
 
-- If `$CURRENT_BRANCH` starts with `{{ branch_prefix }}`: you are **resuming an existing task**.
+- If `$CURRENT_BRANCH` starts with `{{ branch_prefix }}/`: you are **resuming an existing task**.
   Inform the user: "当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
   **Skip steps 4–5.** Proceed to the next phase.
 - If `$CURRENT_BRANCH` is `HEAD` (detached): **ABORT** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
@@ -69,9 +69,9 @@ If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't ex
 
 3. Create the branch:
    ```bash
-   git checkout -b {{ branch_prefix }}task-NNN-<short-desc>
+   git checkout -b {{ branch_prefix }}/task-NNN-<short-desc>
    ```
-   If the branch already exists: **ABORT** — "分支 `{{ branch_prefix }}task-NNN-<short-desc>` 已存在，请确认是否要 resume 该任务或选择其他名称。"
+   If the branch already exists: **ABORT** — "分支 `{{ branch_prefix }}/task-NNN-<short-desc>` 已存在，请确认是否要 resume 该任务或选择其他名称。"
 
 {% elif preflight_mode == "ship" %}
 Before shipping, ensure the base branch is up to date.

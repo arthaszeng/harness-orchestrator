@@ -118,10 +118,10 @@ class TestStepCiCommand:
 
 
 class TestStepMemverse:
-    def test_disable_returns_cursor_disabled(self, tmp_path):
+    def test_disable_returns_disabled(self, tmp_path):
         with patch("harness.commands.init.typer.echo"):
             with patch("harness.commands.init.typer.prompt", return_value="2"):
-                assert _step_memverse(tmp_path) == (False, "cursor", "")
+                assert _step_memverse(tmp_path) == (False, "")
 
     def test_enable_returns_domain(self, tmp_path):
         with patch("harness.commands.init.typer.echo"):
@@ -129,7 +129,7 @@ class TestStepMemverse:
                 "harness.commands.init.typer.prompt",
                 side_effect=["1", "my-domain"],
             ):
-                assert _step_memverse(tmp_path) == (True, "cursor", "my-domain")
+                assert _step_memverse(tmp_path) == (True, "my-domain")
 
 
 class TestUpdateGitignore:

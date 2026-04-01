@@ -97,10 +97,8 @@ class HarnessUI:
         )
         self.console.print()
 
-    def system_status(self, ides: dict[str, bool]) -> None:
-        cursor_st = "[cyber.ok]ON[/]" if ides.get("cursor") else "[cyber.fail]OFF[/]"
-        codex_st = "[cyber.ok]ON[/]" if ides.get("codex") else "[cyber.fail]OFF[/]"
-        content = f"  IDE :: Cursor [{cursor_st}]  Codex [{codex_st}]"
+    def system_status(self) -> None:
+        content = "  IDE :: Cursor [cyber.ok]ON[/]"
         self.console.print(Panel(
             content,
             title="[cyber.header]SYSTEM[/]",
@@ -221,22 +219,6 @@ class HarnessUI:
             if fail_tail:
                 for line in fail_tail[-3:]:
                     self.console.print(f"    [cyber.dim]┊ {line.rstrip()}[/]")
-
-    # ── Strategist / Reflector output ──
-
-    def strategist_result(self, requirement: str, elapsed: float) -> None:
-        self.console.print(
-            f"  [cyber.ok]✓[/] [cyber.label][strategist][/] "
-            f"[cyber.dim]target acquired ({elapsed:.0f}s)[/]",
-        )
-        self.console.print(f"    [cyber.cyan]→[/] {requirement}")
-
-    def strategist_done(self, elapsed: float) -> None:
-        self.console.print(
-            f"  [cyber.ok]✓[/] [cyber.label][strategist][/] "
-            f"[cyber.green]all objectives achieved[/] "
-            f"[cyber.dim]({elapsed:.0f}s)[/]",
-        )
 
     # ── Generic messages ──
 

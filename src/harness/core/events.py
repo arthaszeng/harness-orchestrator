@@ -1,4 +1,7 @@
-"""Structured event log — each agent call, CI run, and state transition appends to events.jsonl."""
+"""Structured event log — each agent call, CI run, and state transition appends to events.jsonl.
+
+Events are written as append-only JSONL for observability and audit.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +10,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from harness.core.roles import DEFAULT_DRIVER
 
 
 class EventEmitter:
@@ -29,7 +34,7 @@ class EventEmitter:
     # ── agent lifecycle ──────────────────────────────────────────
 
     def agent_start(
-        self, *, role: str, driver: str, agent_name: str, iteration: int,
+        self, *, role: str, driver: str = DEFAULT_DRIVER, agent_name: str, iteration: int,
     ) -> float:
         """Record agent invocation start; returns a monotonic timestamp for elapsed calc."""
         self._emit(
@@ -42,7 +47,7 @@ class EventEmitter:
         self,
         *,
         role: str,
-        driver: str,
+        driver: str = DEFAULT_DRIVER,
         agent_name: str,
         iteration: int,
         exit_code: int,

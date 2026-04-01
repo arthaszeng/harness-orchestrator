@@ -2,34 +2,18 @@
 
 # harness-orchestrator
 
-> Cursor 原生多智能体开发框架 — 在 Cursor 内一条命令完成 计划-构建-评审-发布 全流程。
+> **Cursor 原生 AI 工程框架** — 在 Cursor 内完成计划、构建、评审、发布的完整流程，内置结构化质量门禁。
 
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-AI 编程工具擅长单次任务，但持续开发需要更多：目标跟踪、质量门禁、对抗评审、审计轨迹。Harness 将这些组织成契约驱动的工程闭环，**直接运行在 Cursor IDE 内** — 无需独立编排进程，无需复杂配置。
-
-## 从 3.x 升级
-
-4.0.0 版本完全移除了编排器模式。如果你使用过 `harness run`、`harness auto`、`harness stop` 或 `harness vision`，这些 CLI 命令已不再存在。
-
-**迁移路径：**
-- `harness run <需求>` → 在 Cursor IDE 中使用 `/harness-plan <需求>`
-- `harness auto` → 在 Cursor IDE 中使用 `/harness-vision`
-- `harness vision` → 在 Cursor IDE 中使用 `/harness-vision`
-- `harness stop` → 不再需要（Cursor IDE 管理任务生命周期）
-- `[drivers]` 配置段 → 被忽略（可安全保留在配置中）
-- `[autonomous]` 配置段 → 已移除（原生模式无自主循环）
-- `models.driver_defaults` → 已移除（原生模式无驱动器）
-- `workflow.mode` → 已移除（始终为 cursor-native）
-
-你的 `.agents/config.toml` 将继续正常加载 — 未知配置段会被静默忽略。
+AI 编程工具擅长单次任务，但持续开发需要更多：目标跟踪、质量门禁、对抗评审、审计轨迹。Harness 将这些组织成契约驱动的工程闭环，**直接运行在 Cursor IDE 内** — 无需独立进程，无需复杂配置。
 
 ---
 
-## 快速开始（3 分钟上手）
+## 快速开始
 
-### 1. 安装 harness
+### 1. 安装
 
 ```bash
 pip install harness-orchestrator
@@ -37,7 +21,7 @@ harness --version
 ```
 
 <details>
-<summary>备选：从源码安装（面向贡献者）</summary>
+<summary>从源码安装（贡献者）</summary>
 
 ```bash
 git clone https://github.com/arthaszeng/harness-orchestrator.git
@@ -47,60 +31,53 @@ pip install -e ".[dev]"
 
 </details>
 
-### 2. 初始化你的项目
+### 2. 初始化项目
 
 ```bash
 cd /path/to/your/project
 harness init
 ```
 
-向导会引导你完成配置：项目信息、主干分支、CI 命令和可选的 Memverse 集成。它会将 skills、subagents 和 rules 直接生成到你的 `.cursor/` 目录。
+向导引导你完成配置：项目信息、主干分支、CI 命令和可选的 Memverse 集成。Skills、subagents 和 rules 直接生成到 `.cursor/` 目录。
 
-### 3. 在 Cursor 中使用
+### 3. 开始使用
 
-在 Cursor 中打开项目。你现在拥有 **三个主要入口**，覆盖所有任务体量：
+在 Cursor 中打开项目。三个主要入口覆盖所有任务体量：
 
 | 技能 | 何时用 | 功能 |
-|-------|-------------|------|
-| `/harness-brainstorm` | "我有个想法" | 发散探索 → vision → 计划 → 审阅门控 → 自动构建/评审/发布/回顾 |
-| `/harness-vision` | "我有个方向" | 澄清 vision → 计划 → 审阅门控 → 自动构建/评审/发布/回顾 |
-| `/harness-plan` | "我有个需求" | 细化计划 + 5 角色审查 → 审阅门控 → 自动构建/评审/发布/回顾 |
+|------|--------|------|
+| `/harness-brainstorm` | "我有个想法" | 发散探索 → vision → 计划 → 自动构建/评审/发布/回顾 |
+| `/harness-vision` | "我有个方向" | 澄清 vision → 计划 → 自动构建/评审/发布/回顾 |
+| `/harness-plan` | "我有个需求" | 细化计划 + 5 角色审查 → 自动构建/评审/发布/回顾 |
 
-三个入口采用递归组合（brainstorm ⊃ vision ⊃ plan），共享同一计划审查 → ship 管线。
+三个入口采用递归组合（brainstorm ⊃ vision ⊃ plan），共享同一审查 → ship 管线。
 
 **工具类技能：**
 
 | 技能 | 功能 |
-|-------|-------------|
+|------|------|
 | `/harness-investigate` | 系统化 bug 调查：复现 → 假设 → 验证 → 最小修复 |
 | `/harness-learn` | Memverse 知识管理：存储、检索、更新项目经验 |
 | `/harness-retro` | 工程回顾：提交分析、热点检测、趋势追踪 |
 
-**高级技能**（细粒度控制）：
+**管线技能**（细粒度控制）：
 
 | 技能 | 功能 |
-|-------|-------------|
+|------|------|
 | `/harness-build` | 按契约实现，运行 CI，分流失败，输出结构化构建日志 |
 | `/harness-eval` | 5 角色代码评审（架构师 + 产品负责人 + 工程师 + QA + 项目经理） |
 | `/harness-ship` | 全自动流水线：测试 → 评审 → 修复 → 提交 → push → PR |
 | `/harness-doc-release` | 文档同步：检测代码变更导致的文档过时 |
 
-**现在就试试** — 打开 Cursor 聊天窗口，输入：
+**现在就试试：**
 
 ```
 /harness-plan 给用户注册接口添加输入校验
 ```
 
-### 更新
-
-```bash
-harness update          # 升级到最新版，重装产物，检查配置
-harness update --check  # 仅检查是否有新版本
-```
-
 ---
 
-## 背后发生了什么
+## 工作原理
 
 ```
 你输入 /harness-ship "添加功能 X"
@@ -115,12 +92,12 @@ harness update --check  # 仅检查是否有新版本
   → 可二分提交 + push + PR
 ```
 
-### 统一 5 角色评审系统
+### 5 角色评审系统
 
 同一组 5 个专业角色同时审查**计划**和**代码**，全部并行调度：
 
-| 角色 | 计划审查关注点 | 代码评审关注点 |
-|------|---------------|---------------|
+| 角色 | 计划审查 | 代码评审 |
+|------|---------|---------|
 | **架构师** | 可行性、模块影响、依赖变更 | 架构合规性、分层、耦合、安全 |
 | **产品负责人** | vision 对齐、用户价值、验收标准 | 需求覆盖、行为正确性 |
 | **工程师** | 实现可行性、代码复用、技术债 | 代码质量、DRY、模式一致、性能 |
@@ -143,28 +120,29 @@ harness update --check  # 仅检查是否有新版本
 项目设置位于 `.agents/config.toml`：
 
 | 键 | 默认值 | 说明 |
-|-----|---------|-------------|
-| `workflow.max_iterations` | 3 | 每任务最大迭代次数 |
-| `workflow.pass_threshold` | 7.0 | 评审通过阈值（满分 10） |
+|-----|--------|------|
+| `workflow.max_iterations` | 3 | 每任务最大评审迭代次数 |
+| `workflow.pass_threshold` | 7.0 | 评审通过阈值（1-10） |
 | `workflow.auto_merge` | true | 通过后自动合并分支 |
 | `workflow.branch_prefix` | "agent" | 任务分支前缀 |
+| `native.adversarial_model` | "gpt-4.1" | 跨模型审查器 |
+| `native.review_gate` | "eng" | 评审门禁（`eng` = 硬门禁，`advisory` = 仅记录） |
+| `native.plan_review_gate` | "auto" | 计划审阅门控（`human` / `ai` / `auto`） |
 | `native.gate_full_review_min` | 5 | 完整人工审查的升级分数阈值 |
 | `native.gate_summary_confirm_min` | 3 | 摘要确认的升级分数阈值 |
-| `native.adversarial_model` | "gpt-4.1" | 跨模型审查器模型 |
-| `native.review_gate` | "eng" | 评审门禁严格度（`eng` = 硬门禁，`advisory` = 仅记录） |
-| `native.plan_review_gate` | "auto" | 计划审阅门控模式（`human` / `ai` / `auto`） |
-| `native.role_models.*` | `{}` | 每角色模型覆盖：`architect`、`product_owner`、`engineer`、`qa`、`project_manager` |
+| `native.retro_window_days` | 14 | 回顾分析窗口（天） |
+| `native.role_models.*` | `{}` | 每角色模型覆盖 |
 
 ---
 
 ## 命令参考
 
 | 命令 | 说明 |
-|---------|-------------|
-| `harness init [--name] [--ci] [-y]` | 初始化项目配置（交互式向导） |
-| `harness install [--force] [--lang]` | 生成 native 产物（.cursor/ skills、agents、rules） |
-| `harness status` | 显示当前进度 |
-| `harness update [--check] [--force]` | 自更新，重装产物，检查配置 |
+|------|------|
+| `harness init [--name] [--ci] [-y]` | 初始化项目（交互式向导） |
+| `harness install [--force] [--lang]` | 重新生成 `.cursor/` 产物 |
+| `harness status` | 显示当前任务进度 |
+| `harness update [--check] [--force]` | 自更新，重装产物 |
 | `harness --version` | 显示版本 |
 
 ---
@@ -177,10 +155,11 @@ harness-orchestrator/
 │   ├── cli.py              # CLI 入口（Typer）
 │   ├── commands/            # init、install、update、status
 │   ├── core/                # 配置、状态、UI、事件
-│   ├── native/              # Cursor 原生模式生成器
-│   ├── templates/           # Jinja2 模板（配置 + 原生）
+│   ├── native/              # Cursor 原生产物生成器
+│   ├── templates/           # Jinja2 模板
 │   └── integrations/        # Git、Memverse
-├── tests/                   # 测试套件
+├── tests/
+├── docs/
 └── pyproject.toml
 ```
 
@@ -203,6 +182,12 @@ pytest
 ruff check src/ tests/
 ruff format src/ tests/
 ```
+
+---
+
+## 历史文档
+
+早期版本的架构说明（编排器模式、状态机、驱动兼容性）保存在 [`docs/historical.md`](docs/historical.md)。
 
 ---
 

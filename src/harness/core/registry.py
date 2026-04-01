@@ -1,13 +1,11 @@
 """Agent run registry — SQLite-backed persistence for per-invocation tracking.
 
-Every agent invocation (planner, builder, evaluator, strategist, reflector, CI)
+Every agent invocation (architect, product_owner, engineer, qa, project_manager)
 gets a persistent row with id, parent-child, status, telemetry, session_id.
 
 Dual-track design: this registry co-exists with the append-only events.jsonl;
 the JSONL remains the audit log, while SQLite enables structured queries
 (get_by_task, get_children, status dashboard).
-
-Inspired by CodeMachine-CLI's monitoring/db/schema.ts + repository.ts.
 """
 
 from __future__ import annotations
