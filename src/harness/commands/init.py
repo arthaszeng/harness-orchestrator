@@ -171,7 +171,7 @@ def _step_workflow_mode(ides: dict[str, bool]) -> tuple[str, str]:
 
     cursor-native mode only generates skill/agent/rule files into .cursor/ —
     it does NOT require the cursor desktop client or cursor-agent CLI.
-    Always offer it as an option.
+    Always offer it as an option, and it is the recommended default.
     """
     typer.echo(t("init.step_mode_title"))
 
@@ -180,11 +180,11 @@ def _step_workflow_mode(ides: dict[str, bool]) -> tuple[str, str]:
     else:
         typer.echo(t("init.mode_desc_no_cursor"))
 
-    typer.echo(t("init.opt_orchestrator"))
     typer.echo(t("init.opt_native"))
+    typer.echo(t("init.opt_orchestrator"))
     choice = _prompt_choice(t("init.choose"), 2, default=1)
 
-    if choice == 2:
+    if choice == 1:
         typer.echo(t("init.mode_native_selected"))
         adv_model = typer.prompt(
             t("init.native_adversarial_model"), default="gpt-4.1",
@@ -425,8 +425,8 @@ def run_init(
         }
         driver_mode = "auto"
         roles: dict[str, str] = {}
-        workflow_mode = "orchestrator"
-        adversarial_model = ""
+        workflow_mode = "cursor-native"
+        adversarial_model = "gpt-4.1"
         trunk_branch = "main"
         ci = ci_command or "make test"
         memverse_enabled, memverse_driver, memverse_domain = False, "auto", ""
@@ -486,6 +486,8 @@ def run_init(
     typer.echo(t("init.gitignore_updated"))
     if workflow_mode == "cursor-native":
         typer.echo(t("native.init_hint"))
+        typer.echo(t("native.hint_brainstorm"))
+        typer.echo(t("native.hint_vision"))
         typer.echo(t("native.hint_plan"))
         typer.echo(t("native.hint_build"))
         typer.echo(t("native.hint_eval"))
