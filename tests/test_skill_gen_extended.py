@@ -1671,3 +1671,113 @@ def test_zh_memverse_enabled_has_content(tmp_path: Path):
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
         assert "search_memory" in content, f"ZH {name} missing Memverse when enabled"
+
+
+# --- artifact_lang: Language enforcement in templates ---
+
+
+def test_build_context_has_artifact_lang_en(tmp_path: Path):
+    """_build_full_context includes artifact_lang matching the lang parameter (en)."""
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    ctx = _build_full_context(cfg, lang="en")
+    assert "artifact_lang" in ctx
+    assert ctx["artifact_lang"] == "en"
+
+
+def test_build_context_has_artifact_lang_zh(tmp_path: Path):
+    """_build_full_context includes artifact_lang matching the lang parameter (zh)."""
+    cfg = HarnessConfig()
+    cfg.project_root = tmp_path
+    ctx = _build_full_context(cfg, lang="zh")
+    assert "artifact_lang" in ctx
+    assert ctx["artifact_lang"] == "zh"
+
+
+def test_artifact_lang_in_layer0(tmp_path: Path):
+    """artifact_lang is available to all artifact types via Layer 0."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    for art_type, art_name in [
+        ("skill", "harness-build"),
+        ("agent", "harness-architect"),
+        ("rule", "harness-safety-guardrails"),
+    ]:
+        ctx = _build_layered_context(cfg, art_type, art_name, lang="zh")
+        assert "artifact_lang" in ctx, f"{art_type}/{art_name} missing artifact_lang"
+        assert ctx["artifact_lang"] == "zh"
+
+
+def test_en_generated_skills_contain_language_directive(tmp_path: Path):
+    """EN skills contain English language directive after generation."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+    for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
+        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "Language Requirement" in content, f"EN {name} missing language directive"
+        assert "You MUST respond entirely in English" in content, (
+            f"EN {name} missing English enforcement"
+        )
+
+
+def test_zh_generated_skills_contain_language_directive(tmp_path: Path):
+    """ZH skills contain Chinese language directive after generation."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+    for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
+        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "语言要求" in content, f"ZH {name} missing language directive"
+        assert "你必须使用中文回答所有内容" in content, (
+            f"ZH {name} missing Chinese enforcement"
+        )
+
+
+def test_en_generated_agents_contain_language_directive(tmp_path: Path):
+    """EN agents contain English language directive."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "Language Requirement" in content, f"EN {name} missing language directive"
+
+
+def test_zh_generated_agents_contain_language_directive(tmp_path: Path):
+    """ZH agents contain Chinese language directive."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "语言要求" in content, f"ZH {name} missing language directive"
+
+
+def test_en_dispatch_sections_contain_response_language(tmp_path: Path):
+    """EN plan-review and code-review sections include response_language."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+
+    plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "response_language: en" in plan_content, "EN plan missing response_language"
+
+    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "response_language: en" in eval_content, "EN eval missing response_language"
+
+
+def test_zh_dispatch_sections_contain_response_language(tmp_path: Path):
+    """ZH plan-review and code-review sections include response_language."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+
+    plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "response_language: zh" in plan_content, "ZH plan missing response_language"
+
+    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "response_language: zh" in eval_content, "ZH eval missing response_language"

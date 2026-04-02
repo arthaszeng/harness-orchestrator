@@ -14,6 +14,7 @@
 | 5 | `harness-project-manager` | `mode: code-eval`、diff 范围、计划路径、交付物清单、feedback/continue-pause 上下文（如存在） |
 
 每个 prompt 必须包含：
+- `response_language: {{ artifact_lang }}`
 - `diff_range: {{ trunk_branch }}..HEAD`
 - `plan_path: .agents/tasks/task-NNN/plan.md`（如可用）
 {% if memverse_enabled == "true" %}
