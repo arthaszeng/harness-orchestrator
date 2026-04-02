@@ -308,8 +308,23 @@ class TestRunInitNonInteractive:
         assert 'evaluator_model = "inherit"' in body
         vision = agents / "vision.md"
         assert vision.exists()
+        vision_body = vision.read_text(encoding="utf-8")
+        assert "## Problem / User" in vision_body
+        assert "## North Star" in vision_body
+        assert "## Success Signals" in vision_body
+        assert "## Non-Goals / Constraints" in vision_body
+        assert "## Technical Constraints" not in vision_body
         mock_gen.assert_called_once()
         assert mock_gen.call_args.kwargs.get("lang") == "en"
+
+    def test_loads_business_oriented_zh_vision_template(self):
+        tmpl = _load_template("vision.zh.md.j2")
+        content = tmpl.render(project_name="alpha-project")
+        assert "## Problem / User" in content
+        assert "## North Star" in content
+        assert "## Success Signals" in content
+        assert "## Non-Goals / Constraints" in content
+        assert "## 技术约束" not in content
 
     @patch("harness.native.skill_gen.generate_native_artifacts")
     def test_updates_gitignore(self, _mock_gen, monkeypatch, tmp_path):

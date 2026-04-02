@@ -1,5 +1,10 @@
 ## Update Vision
 
+Treat `vision.md` as a product and direction artifact, not an implementation plan.
+- Write in business and user language that a PM, founder, or operator could understand.
+- Do NOT include libraries, frameworks, file paths, endpoint names, schema/table names, or step-by-step build choices unless they are true hard constraints.
+- If technical detail matters, record the constraint in outcome terms; implementation choices belong in `plan.md`, not `vision.md`.
+
 1. Read `.agents/vision.md` (create if missing)
 2. Synthesize the conclusion from the preceding phase into a **structured vision delta**
 3. The vision delta must capture at least:
@@ -7,7 +12,7 @@
    - `North Star`: the long-horizon direction or core promise
    - `Success Signals`: observable signals that the direction is improving
    - `Non-Goals / Constraints`: what is explicitly out of scope or constrained
-   - `Chosen Direction`: why this direction was selected now
+   - `Chosen Direction`: why this direction was selected now, expressed as product strategy rather than implementation steps
 4. Append an incremental section:
    ```markdown
    ## [Date] — [Brief Title]
@@ -26,6 +31,6 @@
    - [constraint or non-goal]
 
    ### Chosen Direction
-   [2-3 sentence summary of the direction chosen and why]
+   [2-3 sentence summary of the direction chosen and why, in user/business terms]
    ```
 5. Write back to `.agents/vision.md`

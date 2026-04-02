@@ -11,6 +11,12 @@ direction** that needs clarification before becoming a plan.
 **Human interaction phases:** Vision Clarification + Plan Review Gate
 **Autonomous phases:** Build → Eval → Ship → Auto-Retro
 
+## Workflow Boundary
+
+- Stay inside the harness workflow after clarifying the vision; do NOT call Cursor `SwitchMode` to `plan`.
+- Planning should happen through the embedded harness planning flow in this skill (the harness equivalent of `/harness-plan`), then continue to `/harness-ship`.
+- "Proceed to planning" here means the next workflow phase, not Cursor's built-in Plan mode.
+
 **Only stop for:**
 - Vision clarification (if the direction has ambiguity)
 - Review gate escalation (when plan_review_gate requires it)

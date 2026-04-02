@@ -11,6 +11,12 @@ description: "愿景驱动管线：澄清增量愿景，通过多角色评审生
 **人机交互阶段：** 愿景澄清 + Plan Review Gate
 **自主阶段：** Build → Eval → Ship → Auto-Retro
 
+## 工作流边界
+
+- 澄清完 vision 后继续留在 harness 工作流里；不要调用 Cursor 的 `SwitchMode` 切到 `plan`。
+- 规划阶段应直接使用本技能中内嵌的 harness 规划流程（等价于 `/harness-plan`），然后继续 `/harness-ship`。
+- 这里的“继续规划”指下一个 workflow 阶段，不是切换到 Cursor 内置的 Plan 模式。
+
 **仅在以下情况停止：**
 - 愿景澄清（如果方向有歧义）
 - Review gate 升级（当 plan_review_gate 要求时）
