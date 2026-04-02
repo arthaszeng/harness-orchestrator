@@ -105,6 +105,22 @@ def save_build_log(
     run_save_build_log(task=task, body=body)
 
 
+@app.command(name="save-feedback-ledger")
+def save_feedback_ledger(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    body: str = typer.Option(
+        "", "--body",
+        help="Feedback ledger JSONL content. If empty, reads from stdin.",
+    ),
+) -> None:
+    """Save feedback-ledger.jsonl to task directory (programmatic artifact write)."""
+    from harness.commands.artifact import run_save_feedback_ledger
+    run_save_feedback_ledger(task=task, body=body)
+
+
 @app.command()
 def update(
     check: bool = typer.Option(

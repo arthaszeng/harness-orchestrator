@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -68,7 +69,11 @@ def run_save_eval(
         artifact_updates={"evaluation": f".agents/tasks/{task}/{path.name}"},
         gate_updates={
             "evaluation": {
-                "status": "pass" if verdict.upper() == "PASS" else "blocked",
+                "status": (
+                    "pass"
+                    if verdict.upper() == "PASS"
+                    else ("pending" if verdict.upper() == "ITERATE" else "blocked")
+                ),
                 "reason": f"{path.name} saved with verdict {verdict.upper()}",
             },
         },
@@ -103,4 +108,34 @@ def run_save_build_log(
         artifact_updates={"build_log": f".agents/tasks/{task}/{path.name}"},
         phase=TaskState.BUILDING,
     )
+    ui.info(f"✓ {path.name} → {path}")
+
+
+def run_save_feedback_ledger(
+    *,
+    task: str,
+    body: str,
+) -> None:
+    """Write feedback-ledger.jsonl to task directory from JSONL body."""
+    from harness.core.feedback_ledger import FeedbackItem, save_feedback_ledger
+
+    ui = get_ui()
+    task_dir = _resolve_task_dir(task)
+
+    if not body:
+        if sys.stdin.isatty():
+            raise typer.BadParameter("no --body and stdin is a tty")
+        body = sys.stdin.read()
+
+    items: list[FeedbackItem] = []
+    for idx, line in enumerate(body.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            raw = json.loads(line)
+            items.append(FeedbackItem.model_validate(raw))
+        except Exception as exc:  # pragma: no cover - normalized via typer below
+            raise typer.BadParameter(f"invalid JSONL at line {idx}: {exc}") from exc
+
+    path = save_feedback_ledger(task_dir, items)
     ui.info(f"✓ {path.name} → {path}")

@@ -184,4 +184,10 @@ def save_ship_metrics(
     task_dir.mkdir(parents=True, exist_ok=True)
     path = task_dir / "ship-metrics.json"
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    from harness.core.workflow_state import WORKFLOW_STATE_FILENAME, sync_task_state, task_dir_number
+
+    # Keep generic helper usage (tmp dirs, ad-hoc scripts) backward-compatible.
+    if task_dir_number(task_dir) is not None or (task_dir / WORKFLOW_STATE_FILENAME).exists():
+        sync_task_state(task_dir, artifact_updates={"ship_metrics": path.name})
     return path

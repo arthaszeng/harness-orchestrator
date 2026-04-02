@@ -242,6 +242,26 @@ def test_sync_task_state_rejects_artifact_ref_outside_task(tmp_path: Path):
         )
 
 
+def test_sync_task_state_rejects_unknown_artifact_keys(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    WorkflowState(task_id="task-001").save(task_dir)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown artifact_updates keys: not_a_field"):
+        sync_task_state(task_dir, artifact_updates={"not_a_field": "x"})
+
+
+def test_sync_task_state_rejects_unknown_gate_keys(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    WorkflowState(task_id="task-001").save(task_dir)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown gate_updates keys: not_a_gate"):
+        sync_task_state(task_dir, gate_updates={"not_a_gate": {"status": "pass"}})
+
+
 # --- B6: HARNESS_TASK_ID env support ---
 
 

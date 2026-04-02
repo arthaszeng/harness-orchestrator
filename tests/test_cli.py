@@ -139,3 +139,33 @@ class TestStatusCommand:
         assert "evaluating" in clean
         assert "Canonical Workflow State Artifact" in clean
         assert "awaiting ship readiness" in clean
+
+
+class TestSaveFeedbackLedgerCommand:
+    def test_save_feedback_ledger_writes_file_and_updates_state(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-021"
+        task_dir.mkdir(parents=True)
+        WorkflowState(task_id="task-021").save(task_dir)
+
+        body = (
+            '{"id":"fb-1","task_id":"task-021","source_phase":"eval","source_role":"qa",'
+            '"severity":"warn","category":"test","summary":"learning","status":"open",'
+            '"decision":"none"}'
+        )
+        result = runner.invoke(
+            app,
+            ["save-feedback-ledger", "--task", "task-021", "--body", body],
+        )
+        assert result.exit_code == 0
+        assert (task_dir / "feedback-ledger.jsonl").exists()
+        state = WorkflowState.model_validate_json((task_dir / "workflow-state.json").read_text(encoding="utf-8"))
+        assert state.artifacts.feedback_ledger == ".agents/tasks/task-021/feedback-ledger.jsonl"
+
+    def test_save_feedback_ledger_rejects_invalid_jsonl(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["save-feedback-ledger", "--task", "task-022", "--body", '{"id":"broken"'],
+        )
+        assert result.exit_code != 0

@@ -152,6 +152,19 @@ class TestSaveShipMetrics:
         assert data["plan_done"] == 4
         assert data["eval_rounds"] == 2
 
+    def test_updates_workflow_state_ref(self, tmp_path: Path):
+        task_dir = tmp_path / ".agents" / "tasks" / "task-009"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-009", "phase": "idle"}',
+            encoding="utf-8",
+        )
+
+        save_ship_metrics(task_dir, branch="agent/task-009")
+        state = load_workflow_state(task_dir)
+        assert state is not None
+        assert state.artifacts.ship_metrics == ".agents/tasks/task-009/ship-metrics.json"
+
 
 class TestSaveEvaluationRawBody:
     def test_raw_body_written_verbatim(self, tmp_path: Path):
@@ -249,6 +262,61 @@ class TestCLISaveEval:
         assert state.phase.value == "evaluating"
         assert state.gates.evaluation.status.value == "pass"
 
+    def test_save_eval_iterate_sets_pending_gate(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-013"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-013", "phase": "idle"}',
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            ["save-eval", "--task", "task-013", "--verdict", "ITERATE", "--score", "6.0"],
+        )
+        assert result.exit_code == 0
+        state = load_workflow_state(task_dir)
+        assert state is not None
+        assert state.gates.evaluation.status.value == "pending"
+
+    def test_save_eval_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-014"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-014", "phase": "idle", '
+            '"artifacts": {"evaluation": ".agents/tasks/task-014/evaluation-r0.md"}}',
+            encoding="utf-8",
+        )
+
+        import harness.core.workflow_state as ws
+        original_sync = ws.sync_task_state
+
+        def fail_sync(*args, **kwargs):
+            raise OSError("sync failed")
+
+        monkeypatch.setattr(ws, "sync_task_state", fail_sync)
+        failed = runner.invoke(
+            app,
+            ["save-eval", "--task", "task-014", "--verdict", "PASS", "--body", "# Eval\n\n## Verdict: PASS\n"],
+        )
+        assert failed.exit_code != 0
+        assert (task_dir / "evaluation-r1.md").exists()
+        state_after_fail = load_workflow_state(task_dir)
+        assert state_after_fail is not None
+        assert state_after_fail.artifacts.evaluation == ".agents/tasks/task-014/evaluation-r0.md"
+
+        monkeypatch.setattr(ws, "sync_task_state", original_sync)
+        recovered = runner.invoke(
+            app,
+            ["save-eval", "--task", "task-014", "--verdict", "PASS", "--body", "# Eval\n\n## Verdict: PASS\n"],
+        )
+        assert recovered.exit_code == 0
+        state_after_recover = load_workflow_state(task_dir)
+        assert state_after_recover is not None
+        assert state_after_recover.artifacts.evaluation == ".agents/tasks/task-014/evaluation-r2.md"
+
 
 class TestCLISaveBuildLog:
     def test_save_build_log_with_body(self, tmp_path: Path, monkeypatch):
@@ -291,3 +359,40 @@ class TestCLISaveBuildLog:
         assert state is not None
         assert state.artifacts.build_log == ".agents/tasks/task-004/build-r1.log"
         assert state.phase.value == "building"
+
+    def test_save_build_log_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-015"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-015", "phase": "idle", '
+            '"artifacts": {"build_log": ".agents/tasks/task-015/build-r0.log"}}',
+            encoding="utf-8",
+        )
+
+        import harness.core.workflow_state as ws
+        original_sync = ws.sync_task_state
+
+        def fail_sync(*args, **kwargs):
+            raise OSError("sync failed")
+
+        monkeypatch.setattr(ws, "sync_task_state", fail_sync)
+        failed = runner.invoke(
+            app,
+            ["save-build-log", "--task", "task-015", "--body", "first"],
+        )
+        assert failed.exit_code != 0
+        assert (task_dir / "build-r1.log").exists()
+        state_after_fail = load_workflow_state(task_dir)
+        assert state_after_fail is not None
+        assert state_after_fail.artifacts.build_log == ".agents/tasks/task-015/build-r0.log"
+
+        monkeypatch.setattr(ws, "sync_task_state", original_sync)
+        recovered = runner.invoke(
+            app,
+            ["save-build-log", "--task", "task-015", "--body", "second"],
+        )
+        assert recovered.exit_code == 0
+        state_after_recover = load_workflow_state(task_dir)
+        assert state_after_recover is not None
+        assert state_after_recover.artifacts.build_log == ".agents/tasks/task-015/build-r2.log"
