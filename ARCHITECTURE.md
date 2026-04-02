@@ -102,8 +102,18 @@ Minimal constants only:
 Task-level canonical workflow state stored at
 `.agents/tasks/task-NNN/workflow-state.json`. It tracks phase, active plan,
 artifact refs, gate snapshots, blocker reason, and deterministic task discovery.
+`resolve_task_dir` resolves the active task with priority:
+`explicit_task_id` → `HARNESS_TASK_ID` env → `session_task_id` → latest numeric.
 `SessionState` is a session-summary compatibility layer; registry/events remain
 audit-only metadata, not gate authorities.
+
+### `worktree.py`
+
+Detects whether the current cwd is inside a Cursor parallel-agent git worktree
+(via `git rev-parse --git-common-dir` vs `--git-dir`). Returns `WorktreeInfo`
+with branch, common dir, and git dir. Used by `status` for worktree identity
+display and by worktree setup scripts for automatic `HARNESS_TASK_ID` binding.
+Isolation is task-resolution + UX scoped; no file-level distributed locking.
 
 ### `handoff.py`
 
@@ -220,7 +230,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 - `skills/harness/**` — generated skills and eval resources.
 - `agents/*.md` — five review agents plus any future template outputs.
 - `rules/*.mdc` — always-on rules (workflow, trust boundary, Fix-First, safety).
-- `worktrees.json` — optional parallel-agent worktree bootstrap commands.
+- `worktrees.json` — optional parallel-agent worktree bootstrap commands; setup scripts now auto-export `HARNESS_TASK_ID` from branch names matching `agent/task-NNN-*`.
 
 ---
 
