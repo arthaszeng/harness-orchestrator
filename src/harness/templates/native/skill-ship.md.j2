@@ -294,29 +294,35 @@ If no `TODOS.md` exists: skip silently.
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-Check for evaluation artifacts using the `TASK_DIR` established in Step 1:
+Run the **system-level gate check** using the `TASK_DIR` established in Step 1:
 
 ```bash
-ls TASK_DIR/evaluation-r*.md 2>/dev/null
+harness gate --task TASK_ID
 ```
 
-**Verification checklist:**
-1. **Exists**: The file must exist. If not → you skipped Step 3.8. Go back.
-2. **Non-empty**: The file must contain a verdict (`PASS` or `ITERATE`). An empty or stub file is not valid.
-3. **Fresh**: The evaluation must be for the CURRENT diff. If code changed after the eval
-   (e.g., fix loop commits), the latest evaluation round must post-date those changes.
-4. **Correct task**: The `TASK_DIR` must match the directory established in Step 1 pre-flight.
+Replace `TASK_ID` with the actual task directory name (e.g. `task-001`).
 
-**If ANY check fails:** You have not completed eval. **Go back to Step 3.8.**
-Do NOT rationalize ("it's just templates", "tests pass so it's fine").
-The eval is what catches issues tests cannot: security holes, design flaws, scope drift.
+**Interpreting the result:**
+- **Exit code 0 (PASS):** All hard checks passed. Proceed to Step 6.
+- **Exit code 1 (BLOCKED):** Read the output — it lists exactly which checks failed.
 
-**If evaluation file exists:** Read the verdict. Proceed only if:
+**If BLOCKED — mandatory actions:**
+1. Read each `✗` line in the output to understand why.
+2. If eval is missing → you skipped Step 3.8. **Go back and run eval.**
+3. If eval verdict is ITERATE → complete the fix loop (Step 5) and re-evaluate.
+4. If eval is stale (warning) → consider re-running eval if code changed after it.
+5. Do NOT rationalize ("it's just templates", "tests pass so it's fine").
+   The eval catches issues tests cannot: security holes, design flaws, scope drift.
+6. After fixing, re-run `harness gate --task TASK_ID` to confirm.
+
 {% if review_gate == 'advisory' %}
-- Advisory mode: any verdict is acceptable (log ITERATE but continue)
+**Advisory mode:** ITERATE verdict is logged as a warning but does not block.
+The gate only blocks when eval is missing, empty, or has no parseable verdict.
 {% else %}
-- Verdict is **PASS** (average >= {{ pass_threshold }})
-- Or all CRITICAL findings have been resolved in the fix loop
+**Eng mode:** The gate is a **hard block**. ITERATE verdict blocks shipping.
+Only **PASS** allows proceeding to Step 6.
+(Note: `harness gate` validates the verdict line, not the numeric score.
+The score threshold (>= {{ pass_threshold }}) is enforced during evaluation in Step 3.8.)
 {% endif %}
 
 ---
@@ -478,9 +484,9 @@ Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospecti
 
 If no task directory exists, write to `.agents/ship-metrics.jsonl` (append one JSON object per line).
 
-If `workflow-state.json` exists (or this branch introduced it), update it with the
-latest ship-readiness gate snapshot, evaluation artifact ref, ship metrics ref, and
-final phase/blocker outcome before finishing.
+If `workflow-state.json` exists (or this branch introduced it), run `harness gate --task TASK_ID`
+one final time to persist the ship-readiness gate snapshot, then update the evaluation
+artifact ref, ship metrics ref, and final phase/blocker outcome before finishing.
 
 ---
 

@@ -291,29 +291,35 @@ Delivered: <一句话总结>
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-使用 Step 1 中建立的 `TASK_DIR` 检查评估产物：
+运行**系统级门禁检查**，使用 Step 1 中建立的 `TASK_DIR`：
 
 ```bash
-ls TASK_DIR/evaluation-r*.md 2>/dev/null
+harness gate --task TASK_ID
 ```
 
-**验证清单：**
-1. **存在**：文件必须存在。如果不存在 → 你跳过了 Step 3.8。回去执行。
-2. **非空**：文件必须包含裁定（`PASS` 或 `ITERATE`）。空文件或占位文件无效。
-3. **新鲜**：评估必须针对当前 diff。如果评估后代码又发生了变更
-   （如修复循环提交），最新的评估轮次必须晚于这些变更。
-4. **正确任务**：`TASK_DIR` 必须与 Step 1 预检中建立的目录匹配。
+将 `TASK_ID` 替换为实际的任务目录名（如 `task-001`）。
 
-**如果任何检查失败：** 你没有完成 eval。**回到 Step 3.8。**
-不要合理化（"只是模板"、"测试通过所以没问题"）。
-评估捕获的是测试无法发现的问题：安全漏洞、设计缺陷、范围漂移。
+**解读结果：**
+- **退出码 0 (PASS)：** 所有硬检查通过。继续到 Step 6。
+- **退出码 1 (BLOCKED)：** 阅读输出 — 它列出了具体哪些检查失败。
 
-**如果评估文件存在：** 读取裁定。仅在以下情况继续：
+**如果 BLOCKED — 强制操作：**
+1. 阅读输出中每一行 `✗` 以了解原因。
+2. 如果 eval 缺失 → 你跳过了 Step 3.8。**回去运行 eval。**
+3. 如果 eval 裁定为 ITERATE → 完成修复循环 (Step 5) 后重新评审。
+4. 如果 eval 过期（warning） → 如果评审后代码有变更，考虑重新运行 eval。
+5. 不要合理化（"只是模板"、"测试通过所以没问题"）。
+   eval 捕获的是测试无法发现的问题：安全漏洞、设计缺陷、范围漂移。
+6. 修复后，重新运行 `harness gate --task TASK_ID` 以确认。
+
 {% if review_gate == 'advisory' %}
-- Advisory 模式：任何裁定都可接受（记录 ITERATE 但继续）
+**Advisory 模式：** ITERATE 裁定记录为 warning 但不阻塞。
+门禁仅在 eval 缺失、为空或没有可解析裁定时阻塞。
 {% else %}
-- 裁定为 **PASS**（平均分 >= {{ pass_threshold }}）
-- 或所有 CRITICAL 发现已在修复循环中解决
+**Eng 模式：** 门禁是**硬阻断**。ITERATE 裁定阻塞交付。
+只有 **PASS** 才允许继续到 Step 6。
+（注：`harness gate` 验证 verdict 行，不检查数值分数。
+分数阈值（>= {{ pass_threshold }}）由 Step 3.8 评审步骤执行。）
 {% endif %}
 
 ---
@@ -474,9 +480,9 @@ PR 创建/更新后，运行 `/harness-doc-release` 工作流：
 
 如果没有任务目录，写入 `.agents/ship-metrics.jsonl`（每行追加一个 JSON 对象）。
 
-如果 `workflow-state.json` 已存在（或本分支引入了它），在结束前同步更新其中的
-ship-readiness gate snapshot、evaluation artifact ref、ship metrics ref，以及最终的
-phase / blocker outcome。
+如果 `workflow-state.json` 已存在（或本分支引入了它），最终运行 `harness gate --task TASK_ID`
+以持久化 ship-readiness gate snapshot，然后更新 evaluation artifact ref、ship metrics ref，
+以及最终的 phase / blocker outcome。
 
 ---
 
