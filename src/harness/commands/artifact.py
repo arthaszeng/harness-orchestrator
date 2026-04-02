@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
+import typer
+
 from harness.core.ui import get_ui
+
+_TASK_DIR_RE = re.compile(r"^task-\d+$")
 
 
 def _resolve_task_dir(task: str) -> Path:
-    """Resolve task ID to a task directory path, creating if needed."""
+    """Resolve task ID to a task directory path, creating if needed.
+
+    Rejects values that don't match ``task-NNN`` to prevent path traversal.
+    """
+    if not _TASK_DIR_RE.match(task):
+        raise typer.BadParameter(
+            f"Invalid task ID '{task}': must match task-NNN (e.g. task-001)"
+        )
     agents_dir = Path.cwd() / ".agents"
-    task_dir = agents_dir / "tasks" / task
+    task_dir = (agents_dir / "tasks" / task).resolve()
+    if not task_dir.is_relative_to((agents_dir / "tasks").resolve()):
+        raise typer.BadParameter(f"Invalid task ID '{task}': path traversal detected")
     task_dir.mkdir(parents=True, exist_ok=True)
     return task_dir
 
@@ -31,9 +45,7 @@ def run_save_eval(
     round_num = next_eval_round(task_dir)
 
     if body:
-        task_dir.mkdir(parents=True, exist_ok=True)
-        path = task_dir / f"evaluation-r{round_num}.md"
-        path.write_text(body, encoding="utf-8")
+        path = save_evaluation(task_dir, round_num=round_num, verdict=verdict, raw_body=body)
     else:
         scores = {
             "Design": {"role": "architect", "score": score},

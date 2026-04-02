@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -17,7 +16,6 @@ from harness.core.artifacts import (
     save_ship_metrics,
 )
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 runner = CliRunner()
 
 
@@ -74,7 +72,7 @@ class TestSaveEvaluation:
         assert "architect" in text
         assert "8/10" in text
         assert "9/10" in text
-        assert "8.5/10" in text  # weighted average
+        assert "8.5/10" in text  # average
 
     def test_findings_listed(self, tmp_path: Path):
         path = save_evaluation(
@@ -152,6 +150,35 @@ class TestSaveShipMetrics:
         assert data["plan_total"] == 5
         assert data["plan_done"] == 4
         assert data["eval_rounds"] == 2
+
+
+class TestSaveEvaluationRawBody:
+    def test_raw_body_written_verbatim(self, tmp_path: Path):
+        body = "# Custom Eval\n\nCustom content here.\n\n## Verdict: PASS\n"
+        path = save_evaluation(tmp_path, raw_body=body, verdict="PASS")
+        assert path.read_text() == body
+
+    def test_raw_body_auto_increments(self, tmp_path: Path):
+        save_evaluation(tmp_path, round_num=1, verdict="ITERATE")
+        path = save_evaluation(tmp_path, raw_body="round 2 content", verdict="PASS")
+        assert path.name == "evaluation-r2.md"
+
+
+class TestCLIPathTraversal:
+    def test_rejects_dotdot(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["save-eval", "--task", "..", "--verdict", "PASS"])
+        assert result.exit_code != 0
+
+    def test_rejects_arbitrary_name(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["save-eval", "--task", "evil-name", "--verdict", "PASS"])
+        assert result.exit_code != 0
+
+    def test_accepts_valid_task_id(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["save-eval", "--task", "task-042", "--verdict", "PASS"])
+        assert result.exit_code == 0
 
 
 class TestCLISaveEval:

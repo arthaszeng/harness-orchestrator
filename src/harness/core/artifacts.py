@@ -30,7 +30,7 @@ def _next_round(task_dir: Path, pattern: re.Pattern[str]) -> int:
             m = pattern.search(p.name)
             if m:
                 max_round = max(max_round, int(m.group(1)))
-    except OSError:
+    except FileNotFoundError:
         pass
     return max_round + 1
 
@@ -54,8 +54,13 @@ def save_evaluation(
     auto_fixed: list[str] | None = None,
     ask_items: list[str] | None = None,
     verdict: str = "PASS",
+    raw_body: str | None = None,
 ) -> Path:
     """Write an ``evaluation-rN.md`` file to *task_dir*.
+
+    If *raw_body* is provided, it is written verbatim (for pre-formatted content
+    from the review synthesis step).  Otherwise a structured template is
+    generated from *scores*, *findings*, etc.
 
     If *round_num* is ``None``, auto-increments from existing files.
     Returns the path of the written file.
@@ -63,64 +68,63 @@ def save_evaluation(
     if round_num is None:
         round_num = next_eval_round(task_dir)
 
-    scores = scores or {}
-    findings = findings or []
-    auto_fixed = auto_fixed or []
-    ask_items = ask_items or []
-
-    lines: list[str] = [f"# Code Evaluation — Round {round_num}", ""]
-
-    # Dimension scores table
-    lines.append("## Dimension Scores")
-    lines.append("| Dimension | Role | Score |")
-    lines.append("|-----------|------|-------|")
-    total = 0.0
-    count = 0
-    for dimension, info in scores.items():
-        role = info.get("role", dimension)
-        score = info.get("score", 0)
-        lines.append(f"| {dimension} | {role} | {score}/10 |")
-        total += float(score)
-        count += 1
-    if count > 0:
-        avg = total / count
-        lines.append(f"| **Weighted Average** | | **{avg:.1f}/10** |")
-    lines.append("")
-
-    # Findings
-    lines.append("## Findings")
-    if findings:
-        for f in findings:
-            lines.append(f"- {f}")
+    if raw_body is not None:
+        content = raw_body
     else:
-        lines.append("None")
-    lines.append("")
+        scores = scores or {}
+        findings = findings or []
+        auto_fixed = auto_fixed or []
+        ask_items = ask_items or []
 
-    # Auto-Fixed
-    lines.append("## Auto-Fixed")
-    if auto_fixed:
-        for f in auto_fixed:
-            lines.append(f"- {f}")
-    else:
-        lines.append("None")
-    lines.append("")
+        lines: list[str] = [f"# Code Evaluation — Round {round_num}", ""]
 
-    # ASK Items
-    lines.append("## ASK Items")
-    if ask_items:
-        for a in ask_items:
-            lines.append(f"- {a}")
-    else:
-        lines.append("None")
-    lines.append("")
+        lines.append("## Dimension Scores")
+        lines.append("| Dimension | Role | Score |")
+        lines.append("|-----------|------|-------|")
+        total = 0.0
+        count = 0
+        for dimension, info in scores.items():
+            role = info.get("role", dimension)
+            score = info.get("score", 0)
+            lines.append(f"| {dimension} | {role} | {score}/10 |")
+            total += float(score)
+            count += 1
+        if count > 0:
+            avg = total / count
+            lines.append(f"| **Average** | | **{avg:.1f}/10** |")
+        lines.append("")
 
-    # Verdict
-    lines.append(f"## Verdict: {verdict.upper()}")
-    lines.append("")
+        lines.append("## Findings")
+        if findings:
+            for f in findings:
+                lines.append(f"- {f}")
+        else:
+            lines.append("None")
+        lines.append("")
+
+        lines.append("## Auto-Fixed")
+        if auto_fixed:
+            for f in auto_fixed:
+                lines.append(f"- {f}")
+        else:
+            lines.append("None")
+        lines.append("")
+
+        lines.append("## ASK Items")
+        if ask_items:
+            for a in ask_items:
+                lines.append(f"- {a}")
+        else:
+            lines.append("None")
+        lines.append("")
+
+        lines.append(f"## Verdict: {verdict.upper()}")
+        lines.append("")
+        content = "\n".join(lines)
 
     task_dir.mkdir(parents=True, exist_ok=True)
     path = task_dir / f"evaluation-r{round_num}.md"
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text(content, encoding="utf-8")
     return path
 
 
