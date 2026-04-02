@@ -62,6 +62,7 @@ Do NOT report findings in these categories — they belong to other roles:
 If you discover a CRITICAL-severity issue outside your scope, report it but prefix with
 `[CROSS-ROLE]` so the synthesis stage can route it correctly.
 
+{% if memverse_enabled == "true" %}
 ## Memverse Integration
 
 If Memverse MCP is available, call `search_memory` with:
@@ -72,6 +73,7 @@ If Memverse MCP is available, call `search_memory` with:
 
 Reference relevant memories in your findings.
 
+{% endif %}
 ## Output Contract
 
 ```

@@ -16,7 +16,9 @@ Send a SINGLE message containing all 5 Task tool calls:
 Each prompt must include:
 - `diff_range: {{ trunk_branch }}..HEAD`
 - `plan_path: .agents/tasks/task-NNN/plan.md` (if available)
-- `memverse_domain: {{ project_name }}`
+{% if memverse_enabled == "true" %}
+- `memverse_domain: {{ memverse_domain }}`
+{% endif %}
 - Role-specific context listed above
 - When the workflow includes long-horizon direction governance:
   - give PO `roadmap_backlog_path` and `feedback_ledger_path` (or an equivalent summary)

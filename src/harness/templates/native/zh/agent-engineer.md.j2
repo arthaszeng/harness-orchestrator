@@ -55,6 +55,7 @@ description: "计划和代码评审阶段的工程审查者。评估实现可行
 如果你发现了范围外的 CRITICAL 级问题，报告它但加上 `[CROSS-ROLE]` 前缀，
 以便合成阶段正确路由。
 
+{% if memverse_enabled == "true" %}
 ## Memverse 集成
 
 如果 Memverse MCP 可用，使用以下查询调用 `search_memory`：
@@ -65,6 +66,7 @@ description: "计划和代码评审阶段的工程审查者。评估实现可行
 
 在你的发现中引用相关记忆。
 
+{% endif %}
 ## 输出契约
 
 ```

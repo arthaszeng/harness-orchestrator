@@ -14,7 +14,9 @@
 | 5 | `harness-project-manager` | `mode: plan-review`、计划路径、交付物数量、文件影响数量、roadmap/backlog/stop-rule 摘要（如存在） |
 
 每个 prompt 必须包含：
-- `memverse_domain: {{ project_name }}`
+{% if memverse_enabled == "true" %}
+- `memverse_domain: {{ memverse_domain }}`
+{% endif %}
 - 计划文件内容（读取并嵌入，或提供路径）
 - 上述角色特定的上下文
 - 当工作流包含长期方向治理时：

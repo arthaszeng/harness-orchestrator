@@ -3,6 +3,7 @@ name: harness-learn
 description: "Structured learning memory management using Memverse MCP as storage backend. Search, add, prune, and export learnings across sessions. Integrates with review and ship workflows for prior knowledge retrieval. (harness)"
 ---
 
+{% if memverse_enabled == "true" %}
 # Harness Learn — Structured Learning Memory
 
 Manage project learnings that persist across sessions. Uses Memverse MCP for
@@ -13,11 +14,11 @@ semantic storage and retrieval.
 ### `/harness-learn` — Show Recent Learnings
 Display the 20 most recent learnings for this project.
 
-1. Call Memverse `search_memory` with query: "learnings for {{ project_name }}"
+1. Call Memverse `search_memory` with query: "learnings for {{ memverse_domain }}"
 2. Display in table format:
 
 ```
-RECENT LEARNINGS ({{ project_name }})
+RECENT LEARNINGS ({{ memverse_domain }})
 ═══════════════════════════════════════════════════
   #  Type         Key                    Confidence
   1  pattern      retry-with-backoff      9/10
@@ -29,7 +30,7 @@ RECENT LEARNINGS ({{ project_name }})
 ### `/harness-learn search <query>` — Semantic Search
 Search learnings by meaning.
 
-1. Call Memverse `search_memory` with the user's query and domain: "{{ project_name }}"
+1. Call Memverse `search_memory` with the user's query and domain: "{{ memverse_domain }}"
 2. Display matching learnings with relevance scores
 3. Show full insight text for each match
 
@@ -48,7 +49,7 @@ Store via Memverse `add_memories` with structured format:
 [{type}] {key}: {insight} (confidence: {confidence}/10, files: {files}, branch: {branch}, commit: {commit})
 ```
 
-Domain: "{{ project_name }}"
+Domain: "{{ memverse_domain }}"
 
 ### `/harness-learn prune` — Check Staleness
 Review existing learnings for staleness.
@@ -77,7 +78,7 @@ LEARNING HEALTH CHECK
 Export all learnings grouped by type.
 
 ```markdown
-# Project Learnings: {{ project_name }}
+# Project Learnings: {{ memverse_domain }}
 
 ## Patterns
 - **retry-with-backoff** (9/10): Always use exponential backoff for external API retries...
@@ -139,7 +140,7 @@ Each learning stored in Memverse follows this structure:
 At the start of `/harness-eval` and `/harness-ship` workflows:
 
 1. Extract key topics from the diff (file names, module names, patterns used)
-2. Call Memverse `search_memory` with these topics and domain "{{ project_name }}"
+2. Call Memverse `search_memory` with these topics and domain "{{ memverse_domain }}"
 3. If relevant learnings are found, display:
 
 ```
@@ -167,7 +168,11 @@ At the end of `/harness-eval` and `/harness-ship` workflows:
 ## Important Rules
 
 - **Always use Memverse MCP** as the storage backend — do not create local files for learnings
-- **Domain isolation** — always scope to "{{ project_name }}" domain
+- **Domain isolation** — always scope to "{{ memverse_domain }}" domain
 - **Deduplication** — before adding, search for existing learnings with similar keys
 - **Confidence decay** — learnings that are contradicted by new evidence should be updated, not just added alongside
 - **Privacy** — never store secrets, credentials, or PII as learnings
+
+{% else %}
+> Memverse is not enabled for this project. To enable, set `integrations.memverse.enabled = true` in `.agents/config.toml` and run `harness update`.
+{% endif %}

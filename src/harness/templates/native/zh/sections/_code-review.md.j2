@@ -16,7 +16,9 @@
 每个 prompt 必须包含：
 - `diff_range: {{ trunk_branch }}..HEAD`
 - `plan_path: .agents/tasks/task-NNN/plan.md`（如可用）
-- `memverse_domain: {{ project_name }}`
+{% if memverse_enabled == "true" %}
+- `memverse_domain: {{ memverse_domain }}`
+{% endif %}
 - 上述角色特定的上下文
 - 当工作流包含长期方向治理时：
   - 对 PO 额外提供 `roadmap_backlog_path` 与 `feedback_ledger_path`（或等价摘要）

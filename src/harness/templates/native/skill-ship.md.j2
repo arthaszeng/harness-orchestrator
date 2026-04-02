@@ -55,10 +55,12 @@ Run straight through and output the PR URL at the end.
    source for phase / gate / blocker / artifact refs. Update it instead of inventing
    a parallel gate record elsewhere.
 
+{% if memverse_enabled == "true" %}
 6. **Prior Learnings**: If Memverse MCP is available, search for learnings relevant to the
    changed files/modules. Display any prior pitfalls or patterns that apply to this diff.
 
-7. **Eval Readiness Reminder**: This workflow WILL run a mandatory eval at Step 3.8.
+{% endif %}
+{% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} **Eval Readiness Reminder**: This workflow WILL run a mandatory eval at Step 3.8.
    After tests pass, the NEXT step is eval — NOT commit, NOT release.
    Create a TODO list now with EVAL explicitly marked:
 

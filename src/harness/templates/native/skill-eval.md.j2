@@ -28,10 +28,12 @@ pipeline. Run straight through and output the evaluation result at the end.
 3. Read `.agents/tasks/task-NNN/plan.md` (the contract)
 4. Read `.agents/tasks/task-NNN/build-rN.log` (the latest build log)
 5. Run `git diff {{ trunk_branch }}..HEAD --stat` to understand the scope
+{% if memverse_enabled == "true" %}
 6. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
    If Memverse MCP is available, call `search_memory` with key topics from the diff.
    Display any relevant prior learnings (especially pitfalls) before starting the review.
-7. If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
+{% endif %}
+{% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
    task state file. Evaluation may append or update gate/blocker snapshots there,
    but registry/events must remain audit-only and must not become workflow gate sources.
 
@@ -46,7 +48,9 @@ unless git diff is empty.
 | `plan.md` | Warn: "No plan — evaluating raw diff" | Skip contract completeness; score Completeness as N/A |
 | `build-rN.log` | Warn: "No build log — skipping builder-claims verification" | Rely on git diff + CI only |
 | `git diff` (empty) | **FATAL** — nothing to review. Stop and report error. | Cannot proceed |
+{% if memverse_enabled == "true" %}
 | Memverse MCP | Skip silently | No prior-learnings lookup |
+{% endif %}
 
 **Minimum viable eval = non-empty git diff.** Everything else degrades gracefully.
 
@@ -67,13 +71,15 @@ unless git diff is empty.
 After the evaluation is complete, capture non-obvious insights as learnings:
 
 1. Review all findings with confidence >= 7
+{% if memverse_enabled == "true" %}
 2. For patterns or pitfalls that aren't already known:
-   - Call Memverse `add_memories` with domain "{{ project_name }}"
+   - Call Memverse `add_memories` with domain "{{ memverse_domain }}"
    - Type: "pattern" (good practice found) or "pitfall" (common mistake found)
    - Source: "observed"
 3. Log: "Captured N new learnings from this review"
 
 If Memverse MCP is not available: skip silently.
+{% endif %}
 
 ---
 
