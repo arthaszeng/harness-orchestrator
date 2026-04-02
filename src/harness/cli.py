@@ -47,6 +47,18 @@ def init(
 
 
 @app.command()
+def gate(
+    task: str = typer.Option(
+        "", "--task", "-t",
+        help="Explicit task ID (e.g. task-001). Auto-detects if omitted.",
+    ),
+) -> None:
+    """Check ship-readiness gates for the current task"""
+    from harness.commands.gate import run_gate
+    run_gate(task=task or None)
+
+
+@app.command()
 def status() -> None:
     """Show current progress and status"""
     from harness.commands.status import run_status

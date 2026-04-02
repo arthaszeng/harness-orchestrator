@@ -1,0 +1,71 @@
+"""harness gate — Ship-readiness gate check."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Optional
+
+from harness.core.gates import CheckStatus, GateVerdict, check_ship_readiness, write_gate_snapshot
+from harness.core.ui import get_ui
+from harness.core.workflow_state import resolve_task_dir
+
+
+def run_gate(*, task: Optional[str] = None) -> None:
+    """Check ship-readiness for the current (or specified) task and render results."""
+    from harness import __version__
+    from harness.core.config import HarnessConfig
+
+    ui = get_ui()
+    console = ui.console
+
+    ui.banner("gate", __version__)
+
+    agents_dir = Path.cwd() / ".agents"
+    task_dir = resolve_task_dir(agents_dir, explicit_task_id=task)
+    if task_dir is None:
+        ui.error("no task directory found" + (f" for '{task}'" if task else ""))
+        ui.info("run from a project with .agents/tasks/task-NNN/ directories")
+        sys.exit(1)
+
+    try:
+        cfg = HarnessConfig.load()
+        review_gate_mode = cfg.native.review_gate
+    except (OSError, ValueError, KeyError):
+        ui.warn("could not load harness config — defaulting to review_gate_mode='eng'")
+        review_gate_mode = "eng"
+
+    verdict = check_ship_readiness(task_dir, review_gate_mode=review_gate_mode)
+
+    _render_verdict(console, task_dir, verdict)
+
+    write_gate_snapshot(task_dir, verdict)
+
+    if not verdict.passed:
+        sys.exit(1)
+
+
+def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
+    """Render the gate verdict using Rich."""
+    task_id = task_dir.name
+
+    status_icon = {
+        CheckStatus.PASS: "[cyber.ok]✓[/]",
+        CheckStatus.BLOCKED: "[cyber.red]✗[/]",
+        CheckStatus.WARNING: "[cyber.warn]![/]",
+        CheckStatus.SKIPPED: "[cyber.dim]–[/]",
+    }
+
+    console.print(f"\n[cyber.magenta]Ship Readiness — {task_id}[/]\n")
+
+    for check in verdict.checks:
+        icon = status_icon.get(check.status, "?")
+        reason_str = f"  {check.reason}" if check.reason else ""
+        console.print(f"  {icon} {check.name}{reason_str}")
+
+    console.print()
+    if verdict.passed:
+        console.print("[cyber.ok]GATE: PASS — ready to ship[/]")
+    else:
+        console.print(f"[cyber.red]GATE: BLOCKED — {verdict.summary}[/]")
+    console.print()
