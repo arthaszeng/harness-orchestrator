@@ -106,13 +106,72 @@ def _detect_project_lang(cfg: HarnessConfig) -> str:
 
 _ROLE_NAMES = tuple(sorted(NATIVE_REVIEW_ROLES))
 
+# ---------------------------------------------------------------------------
+# Layered context assembly
+#
+#   Layer 0 (Base)  — project-wide scalars shared by all artifacts
+#   Layer 1 (Role)  — principles, per-role model selections
+#   Layer 2 (Stage) — gates, hooks, thresholds (pipeline-specific)
+# ---------------------------------------------------------------------------
 
-def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> dict[str, str]:
-    """Build the Jinja2 template context from config + i18n.
+_LAYER_KEYS: dict[int, set[str]] = {
+    0: {
+        "ci_command",
+        "trunk_branch",
+        "branch_prefix",
+        "pass_threshold",
+        "max_iterations",
+        "project_name",
+        "project_lang",
+        "retro_window_days",
+    },
+    1: {
+        "planner_principles",
+        "builder_principles",
+        "evaluator_model",
+        *(f"role_models_{rn}" for rn in sorted(NATIVE_REVIEW_ROLES)),
+    },
+    2: {
+        "review_gate",
+        "plan_review_gate",
+        "hooks_pre_build",
+        "hooks_post_eval",
+        "hooks_pre_ship",
+        "gate_full_review_min",
+        "gate_summary_confirm_min",
+    },
+}
 
-    When role is specified, irrelevant variables are stripped to reduce
-    token noise (inspired by Claude Code's omitClaudeMd pattern).
-    """
+ArtifactType = str  # "skill" | "agent" | "rule"
+
+_ARTIFACT_LAYERS: dict[tuple[ArtifactType, str], set[int]] = {
+    # Skills — need all layers (base + role + stage)
+    ("skill", "harness-brainstorm"): {0, 1, 2},
+    ("skill", "harness-vision"): {0, 1, 2},
+    ("skill", "harness-plan"): {0, 1, 2},
+    ("skill", "harness-build"): {0, 1, 2},
+    ("skill", "harness-eval"): {0, 1, 2},
+    ("skill", "harness-ship"): {0, 1, 2},
+    ("skill", "harness-investigate"): {0, 1, 2},
+    ("skill", "harness-learn"): {0, 1, 2},
+    ("skill", "harness-doc-release"): {0, 1, 2},
+    ("skill", "harness-retro"): {0, 1, 2},
+    # Agents — base + role (no stage hooks)
+    ("agent", "harness-architect"): {0, 1},
+    ("agent", "harness-product-owner"): {0, 1},
+    ("agent", "harness-engineer"): {0, 1},
+    ("agent", "harness-qa"): {0, 1},
+    ("agent", "harness-project-manager"): {0, 1},
+    # Rules — base + stage (no role)
+    ("rule", "harness-trust-boundary"): {0, 1, 2},
+    ("rule", "harness-workflow"): {0, 2},
+    ("rule", "harness-fix-first"): {0, 2},
+    ("rule", "harness-safety-guardrails"): {0},
+}
+
+
+def _build_full_context(cfg: HarnessConfig, *, lang: str = "en") -> dict[str, str]:
+    """Build the complete context with all layers."""
     rm = cfg.native.role_models
     recent_models = detect_cursor_recent_models()
     available_models = recent_models or None
@@ -121,24 +180,27 @@ def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> d
         available_models=available_models,
     )
     ctx: dict[str, str] = {
+        # Metadata (populated per-artifact by _build_layered_context callers)
+        "context_layers": "",
+        # Layer 0 — Base
         "ci_command": cfg.ci.command,
         "trunk_branch": cfg.workflow.trunk_branch,
         "branch_prefix": cfg.workflow.branch_prefix.rstrip("/"),
         "pass_threshold": str(cfg.workflow.pass_threshold),
         "max_iterations": str(cfg.workflow.max_iterations),
-        "evaluator_model": effective_evaluator_model or "IDE default",
-        "evaluator_model_requested": cfg.native.evaluator_model,
-        "adversarial_mechanism": cfg.native.adversarial_mechanism,
-        "planner_principles": _planner_principles(lang),
-        "builder_principles": _builder_principles(lang),
         "project_name": cfg.project.name,
         "project_lang": _detect_project_lang(cfg),
+        "retro_window_days": str(cfg.native.retro_window_days),
+        # Layer 1 — Role
+        "evaluator_model": effective_evaluator_model or "IDE default",
+        "planner_principles": _planner_principles(lang),
+        "builder_principles": _builder_principles(lang),
+        # Layer 2 — Stage
+        "review_gate": cfg.native.review_gate,
+        "plan_review_gate": cfg.native.plan_review_gate,
         "hooks_pre_build": cfg.native.hooks_pre_build,
         "hooks_post_eval": cfg.native.hooks_post_eval,
         "hooks_pre_ship": cfg.native.hooks_pre_ship,
-        "review_gate": cfg.native.review_gate,
-        "plan_review_gate": cfg.native.plan_review_gate,
-        "retro_window_days": str(cfg.native.retro_window_days),
         "gate_full_review_min": str(cfg.native.gate_full_review_min),
         "gate_summary_confirm_min": str(cfg.native.gate_summary_confirm_min),
     }
@@ -150,10 +212,46 @@ def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> d
             available_models=available_models,
         )
 
-    if role == "planner":
-        for key in ("builder_principles",):
-            ctx.pop(key, None)
+    return ctx
 
+
+def _filter_context(
+    full: dict[str, str],
+    artifact_type: ArtifactType,
+    artifact_name: str,
+) -> dict[str, str]:
+    """Filter a pre-built full context to the layers needed by one artifact."""
+    layers = _ARTIFACT_LAYERS.get((artifact_type, artifact_name))
+    if layers is None:
+        return dict(full)
+    allowed_keys: set[str] = set()
+    for layer_id in layers:
+        allowed_keys |= _LAYER_KEYS.get(layer_id, set())
+    return {k: v for k, v in full.items() if k in allowed_keys}
+
+
+def _build_layered_context(
+    cfg: HarnessConfig,
+    artifact_type: ArtifactType,
+    artifact_name: str,
+    *,
+    lang: str = "en",
+) -> dict[str, str]:
+    """Build a per-artifact context containing only the needed layers.
+
+    Convenience wrapper that builds full context then filters.
+    """
+    return _filter_context(_build_full_context(cfg, lang=lang), artifact_type, artifact_name)
+
+
+def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> dict[str, str]:
+    """Backward-compatible wrapper returning full context.
+
+    Existing callers (tests, one-off renders) continue to work unchanged.
+    """  # TODO(B4-compat): remove after test migration
+    ctx = _build_full_context(cfg, lang=lang)
+    if role == "planner":
+        ctx.pop("builder_principles", None)
     return ctx
 
 
@@ -236,7 +334,8 @@ def generate_native_artifacts(
         cfg = HarnessConfig.load(project_root)
 
     tmpl_dir = _get_template_dir(lang)
-    context = _build_context(cfg, lang=lang)
+    rule_activation = cfg.native.rule_activation
+    full_ctx = _build_full_context(cfg, lang=lang)
     count = 0
 
     typer.echo(t("native.generating"))
@@ -247,7 +346,8 @@ def generate_native_artifacts(
         skill_dir = skills_base / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
         out_path = skill_dir / "SKILL.md"
-        content = _render_template(tmpl_dir, tmpl_name, context)
+        ctx = _filter_context(full_ctx, "skill", skill_name)
+        content = _render_template(tmpl_dir, tmpl_name, ctx)
         out_path.write_text(content, encoding="utf-8")
         typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
         count += 1
@@ -257,7 +357,11 @@ def generate_native_artifacts(
     agents_dir.mkdir(parents=True, exist_ok=True)
     for tmpl_name, agent_name in _AGENT_TEMPLATES:
         out_path = agents_dir / f"{agent_name}.md"
-        content = _render_template(tmpl_dir, tmpl_name, context)
+        ctx = _filter_context(full_ctx, "agent", agent_name)
+        ctx["context_layers"] = ",".join(
+            str(i) for i in sorted(_ARTIFACT_LAYERS.get(("agent", agent_name), {0, 1}))
+        )
+        content = _render_template(tmpl_dir, tmpl_name, ctx)
         out_path.write_text(content, encoding="utf-8")
         typer.echo(t("native.generated_agent", path=_rel(project_root, out_path)))
         count += 1
@@ -266,8 +370,14 @@ def generate_native_artifacts(
     rules_dir = project_root / ".cursor" / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
     for tmpl_name, rule_name in _RULE_TEMPLATES:
+        activation = rule_activation.get(rule_name, "always")
+        if activation == "disabled":
+            continue
         out_path = rules_dir / f"{rule_name}.mdc"
-        content = _render_template(tmpl_dir, tmpl_name, context)
+        ctx = _filter_context(full_ctx, "rule", rule_name)
+        content = _render_template(tmpl_dir, tmpl_name, ctx)
+        if activation == "phase_match":
+            content = f"<!-- rule-activation: phase_match -->\n{content}"
         out_path.write_text(content, encoding="utf-8")
         typer.echo(t("native.generated_rule", path=_rel(project_root, out_path)))
         count += 1

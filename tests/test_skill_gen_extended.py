@@ -1370,3 +1370,163 @@ def test_zh_templates_reference_handoff(tmp_path: Path):
 
     ship_content = (skills_base / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
     assert "handoff-ship.json" in ship_content
+
+
+# --- B4: Layered context assembly ---
+
+
+def test_layered_context_agents_lack_stage_keys(tmp_path: Path):
+    """Agent artifacts should NOT receive stage-layer keys (hooks, gates)."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_layered_context(cfg, "agent", "harness-architect", lang="en")
+    assert "ci_command" in ctx
+    assert "evaluator_model" in ctx
+    for key in ("hooks_pre_build", "hooks_post_eval", "hooks_pre_ship",
+                "review_gate", "plan_review_gate",
+                "gate_full_review_min", "gate_summary_confirm_min"):
+        assert key not in ctx, f"agent should not have stage key: {key}"
+
+
+def test_layered_context_rules_lack_role_keys(tmp_path: Path):
+    """Rule artifacts with only base+stage should NOT receive role-layer keys."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_layered_context(cfg, "rule", "harness-workflow", lang="en")
+    assert "trunk_branch" in ctx
+    assert "ci_command" in ctx
+    for key in ("planner_principles", "builder_principles",
+                "role_models_architect", "role_models_qa"):
+        assert key not in ctx, f"rule without layer 1 should not have: {key}"
+
+
+def test_layered_context_skills_have_all_layers(tmp_path: Path):
+    """Skill artifacts get all layers (base + role + stage)."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_layered_context(cfg, "skill", "harness-build", lang="en")
+    assert "ci_command" in ctx
+    assert "builder_principles" in ctx
+    assert "hooks_pre_build" in ctx
+    assert "review_gate" in ctx
+
+
+def test_layered_context_unknown_artifact_gets_full(tmp_path: Path):
+    """Unknown artifact type/name falls back to full context."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_layered_context(cfg, "unknown", "unknown-name", lang="en")
+    assert "ci_command" in ctx
+    assert "builder_principles" in ctx
+    assert "hooks_pre_build" in ctx
+
+
+def test_dead_variables_removed(tmp_path: Path):
+    """adversarial_mechanism and evaluator_model_requested are not in context."""
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_context(cfg)
+    assert "adversarial_mechanism" not in ctx
+    assert "evaluator_model_requested" not in ctx
+
+
+def test_build_context_compat_wrapper_has_all_keys(tmp_path: Path):
+    """_build_context (compat wrapper) returns superset of layered context."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    full = _build_context(cfg)
+    layered = _build_layered_context(cfg, "skill", "harness-build", lang="en")
+    for key in layered:
+        assert key in full, f"compat wrapper missing key: {key}"
+
+
+def test_rule_activation_disabled_skips_file(tmp_path: Path):
+    """disabled rule_activation prevents file generation."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.rule_activation = {"harness-safety-guardrails": "disabled"}
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    rules_dir = tmp_path / ".cursor" / "rules"
+    assert not (rules_dir / "harness-safety-guardrails.mdc").exists()
+    assert (rules_dir / "harness-trust-boundary.mdc").exists()
+
+
+def test_rule_activation_phase_match_adds_marker(tmp_path: Path):
+    """phase_match rule_activation adds a marker comment to the file."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.rule_activation = {"harness-workflow": "phase_match"}
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    content = (tmp_path / ".cursor" / "rules" / "harness-workflow.mdc").read_text(encoding="utf-8")
+    assert content.startswith("<!-- rule-activation: phase_match -->")
+
+
+def test_rule_activation_default_generates_all(tmp_path: Path):
+    """Default rule_activation (empty) generates all 4 rules."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    rules_dir = tmp_path / ".cursor" / "rules"
+    assert (rules_dir / "harness-trust-boundary.mdc").exists()
+    assert (rules_dir / "harness-workflow.mdc").exists()
+    assert (rules_dir / "harness-fix-first.mdc").exists()
+    assert (rules_dir / "harness-safety-guardrails.mdc").exists()
+
+
+def test_rule_activation_disabled_reduces_artifact_count(tmp_path: Path):
+    """Disabling a rule reduces the total artifact count."""
+    cfg = _make_cfg(tmp_path)
+    count_all = generate_native_artifacts(tmp_path, cfg=cfg, force=True)
+
+    cfg.native.rule_activation = {"harness-safety-guardrails": "disabled"}
+    count_less = generate_native_artifacts(tmp_path, cfg=cfg, force=True)
+    assert count_less == count_all - 1
+
+
+def test_agent_context_layers_comment(tmp_path: Path):
+    """Generated agents contain context layers HTML comment."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for agent_name in ("harness-architect", "harness-product-owner",
+                       "harness-engineer", "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{agent_name}.md").read_text(encoding="utf-8")
+        assert "<!-- context: layers " in content, f"{agent_name} missing context layers comment"
+
+
+def test_zh_agent_context_layers_comment(tmp_path: Path):
+    """ZH generated agents contain context layers HTML comment."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for agent_name in ("harness-architect", "harness-product-owner",
+                       "harness-engineer", "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{agent_name}.md").read_text(encoding="utf-8")
+        assert "<!-- context: layers " in content
+
+
+def test_config_rule_activation_unknown_key_warns():
+    """Unknown rule_activation key emits UserWarning."""
+    import warnings as _w
+    from harness.core.config import NativeModeConfig
+
+    with _w.catch_warnings(record=True) as ws:
+        _w.simplefilter("always")
+        NativeModeConfig(rule_activation={"nonexistent-rule": "always"})
+    assert any("Unknown native.rule_activation" in str(w.message) for w in ws)
+
+
+def test_config_rule_activation_invalid_value_warns():
+    """Invalid rule_activation value emits UserWarning."""
+    import warnings as _w
+    from harness.core.config import NativeModeConfig
+
+    with _w.catch_warnings(record=True) as ws:
+        _w.simplefilter("always")
+        NativeModeConfig(rule_activation={"harness-workflow": "invalid_mode"})
+    assert any("Invalid native.rule_activation" in str(w.message) for w in ws)

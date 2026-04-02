@@ -153,11 +153,20 @@ Structured **JSONL** event logging for observability of harness-adjacent activit
 ### `skill_gen.py`
 
 - Loads **Jinja2** templates from `src/harness/templates/native/`.
-- Builds a **template context** from `HarnessConfig` (CI command, trunk branch, native gates, hooks, per-role model hints, etc.) plus small static principle blocks where templates expect them.
+- Builds a **layered template context** via `_build_layered_context()` from `HarnessConfig`.
+  Context is organized into three layers:
+  - **Layer 0 (Base)** — project-wide scalars (CI command, trunk branch, project lang, etc.)
+  - **Layer 1 (Role)** — principles (planner/builder), per-role model hints, evaluator model
+  - **Layer 2 (Stage)** — pipeline gates, hooks, thresholds
+  Each artifact receives only the layers it needs; e.g. agents get Layer 0+1 (no stage hooks),
+  most rules get Layer 0+2 (no role principles), while `harness-trust-boundary` gets all three
+  layers because it references evaluator model info. Mapping is defined in `_ARTIFACT_LAYERS`.
+- **Selective rule activation**: `NativeModeConfig.rule_activation` controls per-rule generation:
+  `"always"` (default), `"phase_match"` (adds marker comment), `"disabled"` (skips file).
 - **`generate_native_artifacts()`** writes:
   - **10 skills** under `.cursor/skills/harness/<skill-name>/SKILL.md`
-  - **5 agents** under `.cursor/agents/*.md`
-  - **4 rules** under `.cursor/rules/*.mdc`
+  - **5 agents** under `.cursor/agents/*.md` (with `<!-- context: layers ... -->` metadata)
+  - **Up to 4 rules** under `.cursor/rules/*.mdc` (count depends on `rule_activation`)
   - **Eval resources** (checklist and specialist docs) under `.cursor/skills/harness/harness-eval/`
   - **`.cursor/worktrees.json`** for parallel worktree setup (skipped if the file already exists unless `force`)
 

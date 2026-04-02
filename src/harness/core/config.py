@@ -69,6 +69,22 @@ class NativeModeConfig(BaseModel):
             'Empty string or absent = use IDE default model.'
         ),
     )
+    rule_activation: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Per-rule activation mode. "
+            'Keys: rule template names (e.g. harness-trust-boundary). '
+            'Values: "always" (default), "phase_match", "disabled".'
+        ),
+    )
+
+    _VALID_RULE_NAMES: frozenset[str] = frozenset({
+        "harness-trust-boundary",
+        "harness-workflow",
+        "harness-fix-first",
+        "harness-safety-guardrails",
+    })
+    _VALID_ACTIVATIONS: frozenset[str] = frozenset({"always", "phase_match", "disabled"})
 
     @model_validator(mode="after")
     def _validate_native_config(self) -> "NativeModeConfig":
@@ -97,6 +113,22 @@ class NativeModeConfig(BaseModel):
                 warnings.warn(
                     f"Invalid native.role_models.{role_name}; generated review agents "
                     "will fall back to the IDE default model for that role.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        unknown_rules = set(self.rule_activation) - self._VALID_RULE_NAMES
+        if unknown_rules:
+            warnings.warn(
+                f"Unknown native.rule_activation keys: {sorted(unknown_rules)}. "
+                f"Valid keys: {sorted(self._VALID_RULE_NAMES)}",
+                UserWarning,
+                stacklevel=2,
+            )
+        for rule_name, activation in self.rule_activation.items():
+            if activation not in self._VALID_ACTIVATIONS:
+                warnings.warn(
+                    f"Invalid native.rule_activation.{rule_name} value '{activation}'. "
+                    f"Valid values: {sorted(self._VALID_ACTIVATIONS)}",
                     UserWarning,
                     stacklevel=2,
                 )
