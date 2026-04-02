@@ -1,0 +1,104 @@
+## Continuous Loop Controller
+
+### Core Objects
+
+Before implementation begins, establish and maintain these 5 stable objects:
+
+1. `Roadmap`: long-horizon direction broken into stage goals
+2. `Plan Backlog`: candidate plan pool with value, dependencies, priority, and expected signals
+3. `Active Plan`: the single plan being advanced in the current round
+4. `Feedback Ledger`: what each build / eval / ship round taught you
+5. `Stop Conditions`: when to pause instead of blindly continuing
+
+Prefer these stable paths:
+
+- `.agents/vision.md`: long-horizon vision
+- `.agents/tasks/task-NNN/plan.md`: contains `## Roadmap`, `## Plan Backlog`, and `## Active Plan`
+- `.agents/tasks/task-NNN/feedback-ledger.md`: round-by-round feedback
+
+If you do not create `feedback-ledger.md`, you must provide an **equivalent stable**
+section or file path inside the task directory.
+
+### Step 1: Build the Roadmap and Plan Backlog
+
+Before writing the current round's plan, establish the long-horizon structure:
+
+1. Organize `## Roadmap` inside `task-NNN/plan.md`
+   - Each stage should define stage goals, success signals, and stop / pivot signals
+2. Organize `## Plan Backlog` inside `task-NNN/plan.md`
+   - Each backlog item must explain:
+     - what user problem it addresses
+     - why it is worth doing now
+     - which success signals it is expected to move
+     - dependencies and risks
+3. If there is no high-value backlog item, stop and report that status to the user
+   instead of forcing a plan
+
+### Step 2: Select the Current Active Plan
+
+Choose the **most valuable item right now** from the backlog and write it into
+`## Active Plan`:
+
+- It must align with the vision and the current roadmap stage
+- It must be more valuable now than the other backlog items
+- It must produce verifiable feedback, not vague exploration
+
+Only after the `Active Plan` is explicit should you enter the formal plan generation
+and review for this round.
+
+---
+
+{% include 'sections/_plan-core.md.j2' %}
+
+---
+
+{% include 'sections/_plan-review.md.j2' %}
+
+---
+
+{% include 'sections/_review-gate.md.j2' %}
+
+---
+
+## Execute the Current Round
+
+The review gate has passed. Invoke `/harness-ship` for the current `Active Plan`
+to run this round's build → eval → ship → PR pipeline.
+
+Important boundary:
+- "Continue to the next round" means the workflow protocol allows another round
+  within the same direction
+- It does **not** mean you are implementing an unattended background scheduler
+- Each round is still one complete active-plan delivery boundary
+
+### Step 3: Write Back Feedback
+
+After each `ship / eval` round, write the result into the `Feedback Ledger`,
+including at minimum:
+
+- which `Active Plan` was advanced
+- which success signals moved and which did not
+- newly exposed risks, constraints, or direction drift
+- recommended roadmap or backlog reprioritization
+- whether the next step should be continue, pause, pivot, or stop
+
+### Step 4: Decide Whether to Enter Another Round
+
+Use the latest feedback:
+
+1. If any Stop Condition is triggered, stop and report the current state
+2. If the current `Active Plan` is in `ITERATE`, keep fixing and re-evaluating;
+   do not consume the next backlog item
+3. If the current `Active Plan` passed and the direction still holds, re-rank the
+   backlog and select the next round
+
+### Stop Conditions
+
+Pause whenever any of these is true:
+
+- The user explicitly says stop
+- Review raises ASK-class findings
+- The direction clearly drifts from the vision or roadmap
+- Budget or iteration limit is reached
+- There is no high-value candidate left in the backlog
+- Feedback shows the current direction is no longer compounding positively

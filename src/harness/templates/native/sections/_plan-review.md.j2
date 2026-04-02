@@ -8,15 +8,20 @@ Send a SINGLE message containing all 5 Task tool calls:
 | # | Subagent | Prompt extras |
 |---|----------|---------------|
 | 1 | `harness-architect` | `mode: plan-review`, plan path, `ARCHITECTURE.md` path if exists |
-| 2 | `harness-product-owner` | `mode: plan-review`, plan path, `.agents/vision.md` path |
+| 2 | `harness-product-owner` | `mode: plan-review`, plan path, `.agents/vision.md` path, roadmap/backlog summary or path when available |
 | 3 | `harness-engineer` | `mode: plan-review`, plan path, source directory listing |
 | 4 | `harness-qa` | `mode: plan-review`, plan path, test directory listing, `ci_command: {{ ci_command }}` |
-| 5 | `harness-project-manager` | `mode: plan-review`, plan path, deliverable count, file impact count |
+| 5 | `harness-project-manager` | `mode: plan-review`, plan path, deliverable count, file impact count, roadmap/backlog/stop-rule summary when available |
 
 Each prompt must include:
 - `memverse_domain: {{ project_name }}`
 - The plan file content (read it and embed, or provide the path)
 - Role-specific context listed above
+- When the workflow includes long-horizon direction governance:
+  - give PO `roadmap_backlog_path` or an equivalent summary
+  - give PM `roadmap_backlog_path`, `stop_conditions`, or an equivalent summary
+  - if that context does not exist, keep the shared section's default single-round
+    semantics and do NOT force loop assumptions
 
 **Degradation ladder** (if Task tool calls fail):
 - **5/5 respond:** Full synthesis as described below

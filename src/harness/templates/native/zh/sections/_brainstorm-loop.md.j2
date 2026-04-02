@@ -1,0 +1,96 @@
+## 持续迭代控制器
+
+### 核心对象
+
+在进入实现前，先建立并维护这 5 个固定对象：
+
+1. `Roadmap`：长期方向拆成若干阶段目标
+2. `Plan Backlog`：候选计划池，记录价值、依赖、优先级与预期信号
+3. `Active Plan`：当前轮唯一要推进的计划
+4. `Feedback Ledger`：每轮 build / eval / ship 后沉淀的学习与信号
+5. `停止条件（Stop Conditions）`：什么情况下必须暂停，而不是盲目继续
+
+优先使用这些稳定路径：
+
+- `.agents/vision.md`：长期 vision
+- `.agents/tasks/task-NNN/plan.md`：包含 `## Roadmap`、`## Plan Backlog`、`## Active Plan`
+- `.agents/tasks/task-NNN/feedback-ledger.md`：逐轮反馈
+
+如果你不新建 `feedback-ledger.md`，则必须在任务目录中提供**等价且稳定**的小节或文件路径。
+
+### 步骤 1：建立 Roadmap 与 Plan Backlog
+
+在写当前轮 plan 之前，先为这个方向建立长期结构：
+
+1. 在 `task-NNN/plan.md` 中整理 `## Roadmap`
+   - 每个阶段写清阶段目标、成功信号与停止/转向信号
+2. 在 `task-NNN/plan.md` 中整理 `## Plan Backlog`
+   - 每个 backlog 项都要说明：
+     - 解决什么用户问题
+     - 为什么现在值得做
+     - 预计推进哪些 success signals
+     - 依赖与风险
+3. 如果没有高价值 backlog 项，停止并向用户汇报，而不是强行生成计划
+
+### 步骤 2：选择当前轮 Active Plan
+
+从 backlog 中选择**当前最值得推进**的一项，写入 `## Active Plan`：
+
+- 它必须与 vision 和 roadmap 当前阶段一致
+- 它必须比其他 backlog 项更有当前价值
+- 它必须能形成可验证的反馈，而不是模糊探索
+
+只有在 `Active Plan` 明确后，才进入本轮的正式计划生成与评审。
+
+---
+
+{% include 'sections/_plan-core.md.j2' %}
+
+---
+
+{% include 'sections/_plan-review.md.j2' %}
+
+---
+
+{% include 'sections/_review-gate.md.j2' %}
+
+---
+
+## 执行当前轮
+
+Review gate 已通过。对当前 `Active Plan` 调用 `/harness-ship` 执行本轮的
+build → eval → ship → PR 管线。
+
+重要边界：
+- 这里的“继续下一轮”指 workflow 协议允许你在同一方向下继续推进
+- 这**不是**要求你实现无人值守后台调度器
+- 每一轮仍然是一次完整的 active-plan 交付边界
+
+### 步骤 3：反馈回写
+
+每轮 `ship / eval` 后，必须把学习结果写回 `Feedback Ledger`，至少包含：
+
+- 本轮推进了哪个 `Active Plan`
+- 哪些 success signals 被推进了，哪些没有
+- 新暴露的风险、约束或方向偏差
+- 对 roadmap 或 backlog 的重排建议
+- 下一轮是否建议继续、暂停、转向或停止
+
+### 步骤 4：决定是否进入下一轮
+
+根据最新 feedback：
+
+1. 如果触发 Stop Conditions，停止并向用户汇报当前状态
+2. 如果当前 `Active Plan` 处于 `ITERATE`，继续修复并复评，同一 backlog 项不出队
+3. 如果当前 `Active Plan` 已通过且方向仍成立，重排 backlog 并选择下一轮
+
+### 停止条件（Stop Conditions）
+
+出现以下任一条件时，必须暂停：
+
+- 用户明确喊停
+- 评审出现 ASK 类问题
+- 方向与 vision / roadmap 明显失配
+- 达到预算或迭代上限
+- backlog 中没有高价值候选项
+- feedback 表明当前方向已不再产生正反馈

@@ -1,20 +1,21 @@
 ---
 name: harness-brainstorm
-description: "发散探索到 PR：通过苏格拉底式提问帮助用户思考模糊想法，收敛为愿景更新和计划，然后自动执行 build/eval/ship/retro。当用户说 brainstorm、我有个想法、帮我想想、探索一下或 harness brainstorm 时使用。(harness)"
+description: "愿景驱动的持续迭代引擎：通过苏格拉底式提问帮助用户挖掘真实需求，沉淀结构化 vision，生成 roadmap 与 plan backlog，并按 active plan 持续执行 build/eval/ship，直到用户喊停。当用户说 brainstorm、我有个想法、帮我想想、探索一下或 harness brainstorm 时使用。(harness)"
 ---
 
-# Harness Brainstorm — 从想法到 PR
+# Harness Brainstorm — 从想法到迭代循环
 
 你正在运行 `/harness-brainstorm` 工作流。用户有一个**模糊的想法**，
-需要发散探索后收敛为计划。
+需要先通过发散探索挖掘真实需求，再沉淀为可持续推进的方向。
 
-**人机交互阶段：** 发散探索 + 愿景 + Plan Review Gate
-**自主阶段：** Build → Eval → Ship → Auto-Retro
+**人机交互阶段：** 发散探索 + 结构化愿景
+**自主阶段：** Roadmap / Backlog / Active Plan Loop → Build → Eval → Ship → Feedback
 
 **仅在以下情况停止：**
 - 苏格拉底式探索（这正是 brainstorm 的意义 — 与用户互动）
 - Review gate 升级（当 plan_review_gate 要求时）
 - 评审中 ASK 类发现
+- 用户明确喊停
 
 **绝不因以下原因停止：**
 - 实现决策（在 build 阶段做出）
@@ -63,9 +64,10 @@ Which approach resonates? Or combine/remix ideas?
 
 ---
 
-{# Recursive composition: brainstorm = Phase 0 + vision-content (which includes plan-content) #}
+{# Brainstorm now uses structured vision + brainstorm-only loop controller. #}
 {% with interaction_depth="high" %}
-{% include 'sections/_vision-content.md.j2' %}
+{% include 'sections/_vision-core.md.j2' %}
+{% include 'sections/_brainstorm-loop.md.j2' %}
 {% endwith %}
 
 ---

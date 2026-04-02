@@ -1,20 +1,21 @@
 ---
 name: harness-brainstorm
-description: "Divergent exploration to PR: help the user think through a vague idea via Socratic questioning, converge on a vision update and plan, then auto-execute build/eval/ship/retro. Use when saying brainstorm, I have an idea, help me think, explore this, or harness brainstorm. (harness)"
+description: "Vision-driven continuous loop: help the user uncover the real need via Socratic questioning, synthesize a structured vision, build a roadmap and plan backlog, then keep executing active plans through build/eval/ship until the user says stop. Use when saying brainstorm, I have an idea, help me think, explore this, or harness brainstorm. (harness)"
 ---
 
-# Harness Brainstorm — From Idea to PR
+# Harness Brainstorm — From Idea to Iteration Loop
 
 You are running the `/harness-brainstorm` workflow. The user has a **vague idea**
-that needs divergent exploration before converging into a plan.
+that needs divergent exploration before becoming a durable direction.
 
-**Human interaction phases:** Divergent Exploration + Vision + Plan Review Gate
-**Autonomous phases:** Build → Eval → Ship → Auto-Retro
+**Human interaction phases:** Divergent Exploration + Structured Vision
+**Autonomous phases:** Roadmap / Backlog / Active Plan Loop → Build → Eval → Ship → Feedback
 
 **Only stop for:**
 - Socratic exploration (the whole point of brainstorm — engage the user)
 - Review gate escalation (when plan_review_gate requires it)
 - ASK-classified review findings during eval
+- The user explicitly says stop
 
 **Never stop for:**
 - Implementation decisions (make them during build)
@@ -63,9 +64,10 @@ Let the user pick, combine, or propose alternatives. This is a conversation, not
 
 ---
 
-{# Recursive composition: brainstorm = Phase 0 + vision-content (which includes plan-content) #}
+{# Brainstorm now uses structured vision + brainstorm-only loop controller. #}
 {% with interaction_depth="high" %}
-{% include 'sections/_vision-content.md.j2' %}
+{% include 'sections/_vision-core.md.j2' %}
+{% include 'sections/_brainstorm-loop.md.j2' %}
 {% endwith %}
 
 ---

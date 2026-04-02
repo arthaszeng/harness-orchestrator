@@ -48,11 +48,14 @@ Open your project in Cursor. Three primary entry points cover all task sizes:
 
 | Skill | When to use | What it does |
 |-------|-------------|--------------|
-| `/harness-brainstorm` | "I have an idea" | Divergent exploration → vision → plan → auto build/eval/ship/retro |
+| `/harness-brainstorm` | "I have an idea" | Divergent exploration → structured vision → roadmap/backlog → iterative build/eval/ship loop |
 | `/harness-vision` | "I have a direction" | Clarify vision → plan → auto build/eval/ship/retro |
 | `/harness-plan` | "I have a requirement" | Refine plan + 5-role review → auto build/eval/ship/retro |
 
-All three use recursive composition (brainstorm ⊃ vision ⊃ plan) and share the same review → ship pipeline.
+Use `/harness-brainstorm` when you want a long-horizon loop that can keep picking the next active plan from a roadmap/backlog.
+Use `/harness-vision` when the direction is already clear and you want one clarified increment before planning and shipping.
+Use `/harness-plan` when you already have one defined task and want a single-round plan → ship flow.
+The entry points still share core building blocks such as vision capture, multi-role review, and the review → ship pipeline.
 
 **Utility skills:**
 

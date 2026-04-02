@@ -548,7 +548,8 @@ def test_brainstorm_has_divergent_phase(tmp_path: Path):
     content = bs.read_text(encoding="utf-8")
     assert "Divergent Exploration" in content
     assert "APPROACH OPTIONS" in content
-    assert "From Idea to PR" in content
+    assert "From Idea to Iteration Loop" in content
+    assert "Continuous Loop Controller" in content
 
 
 def test_brainstorm_updates_vision(tmp_path: Path):
@@ -559,6 +560,7 @@ def test_brainstorm_updates_vision(tmp_path: Path):
     content = bs.read_text(encoding="utf-8")
     assert "vision.md" in content
     assert "Update Vision" in content
+    assert "Success Signals" in content
 
 
 def test_vision_has_clarification_phase(tmp_path: Path):
@@ -779,13 +781,17 @@ def test_brainstorm_includes_vision_core(tmp_path: Path):
 
 
 def test_brainstorm_includes_plan_core(tmp_path: Path):
-    """brainstorm recursively includes _plan-core content (via vision-content → plan-content)."""
+    """brainstorm still includes active-plan generation within the loop controller."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     bs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
     content = bs.read_text(encoding="utf-8")
     assert "Plan Generation" in content
-    assert "Produce Spec + Contract" in content
+    assert "Plan Backlog" in content
+    assert "Active Plan" in content
+    assert "Feedback Ledger" in content
+    assert "Stop Conditions" in content
+    assert "unattended background scheduler" in content
 
 
 def test_brainstorm_includes_plan_review(tmp_path: Path):
@@ -800,8 +806,25 @@ def test_brainstorm_includes_plan_review(tmp_path: Path):
     assert "harness-qa" in content
 
 
+def test_brainstorm_and_ship_include_long_horizon_review_context_hints(tmp_path: Path):
+    """Generated skills expose stable long-horizon review context hints."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    brainstorm = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
+    brainstorm_content = brainstorm.read_text(encoding="utf-8")
+    assert "roadmap_backlog_path" in brainstorm_content
+    assert "single-round" in brainstorm_content
+    assert "do NOT force loop assumptions" in brainstorm_content
+
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    ship_content = ship.read_text(encoding="utf-8")
+    assert "feedback_ledger_path" in ship_content
+    assert "continue_pause_summary" in ship_content
+
+
 def test_brainstorm_includes_ship_invocation(tmp_path: Path):
-    """brainstorm includes the ship invocation at the end of plan-content."""
+    """brainstorm includes the ship invocation inside the loop controller."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     bs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md")
@@ -836,6 +859,32 @@ def test_plan_includes_plan_core_not_vision(tmp_path: Path):
     content = pl.read_text(encoding="utf-8")
     assert "Plan Generation" in content
     assert "Update Vision" not in content
+    assert "Continuous Loop Controller" not in content
+    assert "Plan Backlog" not in content
+
+
+def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
+    """PO and PM agents include long-horizon governance language."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    po = (tmp_path / ".cursor" / "agents" / "harness-product-owner.md").read_text(encoding="utf-8")
+    assert "Roadmap / Plan Backlog alignment" in po
+    assert "Evidence of direction progress" in po
+    assert "Long-Horizon Governance Boundary" in po
+    assert "Direction recommendation" in po
+    assert "single-round" in po
+    assert "do NOT" in po
+    assert "`N/A`" in po
+
+    pm = (tmp_path / ".cursor" / "agents" / "harness-project-manager.md").read_text(encoding="utf-8")
+    assert "Roadmap / Active Plan relationship" in pm
+    assert "Backlog health" in pm
+    assert "Long-Horizon Governance Boundary" in pm
+    assert "Direction recommendation" in pm
+    assert "single-round" in pm
+    assert "do NOT" in pm
+    assert "`N/A`" in pm
 
 
 def test_plan_includes_plan_review(tmp_path: Path):
@@ -1102,6 +1151,31 @@ def test_zh_generated_artifacts_contain_chinese(tmp_path: Path):
     assert "信任边界" in content_rule, "zh trust-boundary rule should be in Chinese"
 
 
+def test_zh_brainstorm_and_governance_agents_contain_loop_concepts(tmp_path: Path):
+    """zh generation includes brainstorm loop anchors and governance language."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    brainstorm = tmp_path / ".cursor" / "skills" / "harness" / "harness-brainstorm" / "SKILL.md"
+    content_bs = brainstorm.read_text(encoding="utf-8")
+    assert "持续迭代控制器" in content_bs
+    assert "Plan Backlog" in content_bs
+    assert "Feedback Ledger" in content_bs
+    assert "停止条件" in content_bs
+
+    po = tmp_path / ".cursor" / "agents" / "harness-product-owner.md"
+    content_po = po.read_text(encoding="utf-8")
+    assert "长期方向治理边界" in content_po
+    assert "方向推进证据" in content_po
+    assert "Direction recommendation" in content_po
+
+    pm = tmp_path / ".cursor" / "agents" / "harness-project-manager.md"
+    content_pm = pm.read_text(encoding="utf-8")
+    assert "长期方向治理边界" in content_pm
+    assert "Backlog 健康度" in content_pm
+    assert "Direction recommendation" in content_pm
+
+
 def test_zh_resources_contain_chinese(tmp_path: Path):
     """zh static resources (review-checklist, specialists) contain Chinese."""
     cfg = _make_cfg(tmp_path)
@@ -1156,6 +1230,32 @@ def test_i18n_catalogs_key_parity():
     missing_in_en = zh_keys - en_keys
     assert not missing_in_zh, f"Keys in en.py but missing in zh.py: {sorted(missing_in_zh)}"
     assert not missing_in_en, f"Keys in zh.py but missing in en.py: {sorted(missing_in_en)}"
+
+
+def test_brainstorm_i18n_hints_describe_loop():
+    """init/native hints describe brainstorm as a loop, not a single plan."""
+    from harness.i18n.en import MESSAGES as EN
+    from harness.i18n.zh import MESSAGES as ZH
+
+    assert "roadmap/backlog" in EN["native.hint_brainstorm"]
+    assert "active plan" in EN["init.guide_brainstorm"]
+    assert "roadmap/backlog" in ZH["native.hint_brainstorm"]
+    assert "active plan" in ZH["init.guide_brainstorm"]
+
+
+def test_readmes_explain_entry_point_boundaries():
+    """README docs distinguish brainstorm, vision, and single-round plan usage."""
+    repo_root = Path(__file__).resolve().parents[1]
+    readme_en = (repo_root / "README.md").read_text(encoding="utf-8")
+    readme_zh = (repo_root / "README.zh-CN.md").read_text(encoding="utf-8")
+
+    assert "long-horizon loop" in readme_en
+    assert "/harness-vision" in readme_en
+    assert "single-round plan" in readme_en
+
+    assert "长期方向" in readme_zh
+    assert "/harness-vision" in readme_zh
+    assert "单轮 plan" in readme_zh
 
 
 def test_zh_ship_skill_contains_chinese(tmp_path: Path):

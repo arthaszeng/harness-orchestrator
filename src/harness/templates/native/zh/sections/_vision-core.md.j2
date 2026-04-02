@@ -1,10 +1,31 @@
 ## 更新愿景
 
 1. 读取 `.agents/vision.md`（如不存在则创建）
-2. 将前一阶段的结论综合为愿景增量
-3. 追加增量段落：
+2. 将前一阶段的结论综合为**结构化愿景增量**
+3. 愿景增量至少要明确：
+   - `Problem / User`：正在解决什么问题，为谁解决
+   - `North Star`：长期方向或核心承诺
+   - `Success Signals`：哪些信号说明这个方向正在变好
+   - `Non-Goals / Constraints`：当前明确不做什么，有哪些约束
+   - `Chosen Direction`：本轮为什么选这个方向
+4. 追加增量段落：
    ```markdown
    ## [日期] — [简要标题]
-   [2-3 句话总结所选方向及原因]
+
+   ### Problem / User
+   [1-2 句话]
+
+   ### North Star
+   [1-2 句话]
+
+   ### Success Signals
+   - [signal 1]
+   - [signal 2]
+
+   ### Non-Goals / Constraints
+   - [constraint or non-goal]
+
+   ### Chosen Direction
+   [2-3 句话总结本轮方向与原因]
    ```
-4. 写回 `.agents/vision.md`
+5. 写回 `.agents/vision.md`

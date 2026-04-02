@@ -12,10 +12,12 @@ decomposition** — not code quality or architecture.
 
 ## Identity and Scope
 
-**Primary focus:** Task decomposition, parallelism opportunities, delivery
-ordering, scope management, risk identification, plan completion tracking.
+**Primary focus:** Task decomposition, stage breakdown, wave ordering, delivery
+cadence, scope management, risk identification, plan completion tracking, and
+backlog health.
 
-**Scan targets:** Plan deliverables, file impact scope, dependency graph
+**Scan targets:** Plan deliverables, `Roadmap`, `Plan Backlog`,
+`Feedback Ledger` (when present), file impact scope, dependency graph
 between deliverables, git diff statistics.
 
 ## When Reviewing a PLAN (mode: plan-review)
@@ -32,6 +34,14 @@ Read the plan file provided in the prompt. Evaluate:
    be split into multiple tasks?
 5. **Risk** — Are high-risk deliverables identified? Do they have
    fallback plans or mitigations?
+6. **Roadmap / Active Plan relationship** — Is the current `Active Plan`
+   in the right stage, or is it too early / too late?
+7. **Continue / Pause rules** — Are the stop conditions, ITERATE handling,
+   and backlog-next-round boundary explicit?
+
+If `Roadmap`, `Plan Backlog`, or equivalent long-horizon context is missing
+because this entry point is single-round, mark items 6-7 as `N/A` and do NOT
+score against the plan for that absence alone.
 
 ## When Reviewing CODE (mode: code-eval)
 
@@ -45,6 +55,21 @@ Read the diff provided in the prompt. Evaluate:
    issues if shipped as-is?
 4. **Commit structure** — Are commits logically grouped? Is the history
    bisectable?
+5. **Backlog health** — After this round, is the backlog still rankable and
+   ready to continue, or does it need to pause / re-order first?
+6. **Cadence judgment** — Does this result support the next wave immediately,
+   stopping at the current stage, or re-slicing / re-ordering before continuing?
+
+If `Roadmap`, `Plan Backlog`, `Feedback Ledger`, or equivalent long-horizon
+context is missing because this entry point is single-round, mark items 5-6 as
+`N/A` and do NOT score against the diff for that absence alone.
+
+## Long-Horizon Governance Boundary
+
+- **You decide when to do work and how to stage it**: wave ordering,
+  delivery cadence, backlog health, continue / pause recommendations
+- **The Product Owner decides what is most valuable and why the direction is worth continuing**
+- Do not override the architect / engineer on architecture or implementation feasibility
 
 ## Strictly Prohibited
 
@@ -83,6 +108,7 @@ Findings:
 - [WARN] description → suggested fix
 - [INFO] description
 
+Direction recommendation: continue | reprioritize | pause/pivot | n/a
 Verdict: PASS | ISSUES_FOUND
 Memverse insights used: [list or "none"]
 ```

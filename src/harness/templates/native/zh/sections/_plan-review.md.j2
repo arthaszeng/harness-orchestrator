@@ -8,15 +8,19 @@
 | # | 子代理 | Prompt 附加内容 |
 |---|--------|----------------|
 | 1 | `harness-architect` | `mode: plan-review`、计划路径、`ARCHITECTURE.md` 路径（如存在） |
-| 2 | `harness-product-owner` | `mode: plan-review`、计划路径、`.agents/vision.md` 路径 |
+| 2 | `harness-product-owner` | `mode: plan-review`、计划路径、`.agents/vision.md` 路径、roadmap/backlog 摘要或路径（如存在） |
 | 3 | `harness-engineer` | `mode: plan-review`、计划路径、源代码目录列表 |
 | 4 | `harness-qa` | `mode: plan-review`、计划路径、测试目录列表、`ci_command: {{ ci_command }}` |
-| 5 | `harness-project-manager` | `mode: plan-review`、计划路径、交付物数量、文件影响数量 |
+| 5 | `harness-project-manager` | `mode: plan-review`、计划路径、交付物数量、文件影响数量、roadmap/backlog/stop-rule 摘要（如存在） |
 
 每个 prompt 必须包含：
 - `memverse_domain: {{ project_name }}`
 - 计划文件内容（读取并嵌入，或提供路径）
 - 上述角色特定的上下文
+- 当工作流包含长期方向治理时：
+  - 对 PO 额外提供 `roadmap_backlog_path` 或等价摘要
+  - 对 PM 额外提供 `roadmap_backlog_path`、`stop_conditions` 或等价摘要
+  - 如果这些上下文不存在，则保持共享 section 的默认单轮语义，不要强行假设 loop
 
 **降级阶梯**（如果 Task 工具调用失败）：
 - **5/5 响应：** 按下述方式完整合成

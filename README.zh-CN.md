@@ -48,11 +48,14 @@ harness init
 
 | 技能 | 何时用 | 功能 |
 |------|--------|------|
-| `/harness-brainstorm` | "我有个想法" | 发散探索 → vision → 计划 → 自动构建/评审/发布/回顾 |
+| `/harness-brainstorm` | "我有个想法" | 发散探索 → 结构化 vision → roadmap/backlog → 迭代式构建/评审/发布循环 |
 | `/harness-vision` | "我有个方向" | 澄清 vision → 计划 → 自动构建/评审/发布/回顾 |
 | `/harness-plan` | "我有个需求" | 细化计划 + 5 角色审查 → 自动构建/评审/发布/回顾 |
 
-三个入口采用递归组合（brainstorm ⊃ vision ⊃ plan），共享同一审查 → ship 管线。
+当你需要长期方向、自主探索和连续推进时，用 `/harness-brainstorm`。
+当你的方向已经清楚，只想先澄清一个增量愿景再继续规划和交付时，用 `/harness-vision`。
+当你已经有一个明确任务，只想走单轮 plan → ship 时，用 `/harness-plan`。
+这些入口仍共享愿景沉淀、多角色评审和 review → ship 等核心构件。
 
 **工具类技能：**
 

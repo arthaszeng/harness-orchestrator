@@ -8,16 +8,20 @@
 | # | 子代理 | Prompt 附加内容 |
 |---|--------|----------------|
 | 1 | `harness-architect` | `mode: code-eval`、diff 范围、架构文档路径 |
-| 2 | `harness-product-owner` | `mode: code-eval`、diff 范围、`.agents/vision.md` 路径、计划路径 |
+| 2 | `harness-product-owner` | `mode: code-eval`、diff 范围、`.agents/vision.md` 路径、计划路径、roadmap/backlog/feedback 上下文（如存在） |
 | 3 | `harness-engineer` | `mode: code-eval`、diff 范围、源代码目录列表 |
 | 4 | `harness-qa` | `mode: code-eval`、diff 范围、`ci_command: {{ ci_command }}`、测试目录列表 |
-| 5 | `harness-project-manager` | `mode: code-eval`、diff 范围、计划路径、交付物清单 |
+| 5 | `harness-project-manager` | `mode: code-eval`、diff 范围、计划路径、交付物清单、feedback/continue-pause 上下文（如存在） |
 
 每个 prompt 必须包含：
 - `diff_range: {{ trunk_branch }}..HEAD`
 - `plan_path: .agents/tasks/task-NNN/plan.md`（如可用）
 - `memverse_domain: {{ project_name }}`
 - 上述角色特定的上下文
+- 当工作流包含长期方向治理时：
+  - 对 PO 额外提供 `roadmap_backlog_path` 与 `feedback_ledger_path`（或等价摘要）
+  - 对 PM 额外提供 `feedback_ledger_path` 与 `continue_pause_summary`（或等价摘要）
+  - 如果这些上下文不存在，则保持共享 section 的默认单轮语义，不要强行引入 loop 结论
 
 **CI 所有权：** 只有 `harness-qa` 运行 `{{ ci_command }}`。其他角色
 对 diff 执行只读分析。

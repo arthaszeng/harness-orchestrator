@@ -1,10 +1,31 @@
 ## Update Vision
 
 1. Read `.agents/vision.md` (create if missing)
-2. Synthesize the conclusion from the preceding phase into a vision delta
-3. Append an incremental section:
+2. Synthesize the conclusion from the preceding phase into a **structured vision delta**
+3. The vision delta must capture at least:
+   - `Problem / User`: what problem is being solved, and for whom
+   - `North Star`: the long-horizon direction or core promise
+   - `Success Signals`: observable signals that the direction is improving
+   - `Non-Goals / Constraints`: what is explicitly out of scope or constrained
+   - `Chosen Direction`: why this direction was selected now
+4. Append an incremental section:
    ```markdown
    ## [Date] — [Brief Title]
+
+   ### Problem / User
+   [1-2 sentences]
+
+   ### North Star
+   [1-2 sentences]
+
+   ### Success Signals
+   - [signal 1]
+   - [signal 2]
+
+   ### Non-Goals / Constraints
+   - [constraint or non-goal]
+
+   ### Chosen Direction
    [2-3 sentence summary of the direction chosen and why]
    ```
-4. Write back to `.agents/vision.md`
+5. Write back to `.agents/vision.md`
