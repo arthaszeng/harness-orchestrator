@@ -16,38 +16,47 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
-_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
+_PLAN_EVAL_ROUND_RE = re.compile(r"plan-eval-r(\d+)\.md$")
+_CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
+_LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
+_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.md$")
+_LEGACY_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
 
 
-def _next_round(task_dir: Path, pattern: re.Pattern[str]) -> int:
+def _next_round(task_dir: Path, patterns: tuple[re.Pattern[str], ...]) -> int:
     """Return the next available round number (1-based)."""
     max_round = 0
     try:
         for p in task_dir.iterdir():
-            m = pattern.search(p.name)
-            if m:
-                max_round = max(max_round, int(m.group(1)))
+            for pattern in patterns:
+                m = pattern.search(p.name)
+                if m:
+                    max_round = max(max_round, int(m.group(1)))
+                    break
     except FileNotFoundError:
         pass
     return max_round + 1
 
 
 def next_eval_round(task_dir: Path) -> int:
-    """Return the next evaluation round number."""
-    return _next_round(task_dir, _EVAL_ROUND_RE)
+    """Return the next global eval round across plan/code eval files."""
+    return _next_round(
+        task_dir,
+        (_PLAN_EVAL_ROUND_RE, _CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE),
+    )
 
 
 def next_build_round(task_dir: Path) -> int:
     """Return the next build log round number."""
-    return _next_round(task_dir, _BUILD_ROUND_RE)
+    return _next_round(task_dir, (_BUILD_ROUND_RE, _LEGACY_BUILD_ROUND_RE))
 
 
 def save_evaluation(
     task_dir: Path,
     *,
+    kind: Literal["plan", "code"] = "code",
     round_num: int | None = None,
     scores: dict[str, dict[str, Any]] | None = None,
     findings: list[str] | None = None,
@@ -56,7 +65,7 @@ def save_evaluation(
     verdict: str = "PASS",
     raw_body: str | None = None,
 ) -> Path:
-    """Write an ``evaluation-rN.md`` file to *task_dir*.
+    """Write a ``{kind}-eval-rN.md`` file to *task_dir*.
 
     If *raw_body* is provided, it is written verbatim (for pre-formatted content
     from the review synthesis step).  Otherwise a structured template is
@@ -76,7 +85,8 @@ def save_evaluation(
         auto_fixed = auto_fixed or []
         ask_items = ask_items or []
 
-        lines: list[str] = [f"# Code Evaluation — Round {round_num}", ""]
+        title = "Plan Evaluation" if kind == "plan" else "Code Evaluation"
+        lines: list[str] = [f"# {title} — Round {round_num}", ""]
 
         lines.append("## Dimension Scores")
         lines.append("| Dimension | Role | Score |")
@@ -123,7 +133,7 @@ def save_evaluation(
         content = "\n".join(lines)
 
     task_dir.mkdir(parents=True, exist_ok=True)
-    path = task_dir / f"evaluation-r{round_num}.md"
+    path = task_dir / f"{kind}-eval-r{round_num}.md"
     path.write_text(content, encoding="utf-8")
     return path
 
@@ -134,7 +144,7 @@ def save_build_log(
     *,
     round_num: int | None = None,
 ) -> Path:
-    """Write a ``build-rN.log`` file to *task_dir*.
+    """Write a ``build-rN.md`` file to *task_dir*.
 
     Returns the path of the written file.
     """
@@ -142,7 +152,7 @@ def save_build_log(
         round_num = next_build_round(task_dir)
 
     task_dir.mkdir(parents=True, exist_ok=True)
-    path = task_dir / f"build-r{round_num}.log"
+    path = task_dir / f"build-r{round_num}.md"
     path.write_text(content, encoding="utf-8")
     return path
 

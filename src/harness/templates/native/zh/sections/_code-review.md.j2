@@ -85,7 +85,7 @@
 **使用 CLI 保存评审结果**（必须执行 — 不可跳过）：
 
 ```bash
-harness save-eval --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
+harness save-eval --kind code --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
 # Code Evaluation — Round N
 
 ## Dimension Scores
@@ -113,4 +113,4 @@ EVAL_EOF
 ```
 
 将 `task-NNN`、分数和 `PASS`/`ITERATE` 替换为实际值。
-命令会以自动递增的轮次编号创建 `evaluation-rN.md`。
+命令会以自动递增的轮次编号创建 `code-eval-rN.md`。

@@ -63,24 +63,29 @@ class GateVerdict:
         return [c for c in self.checks if c.status == CheckStatus.WARNING]
 
 
-_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
-_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
+_CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
+_LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
+_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.md$")
+_LEGACY_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
 _VERDICT_LINE_RE = re.compile(r"^##\s+Verdict:\s+(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 
 
-def _latest_numbered_file(task_dir: Path, pattern: re.Pattern[str]) -> Path | None:
-    """Return the file with the highest numeric round, or None."""
+def _latest_numbered_file_from_patterns(task_dir: Path, patterns: tuple[re.Pattern[str], ...]) -> Path | None:
+    """Return the file with the highest numeric round across patterns, or None."""
     best: tuple[int, Path] | None = None
     try:
         entries = list(task_dir.iterdir())
     except OSError:
         return None
     for p in entries:
-        m = pattern.search(p.name)
-        if m:
+        for pattern in patterns:
+            m = pattern.search(p.name)
+            if not m:
+                continue
             num = int(m.group(1))
             if best is None or num > best[0]:
                 best = (num, p)
+            break
     return best[1] if best else None
 
 
@@ -121,13 +126,16 @@ def check_ship_readiness(
             "plan.md is missing or empty",
         ))
 
-    latest_eval = _latest_numbered_file(task_dir, _EVAL_ROUND_RE)
+    latest_eval = _latest_numbered_file_from_patterns(
+        task_dir,
+        (_CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE),
+    )
     if latest_eval and _file_exists_and_nonempty(latest_eval):
         checks.append(CheckItem("eval_exists", CheckStatus.PASS))
     else:
         checks.append(CheckItem(
             "eval_exists", CheckStatus.BLOCKED,
-            "no non-empty evaluation-rN.md found",
+            "no non-empty code-eval-rN.md found",
         ))
 
     verdict_value: str | None = None
@@ -179,13 +187,16 @@ def check_ship_readiness(
 
     # --- Soft checks ---
 
-    latest_build = _latest_numbered_file(task_dir, _BUILD_ROUND_RE)
+    latest_build = _latest_numbered_file_from_patterns(
+        task_dir,
+        (_BUILD_ROUND_RE, _LEGACY_BUILD_ROUND_RE),
+    )
     if latest_build and latest_build.exists():
         checks.append(CheckItem("build_exists", CheckStatus.PASS))
     else:
         checks.append(CheckItem(
             "build_exists", CheckStatus.WARNING,
-            "no build-rN.log found (may be expected for hotfixes)",
+            "no build-rN.md found (may be expected for hotfixes)",
         ))
 
     if latest_eval and latest_eval.exists():

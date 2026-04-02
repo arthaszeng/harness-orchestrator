@@ -190,8 +190,9 @@ All task state lives under `.agents/`:
 ├── tasks/
 │   └── task-001/
 │       ├── plan.md        # Plan with spec and contract
-│       ├── evaluation-r1.md
-│       ├── build-r1.log
+│       ├── plan-eval-r1.md
+│       ├── code-eval-r2.md
+│       ├── build-r1.md
 │       └── ...
 └── archive/               # Archived sessions
 ```

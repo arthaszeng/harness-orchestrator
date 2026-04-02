@@ -8,8 +8,16 @@ alwaysApply: true
 ## 任务状态
 
 - 所有任务状态保存在 `.agents/tasks/task-NNN/`
-- 计划：`plan.md`，构建日志：`build-rN.log`，评估：`evaluation-rN.md`
+- 计划：`plan.md`，构建日志：`build-rN.md`，评估：`plan-eval-rN.md` + `code-eval-rN.md`
 - 绝不删除任务产物 — 它们构成审计轨迹
+
+## 入口锁（工作流命令优先）
+
+- 只要用户显式调用 `/harness-*`，必须先进入对应 workflow。
+- 在该 workflow 的 gate 通过前，禁止修改 `src/` 或 `tests/`。
+- 首条响应必须回显 `Current stage = ...`（Preflight / Plan / ReviewGate / Build / Eval / Ship）。
+- 若当前阶段不是 Build，禁止实现类代码编辑。
+- 必须先完成该 workflow 要求的工作区清洁检查，再做探索。
 
 ## 提交格式
 

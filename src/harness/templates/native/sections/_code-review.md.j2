@@ -86,7 +86,7 @@ Log: `[AUTO-FIXED] file:line — Problem → What you did`
 **Save the evaluation using the CLI** (mandatory — do NOT skip this step):
 
 ```bash
-harness save-eval --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
+harness save-eval --kind code --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
 # Code Evaluation — Round N
 
 ## Dimension Scores
@@ -114,4 +114,4 @@ EVAL_EOF
 ```
 
 Replace `task-NNN`, scores, and `PASS`/`ITERATE` with actual values.
-The command creates `evaluation-rN.md` with auto-incremented round number.
+The command creates `code-eval-rN.md` with auto-incremented round number.

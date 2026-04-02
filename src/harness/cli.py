@@ -67,6 +67,10 @@ def status() -> None:
 
 @app.command(name="save-eval")
 def save_eval(
+    kind: str = typer.Option(
+        "code", "--kind",
+        help="Evaluation kind: code or plan",
+    ),
     task: str = typer.Option(
         ..., "--task", "-t",
         help="Task ID (e.g. task-001)",
@@ -86,7 +90,9 @@ def save_eval(
 ) -> None:
     """Save evaluation results to task directory (programmatic artifact write)."""
     from harness.commands.artifact import run_save_eval
-    run_save_eval(task=task, verdict=verdict, score=score, body=body)
+    if kind not in {"code", "plan"}:
+        raise typer.BadParameter("kind must be 'code' or 'plan'")
+    run_save_eval(task=task, kind=kind, verdict=verdict, score=score, body=body)
 
 
 @app.command(name="save-build-log")

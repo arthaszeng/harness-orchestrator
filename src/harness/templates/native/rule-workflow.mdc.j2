@@ -8,8 +8,16 @@ alwaysApply: true
 ## Task State
 
 - All task state lives in `.agents/tasks/task-NNN/`
-- Plan: `plan.md`, Build logs: `build-rN.log`, Evaluations: `evaluation-rN.md`
+- Plan: `plan.md`, Build logs: `build-rN.md`, Evaluations: `plan-eval-rN.md` + `code-eval-rN.md`
 - Never delete task artifacts — they form the audit trail
+
+## Entry Lock (Workflow Command First)
+
+- If the user explicitly invokes `/harness-*`, you MUST enter that workflow first.
+- Before passing that workflow's gate, do NOT modify `src/` or `tests/`.
+- First response must echo `Current stage = ...` (Preflight / Plan / ReviewGate / Build / Eval / Ship).
+- If current stage is not Build, implementation edits are forbidden.
+- Run workspace cleanliness checks required by that workflow before exploration.
 
 ## Commit Format
 

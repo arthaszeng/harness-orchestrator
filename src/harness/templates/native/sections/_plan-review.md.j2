@@ -78,3 +78,20 @@ If verdict is `PLAN_NEEDS_REVISION`:
 4. After 2 iterations → proceed to review gate with current state
 
 Persist the final synthesis as `## Plan Review Summary` in the plan file.
+
+**Save the plan evaluation using the CLI** (mandatory for round audit trail):
+
+```bash
+harness save-eval --kind plan --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'PLAN_EVAL_EOF'
+# Plan Evaluation — Round N
+
+## Findings
+[merged plan-review findings]
+
+## Verdict: PASS | ITERATE
+PLAN_EVAL_EOF
+)"
+```
+
+This creates `plan-eval-rN.md` with auto-incremented round number shared with
+code-eval artifacts.

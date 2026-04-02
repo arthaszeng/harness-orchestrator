@@ -504,7 +504,7 @@ PR 创建/更新后，运行 `/harness-doc-release` 工作流：
   "decisions": [],
   "risks": [],
   "open_items": [{"description": "...", "owner": "user|next-task", "priority": "..."}],
-  "artifacts_produced": ["ship-metrics.json", "evaluation-rN.md"],
+  "artifacts_produced": ["ship-metrics.json", "code-eval-rN.md"],
   "scope_changes": [],
   "created_at": "<ISO 8601 UTC>"
 }
@@ -518,9 +518,9 @@ PR 创建/更新后，运行 `/harness-doc-release` 工作流：
 
 所有状态持久化在 `.agents/tasks/task-NNN/` 中：
 - `plan.md` — 计划（如存在）
-- `build-rN.log` — 每轮构建日志
-- `evaluation-rN.md` — 每轮评估
-- `evaluation-rN.json` — 机器可读的分数
+- `build-rN.md` — 每轮构建日志
+- `plan-eval-rN.md` — 每轮计划评审
+- `code-eval-rN.md` — 每轮代码评审
 - `handoff-*.json` — 结构化阶段交接
 
 如果中断，通过检查哪些产物存在以及最新的轮次编号来恢复。

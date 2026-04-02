@@ -199,7 +199,7 @@ def test_sync_task_state_updates_artifacts_and_gate(tmp_path: Path):
 
     sync_task_state(
         task_dir,
-        artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.log"},
+        artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.md"},
         gate_updates={"plan_review": {"status": "pass", "reason": "approved"}},
         phase=TaskState.BUILDING,
     )
@@ -207,7 +207,7 @@ def test_sync_task_state_updates_artifacts_and_gate(tmp_path: Path):
     loaded = load_workflow_state(task_dir)
     assert loaded is not None
     assert loaded.phase == TaskState.BUILDING
-    assert loaded.artifacts.build_log == ".agents/tasks/task-001/build-r1.log"
+    assert loaded.artifacts.build_log == ".agents/tasks/task-001/build-r1.md"
     assert loaded.gates.plan_review.status.value == "pass"
     assert loaded.gates.plan_review.reason == "approved"
 
@@ -223,7 +223,7 @@ def test_sync_task_state_rejects_invalid_existing_state(tmp_path: Path):
     with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
         sync_task_state(
             task_dir,
-            artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.log"},
+            artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.md"},
         )
 
     assert state_path.read_text(encoding="utf-8") == "{broken"

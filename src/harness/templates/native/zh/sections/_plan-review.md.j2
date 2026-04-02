@@ -77,3 +77,19 @@
 4. 2 次迭代后 → 以当前状态进入 review gate
 
 将最终合成结果持久化为计划文件中的 `## Plan Review Summary`。
+
+**使用 CLI 保存计划评审结果**（用于轮次审计，必须执行）：
+
+```bash
+harness save-eval --kind plan --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'PLAN_EVAL_EOF'
+# Plan Evaluation — Round N
+
+## Findings
+[merged plan-review findings]
+
+## Verdict: PASS | ITERATE
+PLAN_EVAL_EOF
+)"
+```
+
+该命令会创建 `plan-eval-rN.md`，并与 code-eval 共用同一个自动递增轮次计数。

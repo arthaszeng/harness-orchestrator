@@ -509,7 +509,7 @@ Write `TASK_DIR/handoff-ship.json` summarizing the ship outcome:
   "decisions": [],
   "risks": [],
   "open_items": [{"description": "...", "owner": "user|next-task", "priority": "..."}],
-  "artifacts_produced": ["ship-metrics.json", "evaluation-rN.md"],
+  "artifacts_produced": ["ship-metrics.json", "code-eval-rN.md"],
   "scope_changes": [],
   "created_at": "<ISO 8601 UTC>"
 }
@@ -523,9 +523,9 @@ Update `workflow-state.json` → `artifacts.handoff` to `"handoff-ship.json"`.
 
 All state is persisted in `.agents/tasks/task-NNN/`:
 - `plan.md` — the plan (if exists)
-- `build-rN.log` — build logs per round
-- `evaluation-rN.md` — evaluations per round
-- `evaluation-rN.json` — machine-readable scores
+- `build-rN.md` — build logs per round
+- `plan-eval-rN.md` — plan evaluations per round
+- `code-eval-rN.md` — code evaluations per round
 - `handoff-*.json` — structured stage handoffs
 
 If interrupted, resume by checking which artifacts exist and which round number is latest.

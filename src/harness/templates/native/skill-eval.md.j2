@@ -28,7 +28,7 @@ pipeline. Run straight through and output the evaluation result at the end.
    it provides a compact summary of the build (what was built, CI result, decisions,
    risks, open items). Use this as your primary context for understanding what changed.
 3. Read `.agents/tasks/task-NNN/plan.md` (the contract)
-4. Read `.agents/tasks/task-NNN/build-rN.log` (the latest build log)
+4. Read `.agents/tasks/task-NNN/build-rN.md` (the latest build log)
 5. Run `git diff {{ trunk_branch }}..HEAD --stat` to understand the scope
 {% if memverse_enabled == "true" %}
 6. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
@@ -51,7 +51,7 @@ unless git diff is empty.
 |----------------|------------|--------|
 | `task-NNN/` directory | Use branch name as audit ID; write eval artifacts to `.agents/evals/` fallback | No task-level tracking |
 | `plan.md` | Warn: "No plan — evaluating raw diff" | Skip contract completeness; score Completeness as N/A |
-| `build-rN.log` | Warn: "No build log — skipping builder-claims verification" | Rely on git diff + CI only |
+| `build-rN.md` | Warn: "No build log — skipping builder-claims verification" | Rely on git diff + CI only |
 | `git diff` (empty) | **FATAL** — nothing to review. Stop and report error. | Cannot proceed |
 {% if memverse_enabled == "true" %}
 | Memverse MCP | Skip silently | No prior-learnings lookup |

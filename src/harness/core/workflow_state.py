@@ -70,6 +70,8 @@ class ArtifactRefs(BaseModel):
     plan: str = Field(default="", max_length=400)
     build_log: str = Field(default="", max_length=400)
     evaluation: str = Field(default="", max_length=400)
+    plan_evaluation: str = Field(default="", max_length=400)
+    code_evaluation: str = Field(default="", max_length=400)
     feedback_ledger: str = Field(default="", max_length=400)
     ship_metrics: str = Field(default="", max_length=400)
     handoff: str = Field(default="", max_length=400)
@@ -296,6 +298,8 @@ def artifact_pairs(state: WorkflowState) -> list[tuple[str, str]]:
         ("plan", state.artifacts.plan),
         ("build", state.artifacts.build_log),
         ("evaluation", state.artifacts.evaluation),
+        ("plan_eval", state.artifacts.plan_evaluation),
+        ("code_eval", state.artifacts.code_evaluation),
         ("feedback", state.artifacts.feedback_ledger),
         ("ship", state.artifacts.ship_metrics),
         ("handoff", state.artifacts.handoff),

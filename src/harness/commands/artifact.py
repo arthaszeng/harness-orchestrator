@@ -34,6 +34,7 @@ def _resolve_task_dir(task: str) -> Path:
 def run_save_eval(
     *,
     task: str,
+    kind: str,
     verdict: str,
     score: float,
     body: str,
@@ -44,11 +45,19 @@ def run_save_eval(
     from harness.core.workflow_state import sync_task_state
 
     ui = get_ui()
+    if kind not in {"code", "plan"}:
+        raise typer.BadParameter("kind must be 'code' or 'plan'")
     task_dir = _resolve_task_dir(task)
     round_num = next_eval_round(task_dir)
 
     if body:
-        path = save_evaluation(task_dir, round_num=round_num, verdict=verdict, raw_body=body)
+        path = save_evaluation(
+            task_dir,
+            kind=kind,
+            round_num=round_num,
+            verdict=verdict,
+            raw_body=body,
+        )
     else:
         scores = {
             "Design": {"role": "architect", "score": score},
@@ -59,27 +68,34 @@ def run_save_eval(
         }
         path = save_evaluation(
             task_dir,
+            kind=kind,
             round_num=round_num,
             scores=scores,
             verdict=verdict,
         )
 
+    status = (
+        "pass"
+        if verdict.upper() == "PASS"
+        else ("pending" if verdict.upper() == "ITERATE" else "blocked")
+    )
+    gate_key = "evaluation" if kind == "code" else "plan_review"
+    phase = TaskState.EVALUATING if kind == "code" else TaskState.PLANNING
+    eval_updates = {f"{kind}_evaluation": f".agents/tasks/{task}/{path.name}"}
+    if kind == "code":
+        eval_updates["evaluation"] = f".agents/tasks/{task}/{path.name}"
     sync_task_state(
         task_dir,
-        artifact_updates={"evaluation": f".agents/tasks/{task}/{path.name}"},
+        artifact_updates=eval_updates,
         gate_updates={
-            "evaluation": {
-                "status": (
-                    "pass"
-                    if verdict.upper() == "PASS"
-                    else ("pending" if verdict.upper() == "ITERATE" else "blocked")
-                ),
+            gate_key: {
+                "status": status,
                 "reason": f"{path.name} saved with verdict {verdict.upper()}",
             },
         },
-        phase=TaskState.EVALUATING,
+        phase=phase,
     )
-    ui.info(f"✓ evaluation-r{round_num}.md → {path}")
+    ui.info(f"✓ {path.name} → {path}")
 
 
 def run_save_build_log(

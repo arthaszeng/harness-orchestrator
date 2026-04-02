@@ -39,7 +39,7 @@ which means DO IT. Implement everything and output the build result.
 3. Read `.agents/tasks/task-NNN/plan.md` — extract the deliverables checklist
    from the Contract section
 4. If this is a subsequent round (feedback exists from evaluation), also read
-   `.agents/tasks/task-NNN/evaluation-rN.md` for the fix suggestions
+   `.agents/tasks/task-NNN/code-eval-rN.md` for the fix suggestions
 5. If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
    source for phase / gate / blocker / artifact refs. Update it when you write
    new build artifacts; do not treat session summaries as a parallel gate source.
@@ -166,7 +166,7 @@ BUILD_EOF
 ```
 
 Replace `task-NNN` and fill in actual values.
-The command creates `build-rN.log` with auto-incremented round number.
+The command creates `build-rN.md` with auto-incremented round number.
 
 When the build log is written, also update `workflow-state.json` (if present, or
 if the contract requires task-level state) so the task reflects the latest build
@@ -193,7 +193,7 @@ Write `TASK_DIR/handoff-build.json` summarizing the build outcome:
   "decisions": [{"what": "...", "why": "...", "classification": "mechanical|taste"}],
   "risks": [{"description": "...", "mitigation": "...", "severity": "low|medium|high"}],
   "open_items": [{"description": "...", "owner": "evaluator|builder", "priority": "..."}],
-  "artifacts_produced": ["build-rN.log", "<list of new/modified source files>"],
+  "artifacts_produced": ["build-rN.md", "<list of new/modified source files>"],
   "scope_changes": ["<any deviations from the plan, or empty>"],
   "created_at": "<ISO 8601 UTC>"
 }
