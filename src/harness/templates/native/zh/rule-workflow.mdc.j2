@@ -1,0 +1,28 @@
+---
+description: "Harness 工作流约定：提交格式、任务状态管理"
+alwaysApply: true
+---
+
+# Harness 工作流约定
+
+## 任务状态
+
+- 所有任务状态保存在 `.agents/tasks/task-NNN/`
+- 计划：`plan.md`，构建日志：`build-rN.log`，评估：`evaluation-rN.md`
+- 绝不删除任务产物 — 它们构成审计轨迹
+
+## 提交格式
+
+使用 conventional commits：`<type>(scope): description`
+- feat：新功能
+- fix：bug 修复
+- refactor：代码重构
+- test：添加或更新测试
+- docs：文档变更
+- chore：维护任务
+
+## 分支约定
+
+- Feature branches：`{{ branch_prefix }}/<task-id>-<short-desc>`
+- 主干分支：`{{ trunk_branch }}`
+- 绝不直接提交到主干

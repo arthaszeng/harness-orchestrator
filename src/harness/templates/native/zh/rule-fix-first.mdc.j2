@@ -1,0 +1,66 @@
+---
+description: "Harness Fix-First 启发式：在呈现给用户之前将评审发现分类为 AUTO-FIX 或 ASK"
+alwaysApply: true
+---
+
+# Fix-First 启发式
+
+在评审代码时（/harness-eval 或 /harness-ship 期间），在呈现之前对每个发现进行分类。
+能修的就修；只问必须问的。
+
+## AUTO-FIX（立即修复，无需用户输入）
+
+满足以下全部三个条件时应用：
+1. **确定性高** — 你确信发现是真实的（置信度 >= 7）
+2. **影响范围小** — 修复涉及 <= 3 行且不改变公共 API
+3. **修复可逆** — 一次 revert 就能干净地撤销
+
+常见 AUTO-FIX 类别：
+- 死代码、过时注释、未使用的导入
+- 缺失的错误处理但修复显而易见（如未检查的返回值）
+- 命名不一致、格式问题
+- 类型明显的缺失类型提示
+- 有直接 eager-loading 修复的 N+1 查询
+- 引用已完成工作的过时 TODO 注释
+
+自动修复后：
+1. 应用修复
+2. 运行 `{{ ci_command }}` 验证无回归
+3. 记录：`[AUTO-FIXED] file:line — 问题 → 所做的修复`
+4. 提交：`git add <fixed-files> && git commit -m "fix: auto-fix review findings"`
+
+## ASK（呈现给用户决定）
+
+满足以下任一条件时应用：
+- **安全发现** — 即使修复看起来很明显
+- **行为变更** — 修复会改变可观察的输出或面向用户的行为
+- **架构变更** — 修复改变组件边界、数据流或 API
+- **数据模型变更** — 修复修改 schema、migration 或存储的数据格式
+- **低置信度** — CRITICAL 发现的置信度 < 7
+- **大影响范围** — 修复涉及 > 3 个文件或改变公共 API
+
+在一个批次中呈现所有 ASK 项（不是逐个呈现）：
+- 编号每个发现
+- 展示：严重程度、file:line、问题、建议修复
+- 每项选项：A) 修复, B) 跳过
+- 如果 0 个 ASK 项：完全跳过 — 不要呈现空列表
+
+## 分类示例
+
+| 发现 | 分类 | 原因 |
+|------|------|------|
+| utils.py 中未使用的导入 `os` | AUTO-FIX | 高确定性，1 行，可逆 |
+| 用户输入的 SQL 注入 | ASK | 安全发现 |
+| API 响应缺失 null 检查 | AUTO-FIX | 明显的修复，小影响范围 |
+| 将 `data` 参数重命名为 `payload` | AUTO-FIX | 命名，小影响范围 |
+| 将认证中间件改为使用 JWT | ASK | 架构变更 |
+| 移除已废弃的端点 | ASK | 行为变更（破坏性） |
+| 为频繁查询的列添加索引 | ASK | 数据模型变更 |
+| LLM 输出未经验证写入数据库 | ASK | 信任边界/安全发现 |
+| 状态转换中的竞态条件 | ASK | 并发修复需要设计 |
+| 过时注释与当前代码矛盾 | AUTO-FIX | 机械性，可逆 |
+| pyproject.toml 和 CHANGELOG 之间的版本不匹配 | AUTO-FIX | 机械性一致性 |
+| subprocess.run 使用 shell=True 和 f-string | ASK | 安全 — shell 注入 |
+| 同步调用阻塞异步事件循环 | AUTO-FIX | 用 run_in_executor 包装 |
+| 缺失 eager loading 导致 N+1 | AUTO-FIX | 添加 select_related/joinedload |
+| switch/match 中未处理新的 enum 值 | ASK | 行为变更 — 可能破坏消费者 |

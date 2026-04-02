@@ -1,0 +1,173 @@
+---
+name: harness-learn
+description: "使用 Memverse MCP 作为存储后端的结构化学习记忆管理。跨会话搜索、添加、清理和导出学习成果。与评审和交付工作流集成以获取先验知识。(harness)"
+---
+
+# Harness Learn — 结构化学习记忆
+
+管理跨会话持久化的项目学习成果。使用 Memverse MCP 进行
+语义存储和检索。
+
+## 命令
+
+### `/harness-learn` — 显示最近的学习成果
+显示此项目最近的 20 个学习成果。
+
+1. 使用查询 "learnings for {{ project_name }}" 调用 Memverse `search_memory`
+2. 以表格格式展示：
+
+```
+RECENT LEARNINGS ({{ project_name }})
+═══════════════════════════════════════════════════
+  #  Type         Key                    Confidence
+  1  pattern      retry-with-backoff      9/10
+  2  pitfall      async-in-sync-context   8/10
+  3  preference   pytest-over-unittest    7/10
+═══════════════════════════════════════════════════
+```
+
+### `/harness-learn search <query>` — 语义搜索
+按含义搜索学习成果。
+
+1. 使用用户的查询和 domain "{{ project_name }}" 调用 Memverse `search_memory`
+2. 展示匹配的学习成果及相关性评分
+3. 显示每个匹配的完整见解文本
+
+### `/harness-learn add` — 添加学习成果
+手动记录新的学习成果。
+
+提示输入（或从上下文中提取）：
+- **type**：pattern / pitfall / preference / architecture / tool
+- **key**：短标识符（kebab-case）
+- **insight**：实际的学习内容（1-3 句话）
+- **confidence**：1-10（这个学习有多确定？）
+- **files**：相关文件（可选）
+
+通过 Memverse `add_memories` 以结构化格式存储：
+```
+[{type}] {key}: {insight} (confidence: {confidence}/10, files: {files}, branch: {branch}, commit: {commit})
+```
+
+Domain："{{ project_name }}"
+
+### `/harness-learn prune` — 检查陈旧性
+审查已有的学习成果是否陈旧。
+
+1. 通过 `search_memory` 获取此项目的所有学习成果
+2. 对引用了具体文件的每个学习成果：
+   - 检查文件是否仍然存在
+   - 如果已删除：标记为可能已陈旧
+3. 检查矛盾：
+   - 关于同一主题说相反话的两个学习成果
+   - 与当前代码模式矛盾的学习成果
+4. 输出报告：
+
+```
+LEARNING HEALTH CHECK
+═══════════════════════════════════════
+  Stale (file deleted):  N learnings
+  Contradictions found:  M pairs
+  Healthy:               K learnings
+═══════════════════════════════════════
+```
+
+5. 对陈旧/矛盾的学习成果：通过 Memverse `delete_memories` 建议删除
+
+### `/harness-learn export` — 导出为 Markdown
+按类型分组导出所有学习成果。
+
+```markdown
+# Project Learnings: {{ project_name }}
+
+## Patterns
+- **retry-with-backoff** (9/10): Always use exponential backoff for external API retries...
+
+## Pitfalls
+- **async-in-sync-context** (8/10): Never call sync DB operations inside async handlers...
+
+## Preferences
+- **pytest-over-unittest** (7/10): Project uses pytest exclusively, never unittest...
+
+## Architecture
+- **event-driven-processing** (9/10): All background jobs use the event queue...
+
+## Tool
+- **ruff-over-flake8** (8/10): Project uses ruff for linting, not flake8...
+```
+
+### `/harness-learn stats` — 统计信息
+显示学习统计。
+
+```
+LEARNING STATISTICS
+═══════════════════════════════════════
+  Total:           N
+  By type:
+    pattern:       X
+    pitfall:       Y
+    preference:    Z
+    architecture:  W
+    tool:          V
+  Avg confidence:  X.X/10
+  By source:
+    observed:      A
+    user-stated:   B
+    inferred:      C
+═══════════════════════════════════════
+```
+
+---
+
+## 记忆 Schema
+
+存储在 Memverse 中的每个学习成果遵循此结构：
+- **type**：pattern / pitfall / preference / architecture / tool
+- **key**：短 kebab-case 标识符
+- **insight**：学习内容（1-3 句话）
+- **confidence**：1-10
+- **source**：observed / user-stated / inferred / cross-model
+- **files**：相关文件路径列表（可选）
+- **branch**：学习时的 git 分支（可选）
+- **commit**：学习时的 commit hash（可选）
+
+---
+
+## 与评审/交付工作流的集成
+
+### 先验学习搜索（自动）
+
+在 `/harness-eval` 和 `/harness-ship` 工作流开始时：
+
+1. 从 diff 中提取关键主题（文件名、模块名、使用的模式）
+2. 使用这些主题和 domain "{{ project_name }}" 调用 Memverse `search_memory`
+3. 如果找到相关学习成果，展示：
+
+```
+PRIOR LEARNINGS (relevant to this diff):
+  - [pitfall] async-in-sync-context: Never call sync DB operations inside async handlers.
+    Relevant because: diff modifies async endpoint handlers.
+```
+
+4. 将先验学习纳入评审 — 已知陷阱应对照 diff 进行检查。
+
+### 捕获学习成果（自动）
+
+在 `/harness-eval` 和 `/harness-ship` 工作流结束时：
+
+1. 审查评估中的所有发现
+2. 对任何非显而易见的发现（置信度 >= 7）且揭示了模式或陷阱的：
+   - 通过 Memverse `add_memories` 自动捕获为学习成果
+   - Type：pattern（如果是好的实践）或 pitfall（如果是常见错误）
+   - Source："observed"
+   - Confidence：与发现的置信度相同
+3. 记录："从本次评审中捕获了 N 个新的学习成果"
+
+---
+
+## 重要规则
+
+- **始终使用 Memverse MCP** 作为存储后端 — 不要为学习成果创建本地文件
+- **域隔离** — 始终限定在 "{{ project_name }}" 域
+- **去重** — 添加之前，搜索具有相似 key 的已有学习成果
+- **置信度衰减** — 被新证据矛盾的学习成果应该被更新，而不是在旁边添加新的
+- **隐私** — 绝不将密钥、凭证或 PII 作为学习成果存储

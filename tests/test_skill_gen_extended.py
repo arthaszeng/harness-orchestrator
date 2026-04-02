@@ -1026,3 +1026,142 @@ class TestResolveNativeLang:
     @patch("harness.native.skill_gen.get_lang", return_value="invalid")
     def test_fallback_invalid_ui_lang_defaults_en(self, _mock_lang):
         assert resolve_native_lang(None) == "en"
+
+
+# --- i18n: Chinese locale tests ---
+
+
+def test_zh_directory_parity():
+    """zh/ directory must mirror en/ — same filenames in every subdirectory."""
+    from harness.native.skill_gen import _get_template_dir
+
+    en_dir = _get_template_dir("en")
+    zh_dir = _get_template_dir("zh")
+
+    def _relative_files(base: Path, exclude_subdir: str = "") -> set[str]:
+        result = set()
+        for p in base.rglob("*"):
+            if not p.is_file():
+                continue
+            rel = str(p.relative_to(base))
+            if exclude_subdir and rel.startswith(exclude_subdir):
+                continue
+            result.add(rel)
+        return result
+
+    en_files = _relative_files(en_dir, exclude_subdir="zh/")
+    zh_files = _relative_files(zh_dir)
+    missing = en_files - zh_files
+    assert not missing, f"zh/ is missing files present in en/: {sorted(missing)}"
+
+
+def test_zh_templates_render_without_errors(tmp_path: Path):
+    """All zh templates render with StrictUndefined — no missing variables."""
+    import jinja2
+    from harness.native.skill_gen import _build_context, _get_template_dir
+
+    cfg = _make_cfg(tmp_path)
+    tmpl_dir = _get_template_dir("zh")
+    context = _build_context(cfg, lang="zh")
+
+    strict_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(tmpl_dir)),
+        undefined=jinja2.StrictUndefined,
+        keep_trailing_newline=True,
+    )
+
+    for tmpl_name in strict_env.loader.list_templates():
+        if not tmpl_name.endswith(".j2"):
+            continue
+        tmpl = strict_env.get_template(tmpl_name)
+        try:
+            tmpl.render(**context)
+        except jinja2.UndefinedError as exc:
+            __import__("pytest").fail(
+                f"Undefined variable in zh/{tmpl_name}: {exc}"
+            )
+
+
+def test_zh_generated_artifacts_contain_chinese(tmp_path: Path):
+    """When lang=zh, generated skills/agents/rules contain Chinese characters."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md"
+    content = build_skill.read_text(encoding="utf-8")
+    assert "严格按合约交付" in content, "zh build skill should contain Chinese principles"
+
+    architect = tmp_path / ".cursor" / "agents" / "harness-architect.md"
+    content_arch = architect.read_text(encoding="utf-8")
+    assert "架构" in content_arch, "zh architect agent should contain Chinese"
+
+    rule = tmp_path / ".cursor" / "rules" / "harness-trust-boundary.mdc"
+    content_rule = rule.read_text(encoding="utf-8")
+    assert "信任边界" in content_rule, "zh trust-boundary rule should be in Chinese"
+
+
+def test_zh_resources_contain_chinese(tmp_path: Path):
+    """zh static resources (review-checklist, specialists) contain Chinese."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    checklist = (
+        tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "review-checklist.md"
+    )
+    content = checklist.read_text(encoding="utf-8")
+    assert "评审" in content, "zh review-checklist should contain Chinese"
+
+
+def test_en_generation_unchanged_after_zh_addition(tmp_path: Path):
+    """English generation is not affected by the zh directory's existence."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+
+    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md"
+    content = build_skill.read_text(encoding="utf-8")
+    assert "Deliver exactly per contract" in content
+    assert "严格按合约交付" not in content
+
+
+def test_get_template_dir_returns_zh_when_available():
+    """_get_template_dir('zh') returns the zh subdirectory."""
+    from harness.native.skill_gen import _get_template_dir
+
+    en_dir = _get_template_dir("en")
+    zh_dir = _get_template_dir("zh")
+    assert zh_dir != en_dir
+    assert zh_dir.name == "zh"
+    assert zh_dir.parent == en_dir
+
+
+def test_get_template_dir_unknown_lang_fallback():
+    """Unknown lang values fall back to en directory."""
+    from harness.native.skill_gen import _get_template_dir
+
+    en_dir = _get_template_dir("en")
+    assert _get_template_dir("fr") == en_dir
+    assert _get_template_dir("") == en_dir
+
+
+def test_i18n_catalogs_key_parity():
+    """en.py and zh.py must have exactly the same set of message keys."""
+    from harness.i18n.en import MESSAGES as EN
+    from harness.i18n.zh import MESSAGES as ZH
+
+    en_keys = set(EN.keys())
+    zh_keys = set(ZH.keys())
+    missing_in_zh = en_keys - zh_keys
+    missing_in_en = zh_keys - en_keys
+    assert not missing_in_zh, f"Keys in en.py but missing in zh.py: {sorted(missing_in_zh)}"
+    assert not missing_in_en, f"Keys in zh.py but missing in en.py: {sorted(missing_in_en)}"
+
+
+def test_zh_ship_skill_contains_chinese(tmp_path: Path):
+    """Ship skill — the largest template — renders correctly in Chinese."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    ship_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md"
+    content = ship_skill.read_text(encoding="utf-8")
+    assert "自动化管线" in content or "交付管线" in content
+    assert "pytest" in content, "CI command should still be present"

@@ -1,0 +1,73 @@
+---
+name: harness-brainstorm
+description: "发散探索到 PR：通过苏格拉底式提问帮助用户思考模糊想法，收敛为愿景更新和计划，然后自动执行 build/eval/ship/retro。当用户说 brainstorm、我有个想法、帮我想想、探索一下或 harness brainstorm 时使用。(harness)"
+---
+
+# Harness Brainstorm — 从想法到 PR
+
+你正在运行 `/harness-brainstorm` 工作流。用户有一个**模糊的想法**，
+需要发散探索后收敛为计划。
+
+**人机交互阶段：** 发散探索 + 愿景 + Plan Review Gate
+**自主阶段：** Build → Eval → Ship → Auto-Retro
+
+**仅在以下情况停止：**
+- 苏格拉底式探索（这正是 brainstorm 的意义 — 与用户互动）
+- Review gate 升级（当 plan_review_gate 要求时）
+- 评审中 ASK 类发现
+
+**绝不因以下原因停止：**
+- 实现决策（在 build 阶段做出）
+- AUTO-FIX 发现（静默修复）
+
+---
+
+{% with preflight_mode="entry" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
+---
+
+## 阶段 0：发散探索
+
+这是 brainstorm 的核心差异点。在此花时间 — 价值在这里创造。
+
+### 步骤 1：理解想法
+
+向用户提出 **2–3 个问题**来理解问题空间（不要一次全问完）：
+
+第一轮：
+- 你想解决什么问题？为谁解决？
+- 当前情况是什么样的？痛点在哪？
+
+第二轮（用户回复后）：
+- 成功是什么样子？有什么约束？
+- 你之前尝试过什么？什么有效什么无效？
+
+### 步骤 2：生成选项
+
+根据用户的回答，生成 **2–3 个方案选项**：
+
+```
+APPROACH OPTIONS
+═══════════════════════════════════════════════════
+  #  Approach                  Pros                      Cons              Complexity
+  1  [name]                    [short]                   [short]           Low/Med/High
+  2  [name]                    [short]                   [short]           Low/Med/High
+  3  [name]                    [short]                   [short]           Low/Med/High
+═══════════════════════════════════════════════════
+Which approach resonates? Or combine/remix ideas?
+```
+
+让用户选择、组合或提出替代方案。这是对话，不是测验。
+
+---
+
+{# Recursive composition: brainstorm = Phase 0 + vision-content (which includes plan-content) #}
+{% with interaction_depth="high" %}
+{% include 'sections/_vision-content.md.j2' %}
+{% endwith %}
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}

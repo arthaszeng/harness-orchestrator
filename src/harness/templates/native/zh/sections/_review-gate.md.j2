@@ -1,0 +1,60 @@
+## Review Gate — {{ plan_review_gate }}
+{% if plan_review_gate == "human" %}
+
+**停止。** 将完整的计划和评审报告呈现给用户。
+
+展示：
+1. 完整计划（spec + 合约）
+2. 计划评审摘要（5 角色评分、综合分、发现）
+3. 任何未解决的审查者关切
+
+等待用户响应：
+- **approve** → 继续进入实现
+- **edit: [反馈]** → 返回规划阶段，根据反馈重新生成
+- **reject** → 终止工作流
+{% elif plan_review_gate == "auto" %}
+
+通过计算**升级评分**来评估计划是否需要人工审查。
+
+**此入口的交互深度：{{ interaction_depth | default("low") }}**
+
+| 信号 | 条件 | 评分 |
+|------|------|------|
+| 交互深度 | high（brainstorm） | **-2** |
+| 交互深度 | medium（vision） | **-1** |
+| 交互深度 | low（plan） | **+0** |
+| 规模 | 交付物 > 5 | +2 |
+| 规模 | 预计修改文件 > 10 | +2 |
+| 风险 | 安全、认证或授权变更 | +3 |
+| 风险 | 数据模型或 schema 变更 | +3 |
+| 风险 | 公共 API 表面变更 | +2 |
+| 质量 | 计划评审综合分 < {{ pass_threshold }}/10 | +2 |
+| 类型 | 新功能（非 fix 或 refactor） | +1 |
+
+**评分 >= {{ gate_full_review_min }} → 完整审查**
+呈现完整计划 + 5 角色评审摘要。等待：
+- **approve** → 继续
+- **edit: [反馈]** → 重新规划
+- **reject** → 终止
+
+**评分 {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → 摘要确认**
+展示简要摘要：
+```
+PLAN SUMMARY
+═══════════════════════════════════════════
+  Task:          task-NNN
+  Deliverables:  N items
+  Files:         ~N estimated
+  Risk flags:    [list or "none"]
+  Review scores: Arch X/10 | Prod X/10 | Eng X/10 | QA X/10 | PM X/10
+  Aggregate:     X/10
+  Gate score:    N (SUMMARY CONFIRM)
+═══════════════════════════════════════════
+Continue? [approve / edit / reject]
+```
+
+**评分 < {{ gate_summary_confirm_min }} → 自动通过**
+记录：`"Plan auto-approved (gate score N, aggregate review score X/10)"` 然后继续。
+{% else %}
+计划在完成评审后自动批准。立即继续。
+{% endif %}

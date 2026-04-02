@@ -1,0 +1,103 @@
+## 代码评审 — 5 角色并行派遣
+
+### 派遣
+
+通过 Task 工具**并行启动所有 5 个审查者**，每个使用 `mode: code-eval`。
+发送一条包含所有 5 个 Task 工具调用的消息：
+
+| # | 子代理 | Prompt 附加内容 |
+|---|--------|----------------|
+| 1 | `harness-architect` | `mode: code-eval`、diff 范围、架构文档路径 |
+| 2 | `harness-product-owner` | `mode: code-eval`、diff 范围、`.agents/vision.md` 路径、计划路径 |
+| 3 | `harness-engineer` | `mode: code-eval`、diff 范围、源代码目录列表 |
+| 4 | `harness-qa` | `mode: code-eval`、diff 范围、`ci_command: {{ ci_command }}`、测试目录列表 |
+| 5 | `harness-project-manager` | `mode: code-eval`、diff 范围、计划路径、交付物清单 |
+
+每个 prompt 必须包含：
+- `diff_range: {{ trunk_branch }}..HEAD`
+- `plan_path: .agents/tasks/task-NNN/plan.md`（如可用）
+- `memverse_domain: {{ project_name }}`
+- 上述角色特定的上下文
+
+**CI 所有权：** 只有 `harness-qa` 运行 `{{ ci_command }}`。其他角色
+对 diff 执行只读分析。
+
+**降级阶梯**（如果 Task 工具调用失败）：
+- **5/5 响应：** 按下述方式完整合成
+- **3-4/5 响应：** 使用可用的评审结果继续，注明缺失的视角
+- **1-2/5 响应：** 记录警告，降级为单代理评审
+- **0/5 响应：** 回退到单个 generalPurpose 子代理评审
+
+### 合成
+
+所有响应到达后：
+
+1. **合并发现** — 将所有 5 位审查者的发现合并为统一列表
+2. **过滤超范围发现** — 使用角色→职责映射：
+   | 角色 | 负责 | 不得报告 |
+   |------|------|---------|
+   | Architect | 设计、模块、依赖、安全设计 | 代码质量、测试、交付、用户价值 |
+   | Product Owner | 用户价值、需求、AC、UX 边界情况 | 代码质量、架构、测试、交付 |
+   | Engineer | 代码质量、DRY、模式、性能、错误处理 | 架构决策、用户价值、交付、测试策略 |
+   | QA | 测试、覆盖率、CI、回归、边界 | 代码质量、架构、用户价值、交付 |
+   | Project Manager | 范围、交付、分解、提交结构 | 代码质量、架构、测试、用户价值 |
+
+   对每个发现，检查报告角色是否负责该类别：
+   - **范围内**：保持原样
+   - **范围外 + CRITICAL**：重新标记为 `[CROSS-ROLE]` 并保留
+   - **范围外 + WARN/INFO**：标记 `[OUT-OF-SCOPE]` 并从评分中排除
+3. **交叉验证：** 如果 2+ 个角色标记同一问题 → 标记 `[HIGH CONFIDENCE]`
+4. **计算维度评分**（将角色映射到评审维度）：
+   ```
+   Design:        [architect score]/10
+   Completeness:  [product-owner score]/10
+   Quality:       [engineer score]/10
+   Regression:    [qa score]/10
+   Scope:         [project-manager score]/10
+   ─────────────────────────────────
+   Weighted avg:  [avg]/10
+   ```
+5. **确定裁定：**
+   - 全部 PASS 且 avg ≥ {{ pass_threshold }} → `PASS`
+   - 任何 CRITICAL 发现 → `ITERATE`
+   - avg < {{ pass_threshold }} → `ITERATE`
+
+### Fix-First 分类
+
+应用 `.cursor/rules/harness-fix-first.mdc` 中的 Fix-First 启发式：
+
+- **AUTO-FIX：** 高确定性 + 小影响范围 + 可逆 → 立即修复
+- **ASK：** 安全、行为变更、架构变更、数据模型变更、
+  或低置信度 → 批量呈现给用户
+
+自动修复后，重新运行 `{{ ci_command }}` 以验证无回归。
+记录：`[AUTO-FIXED] file:line — 问题 → 所做的修复`
+
+### 最终裁定
+
+将评审摘要写入 `.agents/tasks/task-NNN/evaluation-rN.md`：
+
+```markdown
+# Code Evaluation — Round N
+
+## Dimension Scores
+| Dimension | Role | Score |
+|-----------|------|-------|
+| Design | architect | N/10 |
+| Completeness | product-owner | N/10 |
+| Quality | engineer | N/10 |
+| Regression | qa | N/10 |
+| Scope | project-manager | N/10 |
+| **Weighted Average** | | **N/10** |
+
+## Findings
+[merged findings list]
+
+## Auto-Fixed
+[list of auto-fixed items]
+
+## ASK Items
+[items requiring user decision]
+
+## Verdict: PASS | ITERATE
+```

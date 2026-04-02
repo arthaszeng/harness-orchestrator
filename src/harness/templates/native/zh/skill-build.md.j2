@@ -1,0 +1,174 @@
+---
+name: harness-build
+description: "按照 harness 计划/合约实现代码。读取计划，实现所有交付物，运行 CI，分类失败，并写入结构化构建日志。完全自主 — 无需确认。当用户说 build this、实现计划或 harness build 时使用。(harness)"
+---
+
+# Harness Build
+
+你正在运行 `/harness-build` 工作流。这是一个**非交互式、完全自动化**的
+构建管线。在任何步骤都不要请求确认。用户说了 `/harness-build`，
+意味着去做。实现一切并输出构建结果。
+
+**仅在以下情况停止：**
+- 分支内测试失败在分类后无法自动修复
+- 合约交付物确实无法实现（缺少依赖、不可行的需求）
+
+**绝不因以下原因停止：**
+- 实现方案确认
+- "我应该继续吗？"的问题
+- 预存在的测试失败
+- 次要的实现决策（做出决定，记录在构建日志中）
+
+---
+
+## 核心原则
+
+{{ builder_principles }}
+
+---
+
+## 步骤 1：阅读合约
+
+1. 找到当前任务：`.agents/tasks/` 下最新的 `task-NNN` 目录
+2. 读取 `.agents/tasks/task-NNN/plan.md`
+3. 从 Contract 部分提取交付物清单
+4. 如果这是后续轮次（存在评审反馈），同时读取
+   `.agents/tasks/task-NNN/evaluation-rN.md` 获取修复建议
+
+---
+
+## 步骤 2：构建前搜索
+
+在编写任何代码之前：
+
+1. 扫描项目中已有的模式、工具函数和约定
+2. 检查是否有交付物可以通过复用已有代码来解决
+3. 记录项目的测试模式（框架、目录结构、命名）
+
+这可以防止重复造轮子并确保一致性。
+
+---
+
+## 步骤 3：实现
+
+对合约中的每个交付物：
+
+1. 实现代码变更
+2. 为新行为编写测试（匹配项目已有的测试模式）
+3. 在项目使用类型提示的地方确保类型提示/类型安全
+4. 处理错误路径 — 不要留下裸异常或缺失的错误处理
+
+**约束：**
+- 仅修改合约交付物直接要求的或隐含的文件
+- 绝不删除已有测试 — 添加新测试，不要移除旧的
+- 绝不修改交付物中未列出或未隐含的文件
+- 如果发现合约范围之外的相关问题，记录在构建日志中但不要修复
+
+{% if project_lang == 'python' %}
+
+### Python 特定指导
+- 提交前运行 `ruff check`；使用 `ruff check --fix` 自动修复
+- 使用类型提示（PEP 484）；如果项目使用 `mypy` 则运行它
+- 优先使用 `pathlib.Path` 而非 `os.path`
+- 使用 `from __future__ import annotations` 获取现代类型语法
+{% elif project_lang == 'typescript' %}
+
+### TypeScript 特定指导
+- 提交前运行 `tsc --noEmit` 进行类型检查
+- 优先在 tsconfig 中使用 `strict: true`
+- 对不可变属性使用 `readonly`
+- 对象类型优先使用 `interface` 而非 `type`
+{% elif project_lang == 'go' %}
+
+### Go 特定指导
+- 提交前运行 `go vet ./...` 和 `staticcheck ./...`
+- 使用 `errcheck` 检查未处理的错误
+- 提交前运行 `gofmt` / `goimports`
+{% elif project_lang == 'rust' %}
+
+### Rust 特定指导
+- 提交前运行 `cargo clippy`
+- 运行 `cargo fmt --check` 检查格式
+{% endif %}
+
+---
+
+## 步骤 4：运行 CI
+
+运行完整的测试套件：
+
+```bash
+{{ ci_command }}
+```
+
+### 测试失败分类
+
+如果测试失败，确定归属：
+
+**预存在的失败**（在 `{{ trunk_branch }}` 上也失败）：
+- 记录在构建日志中：「预存在的失败：test_name — 非本次变更引入」
+- 继续 — 这不是你的问题
+
+**分支内失败**（在基准分支通过，在 HEAD 失败）：
+- 这是你的问题
+- 仔细阅读失败输出
+- 修复你的实现中的问题
+- 重新运行 `{{ ci_command }}`
+- 每个失败测试最多 3 次修复尝试
+
+**分类后：** 若分支内失败在 3 次尝试后仍存在，在构建日志中记为阻塞项并停止。
+
+{% include 'sections/_error-recovery.md.j2' %}
+
+---
+
+## 步骤 5：写入构建日志
+
+将结构化构建日志写入 `.agents/tasks/task-NNN/build-rN.log`：
+
+```markdown
+# Build Log — Round N
+
+## Deliverables
+- [x] Deliverable 1: what was done, files changed
+- [x] Deliverable 2: what was done, files changed
+- [ ] Deliverable 3: NOT DONE — reason
+
+## Files Changed
+- `path/to/file1.py` — description of change
+- `path/to/file2.py` — description of change
+
+## CI Result
+- Command: `{{ ci_command }}`
+- Result: PASS / FAIL
+- Tests: N passed, M failed
+- Pre-existing failures: K (not introduced by this change)
+
+## Decisions Made
+- (implementation decisions you made without asking — explain rationale)
+
+## Out-of-Scope Issues Found
+- (issues discovered but not fixed — outside contract scope)
+```
+
+{% if hooks_pre_build or hooks_post_eval or hooks_pre_ship %}
+---
+
+{% include 'sections/_hook-points.md.j2' %}
+
+---
+{% endif %}
+
+## 步骤 6：提交
+
+暂存并提交实现：
+
+```bash
+git add <specific-files-changed>
+git commit -m "<type>(scope): implement task-NNN deliverables
+
+Deliverables: (list what was implemented)
+CI: all tests pass"
+```
+
+使用具体的文件路径 — 绝不使用 `git add -A` 或 `git add .` 以避免包含无关变更。

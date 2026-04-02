@@ -1,0 +1,60 @@
+---
+name: harness-vision
+description: "愿景驱动管线：澄清增量愿景，通过多角色评审生成计划，然后自动执行 build/eval/ship/retro。当用户说 vision、我想朝这个方向、这是我需要的或 harness vision 时使用。(harness)"
+---
+
+# Harness Vision — 从方向到 PR
+
+你正在运行 `/harness-vision` 工作流。用户有一个**清晰的增量方向**，
+需要在成为计划之前进行澄清。
+
+**人机交互阶段：** 愿景澄清 + Plan Review Gate
+**自主阶段：** Build → Eval → Ship → Auto-Retro
+
+**仅在以下情况停止：**
+- 愿景澄清（如果方向有歧义）
+- Review gate 升级（当 plan_review_gate 要求时）
+- 评审中 ASK 类发现
+
+**绝不因以下原因停止：**
+- 实现决策（在 build 阶段做出）
+- AUTO-FIX 发现（静默修复）
+
+---
+
+{% with preflight_mode="entry" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
+---
+
+## 阶段 0：愿景澄清
+
+### 步骤 1：理解方向
+
+1. 仔细阅读用户的愿景输入
+2. 读取 `.agents/vision.md`（如存在）以了解已有上下文
+3. 读取 `.agents/config.toml` 获取项目配置
+
+### 步骤 2：澄清（如需要）
+
+如果愿景有**模糊之处**，在一条消息中提出 **1–2 个澄清问题**。
+不要与用户进行多轮问答 — 保持简洁。
+
+需要澄清的情况示例：
+- 范围不清晰（"改善认证"是指添加 MFA、修复 bug 还是重构？）
+- 信号矛盾（愿景说"保持简单"但请求很复杂）
+- 缺少上下文（引用了你在代码库中未见过的系统）
+
+如果愿景足够清晰可以开始规划，跳过澄清直接继续。
+
+---
+
+{# Recursive composition: vision = Phase 0 + vision-content (which includes plan-content) #}
+{% with interaction_depth="medium" %}
+{% include 'sections/_vision-content.md.j2' %}
+{% endwith %}
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}

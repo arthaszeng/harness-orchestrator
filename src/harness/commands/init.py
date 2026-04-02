@@ -38,7 +38,7 @@ def _cyber_step(console, step: int, total: int, title: str) -> None:
     from rich.rule import Rule
     console.print()
     console.print(Rule(
-        f"[cyber.magenta]◆ Step {step}/{total}[/]  [cyber.cyan]{title}[/]",
+        f"[cyber.magenta]◆ {t('init.step_label', step=step, total=total)}[/]  [cyber.cyan]{title}[/]",
         style="cyber.dim",
     ))
 
@@ -249,7 +249,7 @@ def _run_reinit(project_root: Path) -> None:
     console.print(Panel(
         f"  [cyber.green]✓[/] {t('init.reinit_done', count=count)}\n"
         f"  [cyber.dim]{t('init.reinit_hint')}[/]",
-        title="[cyber.header]REINIT COMPLETE[/]",
+        title=f"[cyber.header]{t('init.reinit_complete_title')}[/]",
         border_style="cyber.border",
         padding=(0, 1),
     ))
@@ -337,41 +337,44 @@ def run_init(
     _update_gitignore(project_root)
 
     from rich.panel import Panel
+    _gen = t("init.summary_generated")
+    _upd = t("init.summary_updated")
     summary_lines = [
-        "  [cyber.green]✓[/] .agents/config.toml  [cyber.dim]generated[/]",
+        f"  [cyber.green]✓[/] .agents/config.toml  [cyber.dim]{_gen}[/]",
     ]
     if vision_path.exists():
         summary_lines.append(
-            "  [cyber.green]✓[/] .agents/vision.md    [cyber.dim]generated[/]",
+            f"  [cyber.green]✓[/] .agents/vision.md    [cyber.dim]{_gen}[/]",
         )
     summary_lines.append(
-        "  [cyber.green]✓[/] .gitignore           [cyber.dim]updated[/]",
+        f"  [cyber.green]✓[/] .gitignore           [cyber.dim]{_upd}[/]",
     )
     summary_lines.append(
-        f"  [cyber.green]✓[/] [cyber.cyan]{count}[/] native artifacts  [cyber.dim]generated[/]",
+        f"  [cyber.green]✓[/] [cyber.cyan]{t('init.summary_artifacts', count=count)}[/]"
+        f"  [cyber.dim]{_gen}[/]",
     )
     console.print()
     console.print(Panel(
         "\n".join(summary_lines),
-        title="[cyber.header]INIT COMPLETE[/]",
+        title=f"[cyber.header]{t('init.complete_title')}[/]",
         border_style="cyber.border",
         padding=(0, 1),
     ))
 
     console.print()
-    console.print("  [cyber.cyan]Cursor-native mode ready![/] Use these skills in Cursor IDE:")
+    console.print(f"  [cyber.cyan]{t('init.guide_ready')}[/]")
     console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
-    console.print("  [cyber.magenta]/harness-brainstorm[/]  [cyber.dim]Full creative flow: brainstorm → vision → plan → ship[/]")
-    console.print("  [cyber.magenta]/harness-vision[/]      [cyber.dim]From vision: vision → plan → ship[/]")
-    console.print("  [cyber.magenta]/harness-plan[/]        [cyber.dim]Plan a task, then ship (recommended for defined tasks)[/]")
-    console.print("  [cyber.magenta]/harness-build[/]       [cyber.dim]Implement according to plan[/]")
-    console.print("  [cyber.magenta]/harness-eval[/]        [cyber.dim]5-role parallel code review[/]")
-    console.print("  [cyber.magenta]/harness-ship[/]        [cyber.dim]Direct ship: test → eval → fix → commit → push → PR[/]")
+    console.print(f"  [cyber.magenta]/harness-brainstorm[/]  [cyber.dim]{t('init.guide_brainstorm')}[/]")
+    console.print(f"  [cyber.magenta]/harness-vision[/]      [cyber.dim]{t('init.guide_vision')}[/]")
+    console.print(f"  [cyber.magenta]/harness-plan[/]        [cyber.dim]{t('init.guide_plan')}[/]")
+    console.print(f"  [cyber.magenta]/harness-build[/]       [cyber.dim]{t('init.guide_build')}[/]")
+    console.print(f"  [cyber.magenta]/harness-eval[/]        [cyber.dim]{t('init.guide_eval')}[/]")
+    console.print(f"  [cyber.magenta]/harness-ship[/]        [cyber.dim]{t('init.guide_ship')}[/]")
     console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
 
     console.print()
-    console.print("  [cyber.yellow]▸[/] Edit [cyber.cyan].agents/vision.md[/] to set your project vision,")
-    console.print("    then use [cyber.magenta]/harness-vision[/] in Cursor.")
+    console.print(f"  [cyber.yellow]▸[/] [cyber.cyan]{t('init.guide_edit_vision')}[/]")
+    console.print(f"    [cyber.magenta]{t('init.guide_use_vision')}[/]")
 
 
 def _update_gitignore(project_root: Path) -> None:

@@ -1,0 +1,73 @@
+---
+description: "Harness 安全护栏：在执行破坏性命令之前检测并警告"
+alwaysApply: true
+---
+
+# 安全护栏 — 破坏性命令检测
+
+在执行任何 shell 命令之前，对照以下模式检查。
+如果匹配，输出警告并在继续之前解释风险。
+
+## 破坏性命令模式
+
+### 文件系统破坏
+- `rm -rf` / `rm -r` / `rm --recursive` — 递归删除
+- `rm -f` 用于非平凡路径 — 不确认的强制删除
+- `find ... -delete` — 批量文件删除
+- `chmod -R 777` — 向所有用户开放所有文件
+
+### 数据库破坏
+- `DROP TABLE` / `DROP DATABASE` / `DROP SCHEMA`
+- `TRUNCATE TABLE` / 没有 WHERE 子句的 `DELETE FROM`
+- `ALTER TABLE ... DROP COLUMN`
+
+### Git 破坏性操作
+- `git push --force` / `git push -f` — 重写远程历史
+- `git reset --hard` — 永久丢弃未提交的变更
+- `git checkout .` / `git restore .` — 丢弃所有工作树变更
+- `git clean -fd` — 删除未跟踪的文件和目录
+- `git branch -D` — 强制删除分支（即使未合并）
+
+### 容器/基础设施
+- `kubectl delete` — 删除 Kubernetes 资源
+- `docker rm -f` — 强制删除运行中的容器
+- `docker system prune` — 删除所有未使用的 Docker 数据
+- `terraform destroy` — 销毁基础设施
+
+### 包/环境
+- 没有 virtualenv 的 `pip install` — 修改全局 Python
+- `npm install -g` — 修改全局 Node 包
+
+## 安全例外
+
+以下模式是常见的清理操作，不应触发警告：
+
+- `rm -rf node_modules` / `rm -rf dist` / `rm -rf build`
+- `rm -rf __pycache__` / `rm -rf .cache` / `rm -rf .pytest_cache`
+- `rm -rf .mypy_cache` / `rm -rf .ruff_cache`
+- `rm -rf *.egg-info` / `rm -rf .eggs`
+- `rm -rf coverage` / `rm -rf htmlcov`
+- `rm -rf .tox` / `rm -rf .nox`
+- `git push --force-with-lease`（安全的 force push — 尊重远程状态）
+
+## 匹配时的行为
+
+当检测到破坏性命令时：
+
+1. **输出警告：**
+   ```
+   ⚠️  SAFETY GUARDRAIL: Destructive command detected
+   Command: <the command>
+   Risk: <specific risk description>
+   ```
+
+2. **建议更安全的替代方案**（如果有）：
+   - `rm -rf` → 先用 `ls` 验证路径，或使用 trash/safe-rm
+   - `git push --force` → `git push --force-with-lease`
+   - `git reset --hard` → 先 `git stash`
+   - 没有 WHERE 的 `DELETE FROM` → 添加明确的 WHERE 子句
+
+3. **仅在以下情况继续：**
+   - 用户明确确认了该命令
+   - 或路径匹配上述安全例外
+   - 或上下文使意图明确（如 CI 清理步骤）

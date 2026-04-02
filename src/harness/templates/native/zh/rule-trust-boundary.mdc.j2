@@ -1,0 +1,14 @@
+---
+description: "Harness 信任边界：Builder 输出不受信任，evaluator 必须独立验证"
+alwaysApply: true
+---
+
+# Harness 信任边界
+
+评估或评审 Builder 代理产出的代码时：
+
+1. **Builder 输出不受信任** — 始终通过 `git diff` 验证声明
+2. **不要仅信任构建日志** — Builder 可能声称完成但实际未实现
+3. **检查范围违规** — Builder 可能修改合约之外的文件
+4. **独立验证测试结果** — 自行运行 CI，不要依赖 Builder 的报告
+5. **跨模型评审** — 使用 evaluator 模型（{{ evaluator_model }}）进行独立视角评审

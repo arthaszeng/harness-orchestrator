@@ -1,0 +1,23 @@
+{# _plan-content.md.j2 — aggregates the full plan lifecycle.
+   Included by: _vision-content.md.j2, skill-plan.md.j2
+   Contains: plan-core → plan-review → review-gate → ship invocation #}
+
+{% include 'sections/_plan-core.md.j2' %}
+
+---
+
+{% include 'sections/_plan-review.md.j2' %}
+
+---
+
+{% include 'sections/_review-gate.md.j2' %}
+
+---
+
+## 执行
+
+Review gate 已通过。调用 `/harness-ship` 执行完整的
+build → eval → ship → PR 管线。
+
+Ship 会派遣同样的 5 个角色（architect、product-owner、engineer、
+qa、project-manager）以 `code-eval` 模式进行评审阶段。
