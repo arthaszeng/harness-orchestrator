@@ -123,6 +123,7 @@ _LAYER_KEYS: dict[int, set[str]] = {
         "max_iterations",
         "project_name",
         "project_lang",
+        "artifact_lang",
         "retro_window_days",
         "memverse_enabled",
         "memverse_domain",
@@ -192,6 +193,7 @@ def _build_full_context(cfg: HarnessConfig, *, lang: str = "en") -> dict[str, st
         "max_iterations": str(cfg.workflow.max_iterations),
         "project_name": cfg.project.name,
         "project_lang": _detect_project_lang(cfg),
+        "artifact_lang": lang,
         "retro_window_days": str(cfg.native.retro_window_days),
         "memverse_enabled": "true" if cfg.integrations.memverse.enabled else "false",
         "memverse_domain": (

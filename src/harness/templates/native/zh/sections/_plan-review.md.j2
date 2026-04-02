@@ -14,6 +14,7 @@
 | 5 | `harness-project-manager` | `mode: plan-review`、计划路径、交付物数量、文件影响数量、roadmap/backlog/stop-rule 摘要（如存在） |
 
 每个 prompt 必须包含：
+- `response_language: {{ artifact_lang }}`
 {% if memverse_enabled == "true" %}
 - `memverse_domain: {{ memverse_domain }}`
 {% endif %}

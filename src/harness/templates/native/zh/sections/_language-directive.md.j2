@@ -1,0 +1,23 @@
+{# Language directive — enforces response language for all artifacts.
+   Uses: artifact_lang (from Layer 0)
+#}
+{% if artifact_lang == "zh" %}
+## 语言要求
+
+**你必须使用中文回答所有内容。** 所有分析、发现、建议、总结和描述性文本都必须使用中文。
+
+例外：以下内容保持英文不变：
+- 结构化输出中的字段名和关键字（如 `Score`、`Verdict`、`PASS`、`CRITICAL`、`WARN`、`INFO`）
+- 代码片段、文件路径、命令行指令
+- 专有名词和技术术语（如无通用中文译名）
+{% elif artifact_lang == "en" %}
+## Language Requirement
+
+**You MUST respond entirely in English.** All analysis, findings, recommendations,
+summaries, and descriptive text must be in English.
+
+Exceptions — keep as-is:
+- Structured output field names and keywords (`Score`, `Verdict`, `PASS`, `CRITICAL`, etc.)
+- Code snippets, file paths, CLI commands
+- Proper nouns and technical terms
+{% endif %}

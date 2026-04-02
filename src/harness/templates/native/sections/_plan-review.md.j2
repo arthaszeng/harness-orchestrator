@@ -14,6 +14,7 @@ Send a SINGLE message containing all 5 Task tool calls:
 | 5 | `harness-project-manager` | `mode: plan-review`, plan path, deliverable count, file impact count, roadmap/backlog/stop-rule summary when available |
 
 Each prompt must include:
+- `response_language: {{ artifact_lang }}`
 {% if memverse_enabled == "true" %}
 - `memverse_domain: {{ memverse_domain }}`
 {% endif %}
