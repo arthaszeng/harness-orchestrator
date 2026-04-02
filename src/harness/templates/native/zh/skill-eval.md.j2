@@ -1,0 +1,73 @@
+---
+name: harness-eval
+description: "多角色代码评审，配备 5 个专业审查者和 Fix-First 自动修复。并行派遣 architect、product-owner、engineer、qa 和 project-manager 子代理。当用户说 review this、evaluate、harness eval 或在 build 之后使用。在任何 /harness-build 完成后主动调用。(harness)"
+---
+
+# Harness Eval
+
+你正在运行 `/harness-eval` 工作流。这是一个**最少交互**的评审管线。
+直接运行到底并在最后输出评审结果。
+
+**仅在以下情况停止：**
+- 需要用户判断的 ASK 类发现（见下方 Fix-First）
+- 所有评审子代理都失败（完全没有结果）
+
+**绝不因以下原因停止：**
+- AUTO-FIX 发现（修复、提交、继续）
+- 子代理失败（按降级阶梯优雅降级）
+- 次要问题或信息性发现
+
+---
+
+## 步骤 0：上下文收集
+
+1. 检测当前任务：在 `.agents/tasks/` 下找到最新的 `task-NNN` 目录
+2. 读取 `.agents/tasks/task-NNN/plan.md`（合约）
+3. 读取 `.agents/tasks/task-NNN/build-rN.log`（最新构建日志）
+4. 运行 `git diff {{ trunk_branch }}..HEAD --stat` 了解范围
+5. **先验学习**：搜索 Memverse 获取与变更文件/模块相关的学习成果。
+   如果 Memverse MCP 可用，使用 diff 中的关键主题调用 `search_memory`。
+   在开始评审前展示任何相关的先验学习成果（尤其是陷阱）。
+
+### 上下文降级阶梯
+
+按顺序检查每个上下文来源。跳过缺失的内容 — 除非 git diff 为空，否则不要停止。
+
+| 上下文来源 | 如果缺失 | 影响 |
+|------------|----------|------|
+| `task-NNN/` 目录 | 使用分支名作为审计 ID；将评审产物写入 `.agents/evals/` 备用路径 | 无任务级跟踪 |
+| `plan.md` | WARN: "无计划 — 评审原始 diff" | 跳过合约完整性；Completeness 记为 N/A |
+| `build-rN.log` | WARN: "无构建日志 — 跳过对 builder 声明的核验" | 仅依赖 git diff + CI |
+| `git diff`（为空） | **FATAL** — 无可评审内容。停止并报错。 | 无法继续 |
+| Memverse MCP | 静默跳过 | 无先验学习查询 |
+
+**最低可行评审 = 非空 git diff。** 其他一切优雅降级。
+
+---
+
+{% include 'sections/_trust-boundary.md.j2' %}
+
+---
+
+## 步骤 1：5 角色代码评审
+
+{% include 'sections/_code-review.md.j2' %}
+
+---
+
+## 步骤 2：捕获学习成果
+
+评审完成后，将非显而易见的见解捕获为学习成果：
+
+1. 审查所有置信度 >= 7 的发现
+2. 对于尚未记录的模式或陷阱：
+   - 使用 domain "{{ project_name }}" 调用 Memverse `add_memories`
+   - Type：  "pattern"（发现好的实践）或 "pitfall"（发现常见错误）
+   - Source："observed"
+3. 记录：「从本次评审中捕获了 N 个新的学习成果」
+
+如果 Memverse MCP 不可用：静默跳过。
+
+---
+
+{% include 'sections/_hook-points.md.j2' %}

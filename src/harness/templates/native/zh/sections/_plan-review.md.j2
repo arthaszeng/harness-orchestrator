@@ -1,0 +1,72 @@
+## 计划评审 — 5 角色并行派遣
+
+### 派遣
+
+通过 Task 工具**并行启动所有 5 个审查者**，每个使用 `mode: plan-review`。
+发送一条包含所有 5 个 Task 工具调用的消息：
+
+| # | 子代理 | Prompt 附加内容 |
+|---|--------|----------------|
+| 1 | `harness-architect` | `mode: plan-review`、计划路径、`ARCHITECTURE.md` 路径（如存在） |
+| 2 | `harness-product-owner` | `mode: plan-review`、计划路径、`.agents/vision.md` 路径 |
+| 3 | `harness-engineer` | `mode: plan-review`、计划路径、源代码目录列表 |
+| 4 | `harness-qa` | `mode: plan-review`、计划路径、测试目录列表、`ci_command: {{ ci_command }}` |
+| 5 | `harness-project-manager` | `mode: plan-review`、计划路径、交付物数量、文件影响数量 |
+
+每个 prompt 必须包含：
+- `memverse_domain: {{ project_name }}`
+- 计划文件内容（读取并嵌入，或提供路径）
+- 上述角色特定的上下文
+
+**降级阶梯**（如果 Task 工具调用失败）：
+- **5/5 响应：** 按下述方式完整合成
+- **3-4/5 响应：** 使用可用的评审结果继续，注明缺失的视角
+- **1-2/5 响应：** 记录警告，降级为单代理评审
+- **0/5 响应：** 回退到单个 generalPurpose 子代理评审
+
+### 合成
+
+所有响应到达后：
+
+1. **合并发现** — 将所有 5 位审查者的发现合并为统一列表
+2. **过滤超范围发现** — 使用角色→职责映射：
+   | 角色 | 负责 | 不得报告 |
+   |------|------|---------|
+   | Architect | 设计、模块、依赖、安全设计 | 代码质量、测试、交付、用户价值 |
+   | Product Owner | 用户价值、需求、AC、UX 边界情况 | 代码质量、架构、测试、交付 |
+   | Engineer | 代码质量、DRY、模式、性能、错误处理 | 架构决策、用户价值、交付、测试策略 |
+   | QA | 测试、覆盖率、CI、回归、边界 | 代码质量、架构、用户价值、交付 |
+   | Project Manager | 范围、交付、分解、提交结构 | 代码质量、架构、测试、用户价值 |
+
+   对每个发现，检查报告角色是否负责该类别：
+   - **范围内**：保持原样
+   - **范围外 + CRITICAL**：重新标记为 `[CROSS-ROLE]` 并保留
+   - **范围外 + WARN/INFO**：标记 `[OUT-OF-SCOPE]` 并从评分中排除
+3. **交叉验证：** 如果 2+ 个角色标记同一问题 → 标记 `[HIGH CONFIDENCE]`
+4. **解决冲突：** 如果角色之间相互矛盾，呈现双方观点
+   并标记为 `[TASTE DECISION]` 交由 review gate 处理
+5. **计算综合评分：**
+   ```
+   Architecture:  [architect score]/10
+   Product:       [product-owner score]/10
+   Engineering:   [engineer score]/10
+   Testing:       [qa score]/10
+   Delivery:      [project-manager score]/10
+   ─────────────────────────────────
+   Weighted avg:  [avg]/10
+   ```
+6. **确定裁定：**
+   - 全部 PASS 且 avg ≥ {{ pass_threshold }} → `PLAN_APPROVED`
+   - 任何 CRITICAL 发现 → `PLAN_NEEDS_REVISION`
+   - avg < {{ pass_threshold }} → `PLAN_NEEDS_REVISION`
+
+### 重新规划循环（最多 2 次迭代）
+
+如果裁定为 `PLAN_NEEDS_REVISION`：
+
+1. 修复计划文件中所有 CRITICAL 和 WARN 发现
+2. 重新派遣完整的 5 角色评审（相同的并行模式）
+3. 如果相同问题再次出现（收敛保护）→ 接受并记录为 `## Unresolved Concerns`
+4. 2 次迭代后 → 以当前状态进入 review gate
+
+将最终合成结果持久化为计划文件中的 `## Plan Review Summary`。

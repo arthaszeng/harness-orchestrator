@@ -1,0 +1,14 @@
+{% if hooks_pre_build %}
+## 构建前钩子
+在开始实现之前，执行：`{{ hooks_pre_build }}`
+如果退出码非零，报告错误并停止。
+{% endif %}
+{% if hooks_post_eval %}
+## 评审后钩子
+评审完成后，执行：`{{ hooks_post_eval }}`
+{% endif %}
+{% if hooks_pre_ship %}
+## 交付前钩子
+在推送之前，执行：`{{ hooks_pre_ship }}`
+如果退出码非零，报告错误并停止。
+{% endif %}

@@ -53,6 +53,21 @@ MESSAGES: dict[str, str] = {
     "native.hint_eval": "    /harness-eval       — 5 角色并行代码评审",
     "native.hint_ship": "    /harness-ship       — 直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
     
+    "init.step_label": "步骤 {step}/{total}",
+    "init.complete_title": "初始化完成",
+    "init.reinit_complete_title": "重新初始化完成",
+    "init.summary_generated": "已生成",
+    "init.summary_updated": "已更新",
+    "init.summary_artifacts": "{count} 个 native 产物",
+    "init.guide_ready": "Cursor-native 模式就绪！在 Cursor IDE 中使用以下 skills：",
+    "init.guide_brainstorm": "完整创意流: 头脑风暴 → 愿景 → 规划 → 交付",
+    "init.guide_vision": "从愿景开始: 愿景 → 规划 → 交付",
+    "init.guide_plan": "规划任务后交付（明确任务推荐使用）",
+    "init.guide_build": "按计划实现代码",
+    "init.guide_eval": "5 角色并行代码评审",
+    "init.guide_ship": "直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
+    "init.guide_edit_vision": "编辑 .agents/vision.md 设定项目愿景，",
+    "init.guide_use_vision": "然后在 Cursor 中使用 /harness-vision。",
     "init.gitignore_comment": "# harness — 不跟踪运行时状态",
 
     # ── reinit mode ────────────────────────────────────────────────

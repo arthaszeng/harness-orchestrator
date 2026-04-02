@@ -1,0 +1,88 @@
+{# Workspace Pre-flight — shared section included by entry-point and ship skills.
+   Requires: {% with preflight_mode="entry"|"ship" %}
+   Uses context vars: trunk_branch, branch_prefix
+#}
+{% set preflight_mode = preflight_mode | default("entry") %}
+## 工作区预检
+
+{% if preflight_mode == "entry" %}
+在开始规划或探索之前，确保工作区已准备好接受新任务。
+
+### 1. 清洁检查
+
+```bash
+git status --porcelain
+```
+
+如果输出**不为空**，**立即中止**：
+- 列出脏文件
+- 引导用户："工作区有未提交的变更，请先处理再运行 harness workflow："
+  - `git stash -u` 暂存所有内容（包括未跟踪文件）
+  - `git commit` 提交当前工作
+  - `git checkout -- .` 丢弃变更
+- 不要继续。不要自动暂存。
+
+### 2. Worktree 检测
+
+```bash
+COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
+GITDIR=$(git rev-parse --git-dir 2>/dev/null)
+```
+
+如果 `$COMMON` ≠ `$GITDIR`，你在 **Cursor parallel-agent worktree** 中。
+该 worktree 创建时已复制了 `.cursor/` 和 `.agents/`
+（通过 `worktrees.json`）。**跳过步骤 3–5** — worktree 已经在
+正确的 feature branch 上。继续下一阶段。
+
+### 3. 分支检查
+
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+```
+
+- 如果 `$CURRENT_BRANCH` 以 `{{ branch_prefix }}/` 开头：你正在**恢复一个已有任务**。
+  通知用户："当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
+  **跳过步骤 4–5。** 继续下一阶段。
+- 如果 `$CURRENT_BRANCH` 是 `HEAD`（detached）：**中止** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
+- 否则：继续步骤 4。
+
+### 4. 对齐主干
+
+```bash
+git checkout {{ trunk_branch }}
+git pull origin {{ trunk_branch }}
+```
+
+如果 `git pull` 失败（网络错误、冲突或 `{{ trunk_branch }}` 不存在）：
+**中止** — 显示错误输出并引导："无法更新 `{{ trunk_branch }}`，请手动解决后重新运行。"
+
+### 5. 创建 Feature Branch
+
+1. 确定下一个任务编号：
+   ```bash
+   mkdir -p .agents/tasks
+   ls .agents/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
+   ```
+   如果没有任务，从 `001` 开始。否则将最大值加 1，零填充到 3 位数字。
+
+2. 从用户的需求中提取简短描述（最多 4 个用连字符连接的小写关键词）。
+
+3. 创建分支：
+   ```bash
+   git checkout -b {{ branch_prefix }}/task-NNN-<short-desc>
+   ```
+   如果分支已存在：**中止** — "分支 `{{ branch_prefix }}/task-NNN-<short-desc>` 已存在，请确认是否要 resume 该任务或选择其他名称。"
+
+{% elif preflight_mode == "ship" %}
+在交付之前，确保基础分支是最新的。
+
+### 0. 拉取主干
+
+```bash
+git fetch origin {{ trunk_branch }}
+```
+
+这确保 rebase（Step 2）操作基于最新的远程状态。
+如果 fetch 失败（网络错误）：警告但继续 — rebase 将使用上次拉取的状态。
+
+{% endif %}

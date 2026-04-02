@@ -78,9 +78,14 @@ _RESOURCE_FILES = [
 ]
 
 
-def _get_template_dir() -> Path:
+def _get_template_dir(lang: str = "en") -> Path:
     pkg = importlib.resources.files("harness") / "templates" / _TEMPLATE_DIR
-    return Path(str(pkg))
+    base = Path(str(pkg))
+    if lang == "zh":
+        zh_dir = base / "zh"
+        if zh_dir.is_dir():
+            return zh_dir
+    return base
 
 
 def _detect_project_lang(cfg: HarnessConfig) -> str:
@@ -102,7 +107,7 @@ def _detect_project_lang(cfg: HarnessConfig) -> str:
 _ROLE_NAMES = tuple(sorted(NATIVE_REVIEW_ROLES))
 
 
-def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
+def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> dict[str, str]:
     """Build the Jinja2 template context from config + i18n.
 
     When role is specified, irrelevant variables are stripped to reduce
@@ -124,8 +129,8 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
         "evaluator_model": effective_evaluator_model or "IDE default",
         "evaluator_model_requested": cfg.native.evaluator_model,
         "adversarial_mechanism": cfg.native.adversarial_mechanism,
-        "planner_principles": _planner_principles(),
-        "builder_principles": _builder_principles(),
+        "planner_principles": _planner_principles(lang),
+        "builder_principles": _builder_principles(lang),
         "project_name": cfg.project.name,
         "project_lang": _detect_project_lang(cfg),
         "hooks_pre_build": cfg.native.hooks_pre_build,
@@ -152,7 +157,15 @@ def _build_context(cfg: HarnessConfig, *, role: str = "") -> dict[str, str]:
     return ctx
 
 
-def _planner_principles() -> str:
+def _planner_principles(lang: str = "en") -> str:
+    if lang == "zh":
+        return (
+            "1. **交付清晰的合约** — 每个交付物必须有验收标准\n"
+            "2. **先搜索再构建** — 在提出新模式之前，先检查项目已有的实现\n"
+            "3. **完整性** — 在成本较低时覆盖测试、错误处理和类型安全\n"
+            "4. **范围纪律** — 不添加超出需求的交付物\n"
+            "5. **不做实现** — 你负责规划，Builder 负责实现"
+        )
     return (
         "1. **Deliver a clear contract** — every deliverable must have acceptance criteria\n"
         "2. **Search Before Building** — check what the project already uses before proposing new patterns\n"
@@ -162,7 +175,15 @@ def _planner_principles() -> str:
     )
 
 
-def _builder_principles() -> str:
+def _builder_principles(lang: str = "en") -> str:
+    if lang == "zh":
+        return (
+            "1. **严格按合约交付** — 只实现合约列出的内容\n"
+            "2. **小提交** — 每个逻辑单元一个提交；格式 `<type>(scope): description`\n"
+            "3. **遵循项目约定** — 写新代码前先检查已有模式\n"
+            "4. **测试覆盖** — 新行为需要测试；变更必须保持现有测试通过\n"
+            "5. **不做架构决策** — Planner 负责架构；你负责实现"
+        )
     return (
         "1. **Deliver exactly per contract** — implement only what the contract lists\n"
         "2. **Small commits** — one commit per logical unit; message format `<type>(scope): description`\n"
@@ -206,7 +227,7 @@ _WORKTREES_JSON = {
 def generate_native_artifacts(
     project_root: Path,
     *,
-    lang: str = "en",  # reserved for future i18n
+    lang: str = "en",
     cfg: HarnessConfig | None = None,
     force: bool = False,
 ) -> int:
@@ -214,8 +235,8 @@ def generate_native_artifacts(
     if cfg is None:
         cfg = HarnessConfig.load(project_root)
 
-    tmpl_dir = _get_template_dir()
-    context = _build_context(cfg)
+    tmpl_dir = _get_template_dir(lang)
+    context = _build_context(cfg, lang=lang)
     count = 0
 
     typer.echo(t("native.generating"))

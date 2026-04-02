@@ -1,0 +1,48 @@
+---
+name: harness-plan
+description: "从需求到 PR 的端到端流程：通过多角色评审完善计划，然后自动执行 build/eval/ship/retro。当用户说 plan、做这个、实现、构建这个功能、harness plan 或提供具体需求时使用。(harness)"
+---
+
+# Harness Plan — 从需求到 PR
+
+你正在运行 `/harness-plan` 工作流。用户有一个**具体的需求**，
+需要规划和执行。
+
+**人机交互阶段：** 计划完善 + Review Gate
+**自主阶段：** Build → Eval → Ship → Auto-Retro
+
+**仅在以下情况停止：**
+- 需求模糊（请求澄清**一次**，然后以最佳理解继续）
+- 计划评审识别出的品味决策或用户挑战
+- Review gate 升级（当 plan_review_gate 要求时）
+- 评审中 ASK 类发现
+
+**绝不因以下原因停止：**
+- 计划格式审批
+- 写入磁盘前的确认
+- 实现决策（在 build 阶段做出）
+- AUTO-FIX 发现（静默修复）
+
+---
+
+{% with preflight_mode="entry" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
+---
+
+## 阶段 0：需求理解
+
+阅读用户的需求。如果模糊，请求澄清**一次** —
+然后以最佳理解继续。
+
+---
+
+{# Recursive composition: plan = Phase 0 + plan-content (plan-core, plan-review, gate, ship) #}
+{% with interaction_depth="low" %}
+{% include 'sections/_plan-content.md.j2' %}
+{% endwith %}
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}

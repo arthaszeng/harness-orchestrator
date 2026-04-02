@@ -1,0 +1,499 @@
+---
+name: harness-ship
+description: "最少交互的交付管线：合并基准、测试、5 角色代码评审、修复循环、可二分提交、推送、PR。一个命令 — 你看到的下一个东西就是 PR URL。当用户说 ship this、harness ship、push 或 create a PR 时使用。当用户说代码已完成或要求部署时主动调用。(harness)"
+---
+
+# Harness Ship — 自动化管线
+
+你正在运行 `/harness-ship` 工作流。这是一个**最少交互**的管线。
+直接运行到底并在最后输出 PR URL。
+
+**仅在以下情况停止：**
+- 在主干分支上（中止）
+- 无法自动解决的合并冲突（停止，显示冲突）
+- 分类后仍存在的分支内测试失败（预存在的已分类，不阻塞）
+- 需要用户判断的 ASK 类评审发现
+- 评审分数在 {{ max_iterations }} 次迭代后仍低于 {{ pass_threshold }}
+
+**绝不因以下原因停止：**
+- 未提交的变更（始终包含它们）
+- 提交消息审批（自动提交）
+- PR 内容（自动生成）
+- AUTO-FIX 评审发现（修复并继续）
+
+---
+
+{% with preflight_mode="ship" %}
+{% include 'sections/_workspace-preflight.md.j2' %}
+{% endwith %}
+
+## 步骤 1：预检
+
+1. 检查当前分支。如果在 `{{ trunk_branch }}` 上，**中止**："你在主干分支上。请从 feature branch 交付。"
+
+2. 运行 `git status`。未提交的变更始终包含 — 无需询问。
+
+3. 运行 `git diff {{ trunk_branch }}...HEAD --stat` 和 `git log {{ trunk_branch }}..HEAD --oneline` 了解正在交付的内容。
+
+4. 检查 `.agents/config.toml` 是否存在。
+
+5. **检测或创建任务目录**（确定性算法）：
+   1. 扫描 `.agents/tasks/` 中所有 `task-NNN` 目录
+   2. 设 `L` = 数字最大的 NNN 对应的目录（按数字排序）
+   3. 如果 `L` 存在且 `L/plan.md` 存在 → 复用 `L` 作为 `TASK_DIR`
+   4. 否则 → 创建 `task-{max(NNN)+1}`（如果没有则 `task-001`）作为 `TASK_DIR`
+   5. 所有评审产物、ship-metrics 和构建日志都放入 `TASK_DIR`
+
+   ```bash
+   mkdir -p .agents/tasks/task-NNN
+   ```
+
+   如果 `TASK_DIR/plan.md` 存在计划，读取它作为上下文。
+
+6. **先验学习**：如果 Memverse MCP 可用，搜索与变更文件/模块相关的学习成果。
+   展示适用于此 diff 的先验陷阱或模式。
+
+7. **评审就绪提醒**：此工作流将在 Step 3.8 运行强制评审。
+   测试通过后，下一步是评审 — 不是提交，不是发布。
+   现在创建一个 TODO 列表，其中 EVAL 显式标记：
+
+   ```
+   - [ ] 预检 (Step 1)
+   - [ ] Rebase (Step 2)
+   - [ ] 测试 (Step 3)
+   - [ ] 覆盖率审计 (Step 3.4)
+   - [ ] 计划完成度审计 (Step 3.5)
+   - [ ] **EVAL — 强制** (Step 3.8)
+   - [ ] 范围漂移检测 (Step 4)
+   - [ ] 如果 ITERATE 则修复循环 (Step 5)
+   - [ ] Eval 产物门禁 (Step 5.9)
+   - [ ] 提交 (Step 6)
+   - [ ] 验证门禁 (Step 7)
+   - [ ] 推送 + PR (Step 8)
+   ```
+
+---
+
+## 步骤 2：Rebase 到基础分支（在测试之前）
+
+拉取并 rebase 到基础分支，使测试在最新状态上运行：
+
+```bash
+git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
+```
+
+**如果 rebase 冲突：** 尝试自动解决简单冲突（如 CHANGELOG 排序）。
+如果冲突复杂或有歧义，运行 `git rebase --abort`，**停止**并显示冲突。
+
+**如果已是最新：** 静默继续。
+
+---
+
+## 步骤 3：运行测试（在合并后的代码上）
+
+运行完整的测试套件：
+
+```bash
+{{ ci_command }}
+```
+
+**如果任何测试失败：** 不要立即停止。应用测试失败归属分类：
+
+### 测试失败分类
+
+对每个失败的测试，确定归属：
+
+1. 在基础分支上运行同一测试：
+   ```bash
+   git stash && git checkout {{ trunk_branch }} && {{ ci_command }} 2>&1; git checkout - && git stash pop
+   ```
+   （或使用 `git diff` 检查失败的测试文件是否在本分支被修改）
+
+2. **预存在的失败**（在基础分支上也失败）：记录并继续。不是你的问题。
+3. **分支内失败**（在基础分支通过，在 HEAD 失败）：这是你的问题。必须修复。
+
+**分类后：** 如果分支内失败仍存在，进入修复循环（Step 5）。
+如果所有失败都是预存在的，继续到 Step 3.5。
+
+**如果全部通过：** 静默继续 — 简要记录计数。
+
+---
+
+## 步骤 3.4：测试覆盖率审计
+
+分析 diff 以确保变更的代码路径有充分的测试覆盖。
+
+### 1. 检测测试框架
+扫描：`pytest.ini`、`pyproject.toml [tool.pytest]`、`jest.config.*`、`vitest.config.*`、
+`Makefile` 测试目标、`tox.ini`、`setup.cfg [tool:pytest]`。记录框架以备后用。
+
+### 2. 追踪代码路径
+对 `git diff {{ trunk_branch }}..HEAD` 中的每个文件：
+1. 读取变更的文件，识别所有修改/新增的函数和方法
+2. 对每个函数，追踪：
+   - 正常路径（正常执行）
+   - 每个条件分支（if/else、match/case）
+   - 每个错误路径（try/except、error returns）
+   - 每个循环边界（空集合、单项、多项）
+3. 绘制 ASCII 覆盖率图：
+
+```
+COVERAGE: src/harness/workflow.py
+├─ single_task_pass()
+│  ├─ [TESTED ★★★] happy path — tested in test_single_task_pass
+│  ├─ [TESTED ★★]  max iterations — tested in test_blocked_after_max
+│  ├─ [GAP]        empty spec input — no test
+│  └─ [TESTED ★]   dual eval failure — tested but shallow
+├─ split_spec_contract()
+│  ├─ [TESTED ★★★] with marker
+│  ├─ [TESTED ★★★] without marker
+│  └─ [TESTED ★★★] case insensitive
+```
+
+图例：★★★ = 充分（多个断言）、★★ = 基本（单个断言）、★ = 存在但浅层、GAP = 无测试
+
+### 3. 用户流覆盖
+检查变更代码的以下场景是否被覆盖：
+- 并发/并行执行（如适用）
+- 空/null 状态
+- 边界值（0、最大值、负数）
+- 错误恢复路径
+
+### 4. E2E 决策矩阵
+对变更的代码路径，推荐测试类型：
+- 无 I/O 的纯函数 → **单元测试**
+- 带 mock 依赖的单组件 → **单元测试**
+- 2 个组件交互 → **集成测试**
+- 3+ 个组件或完整用户流 → **E2E 测试**
+- LLM/AI 行为验证 → **eval 测试**
+
+### 5. 回归规则（铁律）
+如果 diff 修改了已有行为（对已有函数的变更，不仅是新代码）：
+- 必须有回归测试验证旧行为仍然有效
+- 这是不可商量的 — 如果缺失则生成测试，不要询问
+
+### 6. 覆盖率门禁
+从图表计算预估覆盖率：
+- 统计总代码路径和已测试路径
+- **>= 80%**：PASS — 继续
+- **>= 60%**：WARNING — 输出："覆盖率约 ~X%。建议为以下路径添加测试：[列出 GAP 路径]"
+- **< 60%**：GATE — 为 GAP 路径自动生成测试（最多 20 个），运行后重新评估
+
+### 7. 自动生成缺失测试（覆盖率 < 60% 时）
+对每个 GAP 路径：
+1. 按照项目已有的测试模式生成测试
+2. 运行测试验证通过
+3. 每次审计最多生成 20 个测试
+4. 提交生成的测试：`git add tests/ && git commit -m "test: auto-generate coverage for gaps"`
+
+---
+
+## 步骤 3.5：计划完成度审计
+
+如果 `.agents/tasks/task-NNN/plan.md` 存在计划文件：
+
+1. 提取每个可操作项（复选框、编号步骤、命令式语句）
+2. 对照 `git diff {{ trunk_branch }}...HEAD` 交叉引用
+3. 分类：**DONE** / **PARTIAL** / **NOT DONE** / **CHANGED**
+4. 输出：
+
+```
+PLAN COMPLETION AUDIT
+═══════════════════════════════════
+  [DONE]      交付物 1 — 变更的文件
+  [DONE]      交付物 2 — 变更的文件
+  [NOT DONE]  交付物 3 — diff 中无证据
+═══════════════════════════════════
+COMPLETION: X/Y DONE, M PARTIAL, K NOT DONE
+```
+
+如果有 NOT DONE 项：在 PR body 中注明。继续 — 这是信息性的，不阻塞。
+
+---
+
+## 步骤 3.8：预着陆评审 — 5 角色代码评估（始终开启）
+
+内联运行代码评估。使用 Task 工具并行派遣所有 5 个角色审查者 —
+主代理协调但不自行执行评审。
+
+{% include 'sections/_code-review.md.j2' %}
+
+{% if review_gate == 'eng' %}
+
+**Review Gate (eng)：** 评估是硬门禁 — ITERATE 裁定阻塞交付。
+所有 CRITICAL 发现必须在继续之前解决。
+{% elif review_gate == 'advisory' %}
+
+**Review Gate (advisory)：** 评估是建议性的 — ITERATE 裁定被记录但不阻塞。
+CRITICAL 发现被标记但交付继续。
+{% endif %}
+
+---
+
+## 步骤 4：范围漂移检测
+
+检查：diff 是否交付了计划中承诺的内容 — 不多不少？
+
+1. 读取计划（如存在）、提交消息和 TODOS.md 了解声明的意图
+2. 运行 `git diff {{ trunk_branch }}...HEAD --stat` 并与意图对比
+3. 输出：
+
+```
+Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
+Intent: <一句话总结>
+Delivered: <一句话总结>
+[如果漂移：列出每个超范围的变更]
+[如果缺失：列出每个未完成的需求]
+```
+
+这是**信息性的** — 不阻塞交付。
+
+---
+
+## 步骤 5：修复循环（如果 ITERATE）
+
+如果评估裁定为 ITERATE：
+
+1. 阅读评估反馈（具体的修复建议）
+2. 对代码应用修复
+3. 运行 `{{ ci_command }}` 验证
+4. 以递增的轮次编号重新运行评估（Step 3.8）
+5. 最多 {{ max_iterations }} 轮迭代
+
+如果 {{ max_iterations }} 轮后仍为 ITERATE：**停止**。报告分数和未解决的发现。
+
+---
+
+## 步骤 5.5：TODOS.md 管理
+
+如果项目根目录存在 `TODOS.md` 文件：
+
+1. 读取 `TODOS.md` 并解析所有 TODO 项
+2. 对照 `git diff {{ trunk_branch }}...HEAD` 检测已完成的项：
+   - 如果 TODO 引用了 diff 中修改/新增的文件/函数，检查工作是否已完成
+   - 如果 TODO 描述的功能现已实现，标记为已完成
+3. 将已完成项移到底部的 `## Completed` 部分
+4. 输出摘要："TODOS: N items marked complete, M remaining"
+5. 如果有项目被更新，提交：`git add TODOS.md && git commit -m "chore: update TODOS.md"`
+
+如果没有 `TODOS.md`：静默跳过。
+
+---
+
+## 步骤 5.9：Eval 产物门禁（强制 — 不可跳过）
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║  EVAL GATE：提交前，验证 eval 确实已运行。                    ║
+║  这捕获 #1 工作流跳过 — 从"测试通过"直接跳到"提交"。          ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+使用 Step 1 中建立的 `TASK_DIR` 检查评估产物：
+
+```bash
+ls TASK_DIR/evaluation-r*.md 2>/dev/null
+```
+
+**验证清单：**
+1. **存在**：文件必须存在。如果不存在 → 你跳过了 Step 3.8。回去执行。
+2. **非空**：文件必须包含裁定（`PASS` 或 `ITERATE`）。空文件或占位文件无效。
+3. **新鲜**：评估必须针对当前 diff。如果评估后代码又发生了变更
+   （如修复循环提交），最新的评估轮次必须晚于这些变更。
+4. **正确任务**：`TASK_DIR` 必须与 Step 1 预检中建立的目录匹配。
+
+**如果任何检查失败：** 你没有完成 eval。**回到 Step 3.8。**
+不要合理化（"只是模板"、"测试通过所以没问题"）。
+评估捕获的是测试无法发现的问题：安全漏洞、设计缺陷、范围漂移。
+
+**如果评估文件存在：** 读取裁定。仅在以下情况继续：
+{% if review_gate == 'advisory' %}
+- Advisory 模式：任何裁定都可接受（记录 ITERATE 但继续）
+{% else %}
+- 裁定为 **PASS**（平均分 >= {{ pass_threshold }}）
+- 或所有 CRITICAL 发现已在修复循环中解决
+{% endif %}
+
+---
+
+## 步骤 6：提交（可二分的块）
+
+{% if review_gate == 'advisory' %}
+评估完成后（advisory 模式 — ITERATE 裁定被记录但不阻塞）：
+{% else %}
+评估 PASS 后：
+{% endif %}
+
+1. **可二分提交**：分析 diff 并按逻辑提交分组：
+   - 基础设施/配置变更在前
+   - 核心逻辑 + 测试放在一起
+   - 每个提交必须独立有效
+
+2. **提交格式**：`<type>(scope): description`
+   Types: feat, fix, refactor, test, docs, chore
+
+3. 按文件组暂存并提交（不是 `git add -A`）：
+   ```bash
+   git add <specific-files> && git commit -m "<type>(scope): description"
+   ```
+
+---
+
+{% include 'sections/_bypass-immunity.md.j2' %}
+
+---
+
+## 步骤 7：验证门禁 — 铁律
+
+```
+铁律：没有新鲜的验证证据，不得声称完成。
+
+防止合理化：
+- "现在应该可以了" → 运行它。
+- "我有信心" → 信心不是证据。
+- "我之前已经测试过了" → 代码在那之后变了。再测一次。
+- "这是个微小的变更" → 微小的变更也能搞垮生产。
+- "只改了文档" → 文档可能有断开的链接、错误的路径。
+
+在没有验证的情况下声称工作完成是不诚实，不是效率。
+```
+
+**推送前验证：**
+
+1. 如果 Step 3 的测试运行后有任何代码变更（评审修复不算），
+   重新运行 `{{ ci_command }}`。粘贴新鲜的输出 — 不是摘要，是实际输出。
+2. 如果测试失败：停止。修复并返回 Step 3。
+3. 验证 git status 是干净的（没有游离的未跟踪文件）。
+
+{% if hooks_pre_build or hooks_post_eval or hooks_pre_ship %}
+---
+
+{% include 'sections/_hook-points.md.j2' %}
+
+---
+{% endif %}
+
+## 步骤 8：推送 + PR
+
+1. 带上游跟踪推送：
+   ```bash
+   git push -u origin HEAD
+   ```
+
+2. **PR 幂等性检查** — 创建新 PR 前检测已有 PR：
+   ```bash
+   EXISTING_PR=$(gh pr view --json url,number,state -q 'select(.state == "OPEN") | .number' 2>/dev/null || echo "")
+   ```
+   - 如果 `EXISTING_PR` 非空：使用 `gh pr edit $EXISTING_PR --body "..."` 更新已有 PR body
+   - 如果为空：创建新 PR
+
+3. 创建或更新 PR：
+   ```bash
+   gh pr create --base {{ trunk_branch }} --title "<type>: <summary>" --body "$(cat <<'EOF'
+   ## Summary
+   <总结所有变更 — 按逻辑部分分组>
+
+   ## Evaluation Scores
+   | Dimension | Score |
+   |-----------|-------|
+   | Design | architect | X/10 |
+   | Completeness | product-owner | X/10 |
+   | Quality | engineer | X/10 |
+   | Regression | qa | X/10 |
+   | Scope | project-manager | X/10 |
+   | **Weighted Average** | | **X.X/10** |
+
+   ## Review Findings
+   - High confidence: N findings
+   - Auto-fixed: M findings
+   - Roles dispatched: architect ✓/✗  product-owner ✓/✗  engineer ✓/✗  qa ✓/✗  project-manager ✓/✗
+
+   ## Plan Completion
+   <完成度清单摘要，或 "No plan file">
+
+   ## Scope Check
+   <CLEAN 或列出漂移/缺失项>
+
+   ## Test Coverage
+   <ASCII 覆盖率图摘要，或 "No coverage audit">
+
+   ## TODOS
+   <N completed, M remaining, 或 "No TODOS.md">
+
+   ## Test Results
+   - [x] All tests pass (N tests)
+
+   EOF
+   )"
+   ```
+
+   如果 `gh` 不可用：打印分支名和远程 URL 以供手动创建 PR。
+
+4. 输出 PR URL。
+
+---
+
+## 步骤 8.5：Doc-Release（自动调用）
+
+PR 创建/更新后，运行 `/harness-doc-release` 工作流：
+
+1. 对比 diff 与项目中所有 `.md` 文件
+2. 自动修复事实性错误（文件路径、版本号、函数名）
+3. 标记叙述/观点变更供用户审查
+4. 如果有文档被更新，修改最后一个提交或创建新提交：
+   ```bash
+   git add '*.md' && git commit -m "docs: sync documentation with latest changes" && git push
+   ```
+
+如果没有发现文档问题：静默跳过。
+
+---
+
+## 步骤 8.75：Ship 指标持久化
+
+将 ship 指标写入 `.agents/tasks/task-NNN/ship-metrics.json` 供回顾消费：
+
+```json
+{
+  "timestamp": "ISO-8601",
+  "branch": "agent/feature-name",
+  "coverage_pct": 85,
+  "plan_total": 5,
+  "plan_done": 5,
+  "pr_quality_score": 8.5,
+  "findings_critical": 0,
+  "findings_informational": 2,
+  "auto_fixed": 1,
+  "test_count": 285,
+  "eval_rounds": 1,
+  "models_used": ["architect", "product-owner", "engineer", "qa", "project-manager"]
+}
+```
+
+如果没有任务目录，写入 `.agents/ship-metrics.jsonl`（每行追加一个 JSON 对象）。
+
+---
+
+## 状态持久化
+
+所有状态持久化在 `.agents/tasks/task-NNN/` 中：
+- `plan.md` — 计划（如存在）
+- `build-rN.log` — 每轮构建日志
+- `evaluation-rN.md` — 每轮评估
+- `evaluation-rN.json` — 机器可读的分数
+
+如果中断，通过检查哪些产物存在以及最新的轮次编号来恢复。
+
+---
+
+## 重要规则
+
+- **绝不跳过 eval。** Step 3.8 必须运行。Step 5.9 验证它确实执行了。没有例外。
+  "测试通过"是不够的 — eval 捕获测试无法发现的问题（安全、设计、范围）。
+- **绝不跳过测试。** 如果测试在分类后仍然失败，停止。
+- **绝不跳过 5 角色代码评审。** 所有 5 个审查者都必须被派遣（如果部分失败则按阶梯降级）。
+- **绝不 force push。** 只使用常规 `git push`。
+- **绝不请求琐碎的确认。** 自动提交、自动推送、自动 PR。
+- **为可二分性拆分提交** — 每个提交 = 一个逻辑变更。
+- **绝不在没有新鲜验证证据的情况下推送。** 如果测试后代码变了，重新运行。
+- **目标是：用户说 `/harness-ship`，他们看到的下一个东西就是 PR URL。**

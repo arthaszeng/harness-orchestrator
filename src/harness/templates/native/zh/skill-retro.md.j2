@@ -1,0 +1,277 @@
+---
+name: harness-retro
+description: "工程回顾，包含提交分析、会话检测、热点分析和趋势跟踪。生成结构化报告用于反思和改进。使用 /harness-retro [7d|14d|30d|compare]。(harness)"
+---
+
+# Harness Retro — 工程回顾
+
+你正在运行 `/harness-retro` 工作流。分析最近的工程活动
+并生成结构化回顾。
+
+**参数：**
+- `/harness-retro` — 默认 {{ retro_window_days }} 天窗口（来自配置）
+- `/harness-retro 7d` — 7 天窗口
+- `/harness-retro 30d` — 30 天窗口
+- `/harness-retro compare` — 比较当前窗口与前一个同长度窗口
+
+---
+
+## 步骤 1：收集原始数据
+
+并行运行以下命令：
+
+```bash
+# 提交历史
+git log --oneline --since="{{ retro_window_days }} days ago" --format="%H|%ai|%an|%s"
+
+# 按作者的简短日志
+git shortlog --since="{{ retro_window_days }} days ago" -sne
+
+# 文件变更统计
+git log --since="{{ retro_window_days }} days ago" --numstat --format=""
+
+# Diff 统计（使用 merge-base 以安全支持浅克隆）
+OLDEST=$(git rev-list --since="{{ retro_window_days }} days ago" HEAD | tail -1)
+if [ -n "$OLDEST" ]; then git diff "$OLDEST"..HEAD --stat; else echo "No commits in window"; fi
+```
+
+---
+
+## 步骤 2：核心指标
+
+计算并展示：
+
+```
+ENGINEERING METRICS (last N days)
+═══════════════════════════════════════════════════
+  Commits:           X
+  Lines added:       +X
+  Lines removed:     -X
+  Net LOC:           +/-X
+  Test ratio:        X% (test LOC / total LOC)
+  Active days:       X / N
+  Sessions:          X (estimated)
+  LOC per session:   X
+═══════════════════════════════════════════════════
+```
+
+---
+
+## 步骤 3：提交时间分布
+
+从提交时间戳构建小时直方图：
+
+```
+COMMIT TIME DISTRIBUTION
+═══════════════════════════════════════
+  00-03  ░
+  04-07  ░░
+  08-11  ░░░░░░░░░░░░░
+  12-15  ░░░░░░░░░░
+  16-19  ░░░░░░░░░░░░░░░
+  20-23  ░░░░░░░
+═══════════════════════════════════════
+  Peak hours: 08-11, 16-19
+```
+
+---
+
+## 步骤 4：会话检测
+
+使用 45 分钟的提交间隔阈值检测工作会话：
+
+- **深度会话**（>2h）：长时间的集中工作
+- **中等会话**（30min-2h）：标准开发
+- **微型会话**（< 30min）：快速修复、配置变更
+
+```
+SESSIONS DETECTED: X
+═══════════════════════════════════════
+  Deep (>2h):      X sessions, avg Xh
+  Medium (30m-2h): X sessions, avg Xm
+  Micro (<30m):    X sessions, avg Xm
+═══════════════════════════════════════
+```
+
+---
+
+## 步骤 5：提交类型分布
+
+按 conventional commit 类型前缀分类：
+
+```
+COMMIT TYPES
+═══════════════════════════════════════
+  feat:     ████████░░  40%
+  fix:      ███░░░░░░░  15%
+  refactor: ██░░░░░░░░  10%
+  test:     ████░░░░░░  20%
+  docs:     █░░░░░░░░░   5%
+  chore:    ██░░░░░░░░  10%
+═══════════════════════════════════════
+```
+
+---
+
+## 步骤 6：热点分析
+
+识别前 10 个最频繁变更的文件：
+
+```
+HOTSPOTS (most changed files)
+═══════════════════════════════════════
+  #  File                          Changes  LOC+/-
+  1  src/harness/templates/native/skill-ship.md.j2  12  +450
+  2  src/harness/native/skill_gen.py   8    +120
+  3  ...
+═══════════════════════════════════════
+```
+
+标记变更 >5 次的文件 — 它们可能需要重构或稳定化。
+
+---
+
+## 步骤 7：PR 大小分布
+
+按大小分析提交组（合并的分支）：
+
+```
+PR SIZES
+═══════════════════════════════════════
+  Small (<50 lines):   X (X%)
+  Medium (50-200):     X (X%)
+  Large (200-500):     X (X%)
+  XL (>500):           X (X%)
+═══════════════════════════════════════
+```
+
+如果存在 XL PR，标记为需要关注 — 更小的 PR 更容易评审。
+
+---
+
+## 步骤 8：专注度评分 + 本周最佳交付
+
+**专注度评分**：直接推进既定目标的提交（功能 + 修复）占比
+vs 开销（chore、docs、无可见输出的重构）。
+
+```
+FOCUS SCORE: X%
+```
+
+**本周最佳交付**：该期间内影响最大的单个提交或 PR。
+基于：变更行数 × 面向用户的影响 × 测试覆盖率。
+
+---
+
+## 步骤 9：团队/作者分析
+
+如果有多个贡献者：
+
+```
+CONTRIBUTOR ANALYSIS
+═══════════════════════════════════════
+  Author          Commits  LOC+/-  Focus%
+  Alice           15       +820    85%
+  Bob             8        +340    70%
+═══════════════════════════════════════
+```
+
+对每个贡献者：一句真诚的赞美，一个成长机会。
+
+---
+
+## 步骤 10：连续天数跟踪
+
+跟踪连续有提交的天数：
+
+```
+STREAK: X consecutive days (current)
+BEST STREAK: Y consecutive days (date range)
+```
+
+---
+
+## 步骤 11：加载与比较（如果之前的回顾存在）
+
+检查 `.agents/retros/` 中是否有之前的回顾快照：
+
+如果存在，进行比较：
+```
+TREND vs LAST RETRO
+═══════════════════════════════════════
+  Metric          Last    Current  Trend
+  Commits         25      32       ↑ +28%
+  LOC/session     180     220      ↑ +22%
+  Test ratio      35%     42%      ↑ +7pp
+  Focus score     70%     85%      ↑ +15pp
+═══════════════════════════════════════
+```
+
+---
+
+## 步骤 12：保存快照
+
+将回顾数据保存到 `.agents/retros/{YYYY-MM-DD}.json`：
+
+```json
+{
+  "date": "YYYY-MM-DD",
+  "window_days": 7,
+  "commits": N,
+  "loc_added": N,
+  "loc_removed": N,
+  "test_ratio": 0.42,
+  "active_days": N,
+  "sessions": N,
+  "focus_score": 0.85,
+  "streak_current": N,
+  "streak_best": N,
+  "hotspots": ["file1", "file2"],
+  "pr_sizes": {"small": N, "medium": N, "large": N, "xl": N}
+}
+```
+
+---
+
+## 步骤 13：叙事总结
+
+以人类可读的叙事结束：
+
+```
+RETRO NARRATIVE
+═══════════════════════════════════════════════════
+
+📊 一句话：在 Z 天内的 Y 个会话中交付了 X 个功能。
+   专注度：W%。测试比例提升至 V%。
+
+🏆 3 个成就：
+  1. ...
+  2. ...
+  3. ...
+
+📈 3 个改进点：
+  1. ...
+  2. ...
+  3. ...
+
+🔄 3 个待培养的习惯：
+  1. ...
+  2. ...
+  3. ...
+═══════════════════════════════════════════════════
+```
+
+叙事应针对具体数据 — 而非泛泛的建议。
+引用实际的提交、文件和指标。
+
+---
+
+## 比较模式
+
+使用 `/harness-retro compare` 调用时：
+
+1. 加载当前窗口回顾数据
+2. 加载前一个窗口回顾数据（相同长度，紧邻之前）
+3. 对所有指标生成比较
+4. 突出显示：最大改进、最大下滑、最稳定的指标
+5. 一句话结论："这是一个[更好/更差/相似]的时期，因为..."

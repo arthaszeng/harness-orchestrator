@@ -1,0 +1,142 @@
+---
+name: harness-doc-release
+description: "交付后自动同步文档。对比 diff 与所有 .md 文件，更新陈旧文档，确保跨文档一致性。在 ship 后自动调用，或手动使用 /harness-doc-release。(harness)"
+---
+
+# Harness Doc-Release — 自动化文档同步
+
+你正在运行 `/harness-doc-release` 工作流。这确保文档
+与代码变更保持同步。
+
+---
+
+## 步骤 1：Diff 分析
+
+1. 运行 `git diff {{ trunk_branch }}..HEAD --stat` 识别所有变更的文件
+2. 运行 `git diff {{ trunk_branch }}..HEAD --name-only -- '*.md'` 找到变更的文档
+3. 找到项目中所有 `.md` 文件：`find . -name '*.md' -not -path './node_modules/*' -not -path './.git/*'`
+4. 分类：
+   - **已变更的文档**：在 diff 中的 .md 文件（已更新）
+   - **可能陈旧的文档**：不在 diff 中但可能引用了变更代码的 .md 文件
+
+---
+
+## 步骤 2：逐文件审计
+
+对找到的每个 `.md` 文件，对照代码变更交叉引用：
+
+### README.md
+- 功能列表：是否与代码库中的实际功能匹配？
+- 安装说明：是否仍然准确？
+- 使用示例：是否仍然与变更后的代码一起工作？
+- 版本号：是否与 pyproject.toml / package.json 匹配？
+- 徽章/链接：是否仍然有效？
+
+### ARCHITECTURE.md / DESIGN.md
+- 组件描述：是否与当前模块结构匹配？
+- 数据流图：是否反映实际数据流？
+- API 边界：是否与实际接口一致？
+
+### CHANGELOG.md
+- 最新条目是否准确描述了当前变更？
+- 版本号是否与 pyproject.toml 一致？
+- 变更描述是否诚实（没有夸大或缩小）？
+
+### 其他 .md 文件
+- 代码引用（文件路径、函数名、类名）是否仍然存在？
+- 配置示例是否与实际配置格式匹配？
+- API 示例是否与实际 API 签名匹配？
+
+---
+
+## 步骤 3：自动更新（事实性修正）
+
+对**事实性不正确**的文档（不是观点问题）：
+
+1. 修复已变更的文件路径
+2. 修复已重命名的函数/类名
+3. 修复与 pyproject.toml 不匹配的版本号
+4. 修复已变更的 CLI 命令示例
+5. 修复已变更的配置格式示例
+
+直接应用这些变更 — 它们是机械性的修正。
+
+提交：`git add '*.md' && git commit -m "docs: auto-sync documentation with code changes"`
+
+---
+
+## 步骤 4：询问有风险的变更
+
+对涉及**判断或观点**的文档变更，呈现给用户：
+
+- 叙述变更（改变项目的描述或理念）
+- 安全模型文档（可能误导安全保证）
+- 架构描述（可能锁定设计决策）
+- 删除文档部分（信息损失）
+
+在一个批次中呈现所有有风险的变更，每项有 A) 应用 / B) 跳过 选项。
+
+---
+
+## 步骤 5：跨文档一致性
+
+检查所有文档的一致性：
+
+1. **版本一致性**：README、pyproject.toml、CHANGELOG 中相同的版本号
+2. **功能对等**：README 中列出的功能在代码库中存在
+3. **链接有效性**：内部文档链接指向已存在的文件
+4. **术语**：文档间一致的命名
+5. **可发现性**：新功能是否在某个可发现的地方被记录？
+
+输出：
+
+```
+DOCUMENTATION HEALTH
+═══════════════════════════════════════════════════
+  Files audited:       N
+  Auto-updated:        M files
+  Needs user input:    K items
+  Cross-doc issues:    J
+  Overall health:      GOOD / NEEDS ATTENTION / STALE
+═══════════════════════════════════════════════════
+```
+
+---
+
+## 步骤 6：提交与输出
+
+1. 如果做了任何自动更新，提交它们：
+   ```bash
+   git add '*.md' && git commit -m "docs: sync documentation with latest changes"
+   ```
+
+2. 输出结构化摘要：
+
+```
+DOC-RELEASE SUMMARY
+═══════════════════════════════════════════════════
+  Auto-updated:
+    - README.md: updated version number, fixed CLI example
+    - ARCHITECTURE.md: updated module list
+
+  Skipped (no changes needed):
+    - CONTRIBUTING.md
+    - LICENSE
+
+  Flagged for user:
+    - README.md line 15: project description may need updating
+
+  Cross-doc issues:
+    - None found
+═══════════════════════════════════════════════════
+```
+
+---
+
+## 重要规则
+
+- **事实性修正是 AUTO-FIX** — 文件路径、版本号、函数名
+- **叙述/观点变更是 ASK** — 描述、理念、架构愿景
+- **绝不在未询问的情况下删除文档** — 即使看起来已经过时
+- **检查所有 .md 文件**，不仅是 diff 中的
+- **准确性优于简洁性** — 文档应该正确，即使更长
