@@ -6,7 +6,7 @@ import pydantic
 import pytest
 
 from harness.core.config import HarnessConfig, NativeModeConfig
-from harness.native.skill_gen import _build_context, generate_native_artifacts
+from harness.native.skill_gen import _build_full_context, generate_native_artifacts
 
 
 # ── config validation ──────────────────────────────────────────
@@ -59,7 +59,7 @@ def test_harness_config_default_gate_thresholds():
 def test_build_context_has_gate_thresholds(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert "gate_full_review_min" in ctx
     assert "gate_summary_confirm_min" in ctx
     assert ctx["gate_full_review_min"] == "5"
@@ -69,7 +69,7 @@ def test_build_context_has_gate_thresholds(tmp_path: Path):
 def test_build_context_gate_thresholds_custom(tmp_path: Path):
     cfg = HarnessConfig(native=NativeModeConfig(gate_full_review_min=8, gate_summary_confirm_min=4))
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert ctx["gate_full_review_min"] == "8"
     assert ctx["gate_summary_confirm_min"] == "4"
 

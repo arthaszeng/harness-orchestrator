@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
-    _build_context,
+    _build_full_context,
     _detect_project_lang,
     generate_native_artifacts,
     resolve_native_lang,
@@ -43,13 +43,13 @@ def test_detect_project_lang_unknown(tmp_path: Path):
     assert _detect_project_lang(cfg) == "unknown"
 
 
-# --- _build_context ---
+# --- _build_full_context ---
 
 
 def test_build_context_default_has_all_keys(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert "ci_command" in ctx
     assert "trunk_branch" in ctx
     assert "project_lang" in ctx
@@ -58,20 +58,12 @@ def test_build_context_default_has_all_keys(tmp_path: Path):
     assert "hooks_pre_build" in ctx
 
 
-def test_build_context_planner_strips_builder_principles(tmp_path: Path):
-    cfg = HarnessConfig()
-    cfg.project_root = tmp_path
-    ctx = _build_context(cfg, role="planner")
-    assert "builder_principles" not in ctx
-    assert "planner_principles" in ctx
-
-
 def test_build_context_hooks_from_config(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
     cfg.native.hooks_pre_build = "scripts/pre.sh"
     cfg.native.hooks_post_eval = "scripts/post.sh"
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert ctx["hooks_pre_build"] == "scripts/pre.sh"
     assert ctx["hooks_post_eval"] == "scripts/post.sh"
 
@@ -79,7 +71,7 @@ def test_build_context_hooks_from_config(tmp_path: Path):
 def test_build_context_has_review_gate(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert "review_gate" in ctx
     assert ctx["review_gate"] == "eng"
 
@@ -88,31 +80,31 @@ def test_build_context_review_gate_custom(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
     cfg.native.review_gate = "advisory"
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert ctx["review_gate"] == "advisory"
 
 
 def test_build_context_has_plan_review_gate(tmp_path: Path):
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert "plan_review_gate" in ctx
     assert ctx["plan_review_gate"] == "auto"
 
 
 def test_build_context_has_role_models(tmp_path: Path):
-    """_build_context includes role_models_* for all 5 roles."""
+    """_build_full_context includes role_models_* for all 5 roles."""
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     for role in ("architect", "product_owner", "engineer", "qa", "project_manager"):
         assert f"role_models_{role}" in ctx
         assert ctx[f"role_models_{role}"] == ""
 
 
 def test_build_context_role_models_from_config(tmp_path: Path):
-    """_build_context passes per-role model overrides from config."""
+    """_build_full_context passes per-role model overrides from config."""
     cfg = HarnessConfig()
     cfg.project_root = tmp_path
     cfg.native.role_models = {"architect": "gpt-4.1", "qa": "o3-mini"}
@@ -120,7 +112,7 @@ def test_build_context_role_models_from_config(tmp_path: Path):
         "harness.native.skill_gen.detect_cursor_recent_models",
         return_value=["gpt-4.1", "o3-mini"],
     ):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["role_models_architect"] == "gpt-4.1"
     assert ctx["role_models_qa"] == "o3-mini"
     assert ctx["role_models_engineer"] == ""
@@ -131,7 +123,7 @@ def test_build_context_uses_evaluator_model_as_default_role_model(tmp_path: Path
     cfg.project_root = tmp_path
     cfg.native.evaluator_model = "gpt-4.1"
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["role_models_architect"] == "gpt-4.1"
     assert ctx["role_models_engineer"] == "gpt-4.1"
     assert ctx["role_models_qa"] == "gpt-4.1"
@@ -142,7 +134,7 @@ def test_build_context_keeps_valid_evaluator_model_when_discovery_unavailable(tm
     cfg.project_root = tmp_path
     cfg.native.evaluator_model = "gpt-4.1"
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["evaluator_model"] == "gpt-4.1"
     assert ctx["role_models_architect"] == "gpt-4.1"
 
@@ -156,7 +148,7 @@ def test_build_context_role_override_beats_evaluator_model(tmp_path: Path):
         "harness.native.skill_gen.detect_cursor_recent_models",
         return_value=["gpt-4.1", "o3-mini"],
     ):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["role_models_architect"] == "o3-mini"
     assert ctx["role_models_engineer"] == "gpt-4.1"
 
@@ -166,7 +158,7 @@ def test_build_context_keeps_valid_role_override_when_discovery_unavailable(tmp_
     cfg.project_root = tmp_path
     cfg.native.role_models = {"architect": "o3-mini"}
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["role_models_architect"] == "o3-mini"
 
 
@@ -175,7 +167,7 @@ def test_build_context_invalid_evaluator_model_falls_back_to_default(tmp_path: P
     cfg.project_root = tmp_path
     cfg.native.evaluator_model = "bad model"
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["evaluator_model"] == "IDE default"
     assert ctx["role_models_architect"] == ""
 
@@ -188,7 +180,7 @@ def test_build_context_unavailable_evaluator_model_falls_back_to_default(tmp_pat
         "harness.native.skill_gen.detect_cursor_recent_models",
         return_value=["claude-4.6-opus-high-thinking"],
     ):
-        ctx = _build_context(cfg)
+        ctx = _build_full_context(cfg)
     assert ctx["evaluator_model"] == "IDE default"
     assert ctx["role_models_architect"] == ""
 
@@ -523,11 +515,11 @@ def test_config_invalid_role_model_warns():
 def test_templates_have_no_undefined_variables(tmp_path: Path):
     """All templates render without UndefinedError when given the full context."""
     import jinja2
-    from harness.native.skill_gen import _build_context, _get_template_dir
+    from harness.native.skill_gen import _build_full_context as _bfc, _get_template_dir
 
     cfg = _make_cfg(tmp_path)
     tmpl_dir = _get_template_dir()
-    context = _build_context(cfg)
+    context = _bfc(cfg)
 
     strict_env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(tmpl_dir)),
@@ -1139,11 +1131,11 @@ def test_zh_directory_parity():
 def test_zh_templates_render_without_errors(tmp_path: Path):
     """All zh templates render with StrictUndefined — no missing variables."""
     import jinja2
-    from harness.native.skill_gen import _build_context, _get_template_dir
+    from harness.native.skill_gen import _build_full_context as _bfc, _get_template_dir
 
     cfg = _make_cfg(tmp_path)
     tmpl_dir = _get_template_dir("zh")
-    context = _build_context(cfg, lang="zh")
+    context = _bfc(cfg, lang="zh")
 
     strict_env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(tmpl_dir)),
@@ -1431,20 +1423,20 @@ def test_layered_context_unknown_artifact_gets_full(tmp_path: Path):
 def test_dead_variables_removed(tmp_path: Path):
     """adversarial_mechanism and evaluator_model_requested are not in context."""
     cfg = _make_cfg(tmp_path)
-    ctx = _build_context(cfg)
+    ctx = _build_full_context(cfg)
     assert "adversarial_mechanism" not in ctx
     assert "evaluator_model_requested" not in ctx
 
 
-def test_build_context_compat_wrapper_has_all_keys(tmp_path: Path):
-    """_build_context (compat wrapper) returns superset of layered context."""
+def test_full_context_superset_of_layered(tmp_path: Path):
+    """_build_full_context returns superset of any layered context."""
     from harness.native.skill_gen import _build_layered_context
 
     cfg = _make_cfg(tmp_path)
-    full = _build_context(cfg)
+    full = _build_full_context(cfg)
     layered = _build_layered_context(cfg, "skill", "harness-build", lang="en")
     for key in layered:
-        assert key in full, f"compat wrapper missing key: {key}"
+        assert key in full, f"full context missing key: {key}"
 
 
 def test_rule_activation_disabled_skips_file(tmp_path: Path):

@@ -252,17 +252,6 @@ def _build_layered_context(
     return _filter_context(_build_full_context(cfg, lang=lang), artifact_type, artifact_name)
 
 
-def _build_context(cfg: HarnessConfig, *, role: str = "", lang: str = "en") -> dict[str, str]:
-    """Backward-compatible wrapper returning full context.
-
-    Existing callers (tests, one-off renders) continue to work unchanged.
-    """  # TODO(B4-compat): remove after test migration
-    ctx = _build_full_context(cfg, lang=lang)
-    if role == "planner":
-        ctx.pop("builder_principles", None)
-    return ctx
-
-
 def _planner_principles(lang: str = "en") -> str:
     if lang == "zh":
         return (

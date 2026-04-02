@@ -11,6 +11,13 @@ Handoff files live alongside other task artifacts in
 
 from __future__ import annotations
 
+__all__ = [
+    "StageHandoff",
+    "save_handoff",
+    "load_handoff",
+    "load_latest_handoff",
+]
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
