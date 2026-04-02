@@ -892,7 +892,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     assert "Roadmap / Plan Backlog alignment" in po
     assert "Evidence of direction progress" in po
     assert "Long-Horizon Governance Boundary" in po
-    assert "Direction recommendation" in po
+    assert "Value recommendation" in po
     assert "single-round" in po
     assert "do NOT" in po
     assert "`N/A`" in po
@@ -901,7 +901,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     assert "Roadmap / Active Plan relationship" in pm
     assert "Backlog health" in pm
     assert "Long-Horizon Governance Boundary" in pm
-    assert "Direction recommendation" in pm
+    assert "Delivery recommendation" in pm
     assert "single-round" in pm
     assert "do NOT" in pm
     assert "`N/A`" in pm
@@ -1197,13 +1197,13 @@ def test_zh_brainstorm_and_governance_agents_contain_loop_concepts(tmp_path: Pat
     content_po = po.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_po
     assert "方向推进证据" in content_po
-    assert "Direction recommendation" in content_po
+    assert "Value recommendation" in content_po
 
     pm = tmp_path / ".cursor" / "agents" / "harness-project-manager.md"
     content_pm = pm.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_pm
     assert "Backlog 健康度" in content_pm
-    assert "Direction recommendation" in content_pm
+    assert "Delivery recommendation" in content_pm
 
 
 def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):

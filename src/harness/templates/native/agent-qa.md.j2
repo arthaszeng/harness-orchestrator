@@ -45,7 +45,8 @@ Read the plan file provided in the prompt. Evaluate:
 Read the diff provided in the prompt. Evaluate:
 
 1. **Test coverage** — Run `{{ ci_command }}` and analyze results.
-   Are all code paths in the diff covered by tests?
+   If no coverage artifact/report is available, mark as `evidence-missing`
+   instead of asserting full path coverage.
 2. **Edge cases** — Off-by-one errors, empty collections, null values,
    boundary conditions.
 3. **Regression tests** — If existing behavior changed, are there
