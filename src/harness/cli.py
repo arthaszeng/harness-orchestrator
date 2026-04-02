@@ -135,14 +135,14 @@ def update(
     ),
     force: bool = typer.Option(
         False, "--force", "-f",
-        help="Force reinstall agent definitions even when already up to date",
+        help="Do not write project artifacts; print init --force reminder for target repo",
     ),
 ) -> None:
-    """Self-update harness, reinstall artifacts, and migrate config.
+    """Self-update harness and run config migration checks.
 
     Steps:
     1. Check PyPI for newer version and upgrade via pip
-    2. Reinstall native artifacts (only after upgrade, or with --force)
+    2. Print project-safe reminder to run `harness init --force` in target repo
     3. Check .harness-flow/config.toml for new/deprecated keys
     """
     from harness.commands.update import run_update

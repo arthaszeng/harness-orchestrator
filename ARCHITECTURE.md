@@ -41,7 +41,7 @@ Built with **Typer**. Three commands:
 | `init`    | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
 | `gate`    | Check ship-readiness gates for the current task (hard + soft checks). |
 | `status`  | Load session state and render a Rich dashboard. |
-| `update`  | Check PyPI, optional pip upgrade, reinstall artifacts, config migration hints. |
+| `update`  | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes. |
 
 ---
 
@@ -65,7 +65,7 @@ dashboard can render canonical phase / gate / blocker information via **Rich**
 
 ### `update.py`
 
-Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, reinstalls native artifacts, and runs lightweight **config migration** checks with user-visible warnings.
+Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run **`harness init --force`** in the target repository when regeneration is needed.
 
 ---
 

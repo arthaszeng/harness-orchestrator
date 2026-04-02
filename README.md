@@ -174,7 +174,7 @@ Project settings live in `.harness-flow/config.toml`:
 |---------|-------------|
 | `harness init [--name] [--ci] [-y] [--force]` | Initialize project (interactive wizard); `--force` regenerates artifacts |
 | `harness status` | Show current task progress |
-| `harness update [--check] [--force]` | Self-update and reinstall artifacts |
+| `harness update [--check] [--force]` | Self-update + config migration check (no project artifact writes) |
 | `harness --version` | Show version |
 
 ---
@@ -231,7 +231,7 @@ harness init --lang en    # English (default)
 ## Updating
 
 ```bash
-harness update          # upgrade, reinstall artifacts, check config
+harness update          # upgrade + config check; no project artifact writes
 harness update --check  # just check for new version
 ```
 

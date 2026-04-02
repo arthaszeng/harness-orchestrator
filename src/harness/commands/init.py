@@ -253,6 +253,7 @@ def _run_reinit(project_root: Path) -> None:
         border_style="cyber.border",
         padding=(0, 1),
     ))
+    console.print(f"  [cyber.yellow]✨[/] {t('init.easter_egg')}")
 
 
 # ── Main flow ─────────────────────────────────────────────────────
@@ -375,6 +376,7 @@ def run_init(
     console.print()
     console.print(f"  [cyber.yellow]▸[/] [cyber.cyan]{t('init.guide_edit_vision')}[/]")
     console.print(f"    [cyber.magenta]{t('init.guide_use_vision')}[/]")
+    console.print(f"  [cyber.yellow]✨[/] {t('init.easter_egg')}")
 
 
 def _update_gitignore(project_root: Path) -> None:

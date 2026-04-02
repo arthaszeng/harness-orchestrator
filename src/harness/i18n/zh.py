@@ -68,6 +68,7 @@ MESSAGES: dict[str, str] = {
     "init.guide_ship": "直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
     "init.guide_edit_vision": "编辑 .harness-flow/vision.md 设定项目愿景，",
     "init.guide_use_vision": "然后在 Cursor 中使用 /harness-vision。",
+    "init.easter_egg": "产物锻造台已上线，下一步可直接召唤 /harness-plan。",
     "init.gitignore_comment": "# harness — 不跟踪运行时状态",
 
     # ── reinit mode ────────────────────────────────────────────────
@@ -84,14 +85,16 @@ MESSAGES: dict[str, str] = {
     "update.upgrading": "正在通过 pip 升级...",
     "update.upgrade_ok": "升级完成",
     "update.upgrade_fail": "升级失败（见上方错误）",
-    "update.skip_reinstall": "由于升级失败，跳过产物重装",
-    "update.reinstall": "正在重新安装 native 产物...",
-    "update.skip_reinstall_unreachable": "无法确认版本，跳过重装（使用 --force）",
+    "update.skip_reinstall": "升级失败；update 未改写任何项目文件",
+    "update.skip_reinstall_unreachable": "无法确认版本；update 不会改写当前项目文件",
     "update.migrate_title": "配置迁移检查...",
     "update.config_parse_error": "无法解析 {path}",
     "update.config_missing_section": "缺少 [{section}] 配置段（{desc}）— 建议添加",
     "update.config_ok": "配置已是最新",
-    "update.skip_reinstall_up_to_date": "已是最新版本，跳过重装（使用 --force）",
+    "update.skip_reinstall_up_to_date": "已是最新版本；如需重装请在目标仓库执行 `harness init --force`",
+    "update.skip_reinstall_upgrade_ok": "升级完成；update 不会写入项目产物文件",
+    "update.force_no_project_write": "--force 不再在当前目录重装产物；请在目标仓库执行 `harness init --force`",
+    "update.easter_egg": "升级增益 +1，下一关：在目标项目里执行 `harness init --force`。",
 
     # ── progress / suggest_next_action ───────────────────────────
     "progress.blocked": "当前任务被阻塞 — {reason}",

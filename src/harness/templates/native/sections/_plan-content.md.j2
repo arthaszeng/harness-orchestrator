@@ -49,3 +49,8 @@ build → eval → ship → PR pipeline.
 
 Ship will dispatch the same 5 roles (architect, product-owner, engineer,
 qa, project-manager) in `code-eval` mode for the evaluation phase.
+
+Hard completion rule:
+- Do not stop after Build, and do not ask "continue?" after internal milestones.
+- Continue autonomously through ship until the PR URL is produced, unless one of the explicit stop conditions at the top of this workflow is met.
+- If test/eval/gate steps fail, or any command exits non-zero and cannot be auto-fixed, stop and report blockers instead of forcing progress.

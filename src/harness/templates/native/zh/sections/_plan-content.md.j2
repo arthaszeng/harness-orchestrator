@@ -49,3 +49,8 @@ build → eval → ship → PR 管线。
 
 Ship 会派遣同样的 5 个角色（architect、product-owner、engineer、
 qa、project-manager）以 `code-eval` 模式进行评审阶段。
+
+硬性完成规则：
+- 不得在 Build 结束后停下，也不得在中间里程碑询问“是否继续”。
+- 必须自主连续执行到产出 PR URL，除非触发本工作流顶部定义的显式停止条件。
+- 若测试/eval/gate 失败，或命令非零退出且无法自动修复，必须停止并报告阻塞，禁止强行推进。

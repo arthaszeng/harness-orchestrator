@@ -289,7 +289,7 @@ class TestUpdateGitignore:
 
 class TestRunInitNonInteractive:
     @patch("harness.native.skill_gen.generate_native_artifacts")
-    def test_creates_agents_layout_and_config(self, mock_gen, monkeypatch, tmp_path):
+    def test_creates_agents_layout_and_config(self, mock_gen, monkeypatch, tmp_path, capsys):
         monkeypatch.chdir(tmp_path)
         run_init(
             name="alpha-project",
@@ -316,6 +316,9 @@ class TestRunInitNonInteractive:
         assert "## Technical Constraints" not in vision_body
         mock_gen.assert_called_once()
         assert mock_gen.call_args.kwargs.get("lang") == "en"
+        logs = capsys.readouterr()
+        rendered = f"{logs.out}\n{logs.err}"
+        assert "/harness-plan" in rendered
 
     def test_loads_business_oriented_zh_vision_template(self):
         tmpl = _load_template("vision.zh.md.j2")
@@ -340,7 +343,7 @@ class TestRunInitReinit:
     """With --force and existing config, init skips wizard and regenerates artifacts."""
 
     @patch("harness.native.skill_gen.generate_native_artifacts", return_value=42)
-    def test_reinit_skips_wizard_regenerates(self, mock_gen, monkeypatch, tmp_path):
+    def test_reinit_skips_wizard_regenerates(self, mock_gen, monkeypatch, tmp_path, capsys):
         monkeypatch.chdir(tmp_path)
         agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
@@ -354,6 +357,9 @@ class TestRunInitReinit:
         mock_gen.assert_called_once()
         call_kwargs = mock_gen.call_args.kwargs
         assert call_kwargs.get("force") is True
+        logs = capsys.readouterr()
+        rendered = f"{logs.out}\n{logs.err}"
+        assert "/harness-plan" in rendered
 
     @patch("harness.native.skill_gen.generate_native_artifacts", return_value=10)
     def test_reinit_uses_config_lang(self, mock_gen, monkeypatch, tmp_path):

@@ -67,6 +67,7 @@ MESSAGES: dict[str, str] = {
     "init.guide_ship": "Direct ship: test → eval → fix → commit → push → PR",
     "init.guide_edit_vision": "Edit .harness-flow/vision.md to set your project vision,",
     "init.guide_use_vision": "then use /harness-vision in Cursor.",
+    "init.easter_egg": "Artifact forge online. You can summon your next task with /harness-plan.",
     "init.gitignore_comment": "# harness — do not track runtime state",
 
     # ── reinit mode ────────────────────────────────────────────────
@@ -83,14 +84,16 @@ MESSAGES: dict[str, str] = {
     "update.upgrading": "Upgrading via pip...",
     "update.upgrade_ok": "Upgrade complete",
     "update.upgrade_fail": "Upgrade failed (see errors above)",
-    "update.skip_reinstall": "Skipping artifact reinstall due to upgrade failure",
-    "update.reinstall": "Reinstalling native artifacts...",
-    "update.skip_reinstall_unreachable": "Could not verify version, skipping reinstall (use --force)",
+    "update.skip_reinstall": "Upgrade failed; no project files changed by update",
+    "update.skip_reinstall_unreachable": "Could not verify version; no project files changed by update",
     "update.migrate_title": "Config migration check...",
     "update.config_parse_error": "Could not parse {path}",
     "update.config_missing_section": "Missing [{section}] section ({desc}) — consider adding it",
     "update.config_ok": "Config is up to date",
-    "update.skip_reinstall_up_to_date": "Already at latest, skipping reinstall (use --force)",
+    "update.skip_reinstall_up_to_date": "Already at latest; run `harness init --force` in target repo if needed",
+    "update.skip_reinstall_upgrade_ok": "Upgrade done; update does not write project artifacts",
+    "update.force_no_project_write": "--force no longer reinstalls artifacts here; run `harness init --force` in target repo",
+    "update.easter_egg": "Upgrade buff acquired +1. Next quest: `harness init --force` in your target project.",
 
     # ── progress / suggest_next_action ───────────────────────────
     "progress.blocked": "Current task is blocked — {reason}",

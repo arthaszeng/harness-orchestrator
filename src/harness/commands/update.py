@@ -1,4 +1,4 @@
-"""harness update — self-update, reinstall artifacts, and migrate config."""
+"""harness update — self-update and run config migration checks."""
 
 from __future__ import annotations
 
@@ -171,18 +171,14 @@ def run_update(*, check: bool = False, force: bool = False) -> None:
     if check:
         raise typer.Exit(0)
 
-    # Step 2: Reinstall agent definitions (only after upgrade or with --force)
-    if upgraded or force:
-        console.print()
-        console.print(f"  [cyber.magenta]▸[/] {t('update.reinstall')}")
-        from harness.native.skill_gen import generate_native_artifacts, resolve_native_lang
-        resolved_lang = resolve_native_lang(project_root)
-        try:
-            from harness.core.config import HarnessConfig
-            cfg = HarnessConfig.load(project_root)
-        except Exception:
-            cfg = None
-        generate_native_artifacts(project_root, lang=resolved_lang, cfg=cfg, force=True)
+    # Step 2: Never write project artifacts from update.
+    # Users should run `harness init --force` in the target repository.
+    console.print()
+    if upgraded:
+        console.print(f"  [cyber.green]✓[/] {t('update.skip_reinstall_upgrade_ok')}")
+        console.print(f"  [cyber.yellow]✨[/] {t('update.easter_egg')}")
+    elif force:
+        console.print(f"  [cyber.warn]![/] {t('update.force_no_project_write')}")
     elif pypi_unreachable:
         console.print(
             f"  [cyber.warn]![/] {t('update.skip_reinstall_unreachable')}"
