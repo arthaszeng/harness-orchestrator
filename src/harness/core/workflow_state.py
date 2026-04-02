@@ -224,14 +224,19 @@ def sync_task_state(
         state = WorkflowState(task_id=task_dir.name)
 
     if artifact_updates:
+        unknown_artifact_keys = [key for key in artifact_updates if not hasattr(state.artifacts, key)]
+        if unknown_artifact_keys:
+            keys = ", ".join(sorted(unknown_artifact_keys))
+            raise ValueError(f"unknown artifact_updates keys: {keys}")
         for key, value in artifact_updates.items():
-            if hasattr(state.artifacts, key):
-                setattr(state.artifacts, key, _normalize_artifact_ref(task_dir, value))
+            setattr(state.artifacts, key, _normalize_artifact_ref(task_dir, value))
 
     if gate_updates:
+        unknown_gate_keys = [key for key in gate_updates if not hasattr(state.gates, key)]
+        if unknown_gate_keys:
+            keys = ", ".join(sorted(unknown_gate_keys))
+            raise ValueError(f"unknown gate_updates keys: {keys}")
         for key, payload in gate_updates.items():
-            if not hasattr(state.gates, key):
-                continue
             current = getattr(state.gates, key)
             update = {
                 "status": payload.get("status", current.status),

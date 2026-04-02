@@ -77,8 +77,14 @@ description: "计划和代码评审阶段的项目管理审查者。评估任务
 - "estimation accuracy"
 - "scope creep"
 - "delivery patterns"
+- project recent window: domain `{{ project_name or memverse_domain }}`, limit 20
+- role learning window: domain `{{ project_name or memverse_domain }}-project-manager-learning`, limit 15
 
 在你的发现中引用相关记忆。
+
+如果 findings 包含 `[LEARNING]` 条目，best-effort 调用 `add_memories`
+写入 `{{ project_name or memverse_domain }}-project-manager-learning`（non-blocking；
+Memverse 不可用时不应导致评审失败）。
 
 {% endif %}
 ## 输出契约
@@ -92,6 +98,7 @@ Findings:
 - [CRITICAL] description → suggested fix
 - [WARN] description → suggested fix
 - [INFO] description
+- [LEARNING] role-specific long-lived, cross-project/language insight
 
 Direction recommendation: continue | reprioritize | pause/pivot | n/a
 Verdict: PASS | ISSUES_FOUND

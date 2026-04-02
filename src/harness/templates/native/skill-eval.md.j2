@@ -33,6 +33,9 @@ pipeline. Run straight through and output the evaluation result at the end.
 {% if memverse_enabled == "true" %}
 6. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
    If Memverse MCP is available, call `search_memory` with key topics from the diff.
+   Use dual windows:
+   - project recent: domain `{{ project_name or memverse_domain }}`, limit 20
+   - role learning: domain `{{ project_name or memverse_domain }}-<role>-learning`, limit 15
    Display any relevant prior learnings (especially pitfalls) before starting the review.
 {% endif %}
 {% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
@@ -73,12 +76,15 @@ unless git diff is empty.
 After the evaluation is complete, capture non-obvious insights as learnings:
 
 1. Review all findings with confidence >= 7
+2. Parse merged findings for `[LEARNING]` items. Keep only entries that are:
+   - long-lived
+   - cross-project / cross-language reusable
+   - strongly role-relevant
 {% if memverse_enabled == "true" %}
-2. For patterns or pitfalls that aren't already known:
-   - Call Memverse `add_memories` with domain "{{ memverse_domain }}"
-   - Type: "pattern" (good practice found) or "pitfall" (common mistake found)
-   - Source: "observed"
-3. Log: "Captured N new learnings from this review"
+3. For each role's `[LEARNING]` item, schedule a best-effort `add_memories`
+   write to `{{ project_name or memverse_domain }}-<role>-learning`.
+   Treat this as non-blocking fire-and-forget: do not block gate on write outcome.
+4. Log counters: `LEARNING_ADD scheduled|skipped|failed-open`.
 
 If Memverse MCP is not available: skip silently.
 {% endif %}
