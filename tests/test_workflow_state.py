@@ -55,6 +55,17 @@ def test_load_workflow_state_unknown_schema_returns_none(tmp_path: Path):
     assert load_workflow_state(task_dir) is None
 
 
+def test_load_workflow_state_task_id_directory_mismatch_returns_none(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir.mkdir(parents=True)
+    (task_dir / WORKFLOW_STATE_FILENAME).write_text(
+        '{"schema_version": 1, "task_id": "task-002", "phase": "idle"}',
+        encoding="utf-8",
+    )
+
+    assert load_workflow_state(task_dir) is None
+
+
 def test_iter_task_dirs_uses_numeric_sort(tmp_path: Path):
     tasks_dir = tmp_path / ".agents" / "tasks"
     for name in ("task-2", "task-10", "task-9"):
@@ -92,3 +103,29 @@ def test_load_current_workflow_state_prefers_session_task_dir(tmp_path: Path):
     task_dir, state = load_current_workflow_state(agents_dir, session_task_id="task-001")
     assert task_dir is not None and task_dir.name == "task-001"
     assert state is not None and state.phase == TaskState.PLANNING
+
+
+def test_load_current_workflow_state_prefers_explicit_task_id(tmp_path: Path):
+    agents_dir = tmp_path / ".agents"
+    task1 = agents_dir / "tasks" / "task-001"
+    task2 = agents_dir / "tasks" / "task-002"
+    WorkflowState(task_id="task-001", phase=TaskState.PLANNING).save(task1)
+    WorkflowState(task_id="task-002", phase=TaskState.BUILDING).save(task2)
+
+    task_dir, state = load_current_workflow_state(
+        agents_dir,
+        explicit_task_id="task-002",
+        session_task_id="task-001",
+    )
+    assert task_dir is not None and task_dir.name == "task-002"
+    assert state is not None and state.phase == TaskState.BUILDING
+
+
+def test_load_current_workflow_state_does_not_fallback_when_session_task_missing(tmp_path: Path):
+    agents_dir = tmp_path / ".agents"
+    task2 = agents_dir / "tasks" / "task-002"
+    WorkflowState(task_id="task-002", phase=TaskState.BUILDING).save(task2)
+
+    task_dir, state = load_current_workflow_state(agents_dir, session_task_id="task-001")
+    assert task_dir is None
+    assert state is None

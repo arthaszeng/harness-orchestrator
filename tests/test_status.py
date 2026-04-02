@@ -21,7 +21,7 @@ from harness.core.state import (
     TaskState,
 )
 from harness.core.ui import CYBER_THEME
-from harness.core.workflow_state import WorkflowState
+from harness.core.workflow_state import GateStatus, WorkflowState
 
 
 def _make_console():
@@ -77,12 +77,17 @@ class TestRenderCurrent:
         )
         workflow_state.active_plan.title = "Canonical Workflow State Artifact"
         workflow_state.blocker.reason = "missing ship readiness gate"
+        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.gates.evaluation.reason = "awaiting review"
+        workflow_state.gates.evaluation.status = GateStatus.PENDING
         _render_current(console, state, workflow_state=workflow_state)
         output = buf.getvalue()
         assert "workflow state" in output
         assert "evaluating" in output
         assert "Canonical Workflow State Artifact" in output
         assert "missing ship readiness gate" in output
+        assert "plan.md" in output
+        assert "awaiting review" in output
         assert "workflow-state.json" in output
 
 

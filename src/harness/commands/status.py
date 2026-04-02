@@ -16,7 +16,12 @@ from harness.core.progress import (
 )
 from harness.core.state import SessionState
 from harness.core.ui import get_ui
-from harness.core.workflow_state import WorkflowState, load_current_workflow_state
+from harness.core.workflow_state import (
+    WorkflowState,
+    artifact_pairs,
+    gate_pairs,
+    load_current_workflow_state,
+)
 
 log = logging.getLogger("harness.commands.status")
 
@@ -95,6 +100,18 @@ def _render_current(
             console.print(f"  Plan:      {workflow_state.active_plan.title}")
         if workflow_state.blocker.reason:
             console.print(f"  Blocker:   [cyber.red]{workflow_state.blocker.reason}[/]")
+        artifacts = artifact_pairs(workflow_state)
+        if artifacts:
+            rendered = ", ".join(f"{label}={value}" for label, value in artifacts)
+            console.print(f"  Artifacts: [cyber.dim]{rendered}[/]")
+        gates = gate_pairs(workflow_state)
+        if gates:
+            rendered = ", ".join(
+                f"{label}={snapshot.status.value}"
+                + (f" ({snapshot.reason})" if snapshot.reason else "")
+                for label, snapshot in gates
+            )
+            console.print(f"  Gates:     [cyber.dim]{rendered}[/]")
         console.print(
             f"  State:     [cyber.dim].agents/tasks/{workflow_state.task_id}/workflow-state.json[/]"
         )

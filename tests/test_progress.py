@@ -17,7 +17,7 @@ from harness.core.state import (
     TaskRecord,
     TaskState,
 )
-from harness.core.workflow_state import WorkflowState
+from harness.core.workflow_state import GateStatus, WorkflowState
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +194,9 @@ class TestUpdateProgress:
         )
         workflow_state.active_plan.title = "Canonical Workflow State Artifact"
         workflow_state.blocker.reason = "awaiting eval gate"
+        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.gates.ship_readiness.status = GateStatus.PENDING
+        workflow_state.gates.ship_readiness.reason = "waiting for evaluation"
         workflow_state.save(task_dir)
 
         state = SessionState(mode="idle")
@@ -202,6 +205,9 @@ class TestUpdateProgress:
         assert "Canonical phase" in content
         assert "evaluating" in content
         assert "awaiting eval gate" in content
+        assert "Artifact refs" in content
+        assert "plan.md" in content
+        assert "ship_readiness=pending" in content
         assert "workflow-state.json" in content
 
     def test_resumable_section(self, tmp_path: Path):

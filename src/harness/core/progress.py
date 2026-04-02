@@ -9,7 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from harness.core.state import CompletedTask, SessionState, TaskState
-from harness.core.workflow_state import WorkflowState, load_current_workflow_state
+from harness.core.workflow_state import (
+    WorkflowState,
+    artifact_pairs,
+    gate_pairs,
+    load_current_workflow_state,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +106,22 @@ def update_progress(agents_dir: Path, state: SessionState) -> None:
             lines.append(f"- Active plan: `{workflow_state.active_plan.title}`")
         if workflow_state.blocker.reason:
             lines.append(f"- Blocker: {workflow_state.blocker.reason}")
+        artifacts = artifact_pairs(workflow_state)
+        if artifacts:
+            lines.append(
+                "- Artifact refs: "
+                + ", ".join(f"{label}: `{value}`" for label, value in artifacts)
+            )
+        gates = gate_pairs(workflow_state)
+        if gates:
+            lines.append(
+                "- Gates: "
+                + ", ".join(
+                    f"{label}={snapshot.status.value}"
+                    + (f" ({snapshot.reason})" if snapshot.reason else "")
+                    for label, snapshot in gates
+                )
+            )
         lines.append(
             f"- Workflow state: `.agents/tasks/{workflow_state.task_id}/workflow-state.json`"
         )

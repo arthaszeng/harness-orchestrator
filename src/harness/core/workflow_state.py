@@ -164,7 +164,33 @@ def load_current_workflow_state(
         explicit_task_id=explicit_task_id,
         session_task_id=session_task_id,
     )
+    if explicit_task_id is None and session_task_id and task_dir is not None and task_dir.name != session_task_id:
+        return None, None
     if task_dir is None:
         return None, None
     return task_dir, load_workflow_state(task_dir)
+
+
+def artifact_pairs(state: WorkflowState) -> list[tuple[str, str]]:
+    pairs = [
+        ("plan", state.artifacts.plan),
+        ("build", state.artifacts.build_log),
+        ("evaluation", state.artifacts.evaluation),
+        ("feedback", state.artifacts.feedback_ledger),
+        ("ship", state.artifacts.ship_metrics),
+    ]
+    return [(label, value) for label, value in pairs if value]
+
+
+def gate_pairs(state: WorkflowState) -> list[tuple[str, GateSnapshot]]:
+    pairs = [
+        ("plan_review", state.gates.plan_review),
+        ("evaluation", state.gates.evaluation),
+        ("ship_readiness", state.gates.ship_readiness),
+    ]
+    return [
+        (label, snapshot)
+        for label, snapshot in pairs
+        if snapshot.status != GateStatus.UNKNOWN or snapshot.reason
+    ]
 
