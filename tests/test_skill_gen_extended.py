@@ -892,7 +892,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     assert "Roadmap / Plan Backlog alignment" in po
     assert "Evidence of direction progress" in po
     assert "Long-Horizon Governance Boundary" in po
-    assert "Direction recommendation" in po
+    assert "Value recommendation" in po
     assert "single-round" in po
     assert "do NOT" in po
     assert "`N/A`" in po
@@ -901,7 +901,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     assert "Roadmap / Active Plan relationship" in pm
     assert "Backlog health" in pm
     assert "Long-Horizon Governance Boundary" in pm
-    assert "Direction recommendation" in pm
+    assert "Delivery recommendation" in pm
     assert "single-round" in pm
     assert "do NOT" in pm
     assert "`N/A`" in pm
@@ -915,6 +915,9 @@ def test_plan_includes_plan_review(tmp_path: Path):
     content = pl.read_text(encoding="utf-8")
     assert "5-Role Parallel Dispatch" in content
     assert "Re-Plan Loop" in content
+    assert "Value recommendation" in content
+    assert "Delivery recommendation" in content
+    assert "Do NOT collapse them into one generic direction field" in content
 
 
 def test_plan_includes_ship_invocation(tmp_path: Path):
@@ -941,6 +944,8 @@ def test_eval_uses_five_role_code_review(tmp_path: Path):
     assert "harness-qa" in content
     assert "harness-product-owner" in content
     assert "harness-project-manager" in content
+    assert "Value recommendation" in content
+    assert "Delivery recommendation" in content
     assert "Pass 1:" not in content
     assert "Pass 2:" not in content
     assert "Pass 3:" not in content
@@ -1197,13 +1202,13 @@ def test_zh_brainstorm_and_governance_agents_contain_loop_concepts(tmp_path: Pat
     content_po = po.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_po
     assert "方向推进证据" in content_po
-    assert "Direction recommendation" in content_po
+    assert "Value recommendation" in content_po
 
     pm = tmp_path / ".cursor" / "agents" / "harness-project-manager.md"
     content_pm = pm.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_pm
     assert "Backlog 健康度" in content_pm
-    assert "Direction recommendation" in content_pm
+    assert "Delivery recommendation" in content_pm
 
 
 def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
@@ -1214,6 +1219,16 @@ def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
     for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
         content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
         assert "workflow-state.json" in content, f"{name} missing zh workflow-state reference"
+
+    plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "方向/治理合成" in plan_content
+    assert "Value recommendation" in plan_content
+    assert "Delivery recommendation" in plan_content
+
+    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "方向/治理合成" in eval_content
+    assert "Value recommendation" in eval_content
+    assert "Delivery recommendation" in eval_content
 
 
 def test_zh_resources_contain_chinese(tmp_path: Path):
