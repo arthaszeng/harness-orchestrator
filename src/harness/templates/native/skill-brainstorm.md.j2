@@ -11,6 +11,12 @@ that needs divergent exploration before becoming a durable direction.
 **Human interaction phases:** Divergent Exploration + Structured Vision
 **Autonomous phases:** Roadmap / Backlog / Active Plan Loop → Build → Eval → Ship → Feedback
 
+## Workflow Boundary
+
+- Stay inside the harness workflow after vision capture; do NOT call Cursor `SwitchMode` to `plan`.
+- When planning is needed, continue with the embedded harness planning flow in this skill (the harness equivalent of `/harness-plan`), then continue to `/harness-ship`.
+- "Move to the planning phase" here is a workflow transition, not a switch to Cursor's built-in Plan mode.
+
 **Only stop for:**
 - Socratic exploration (the whole point of brainstorm — engage the user)
 - Review gate escalation (when plan_review_gate requires it)

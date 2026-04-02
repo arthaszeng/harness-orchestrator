@@ -839,6 +839,23 @@ def test_vision_includes_vision_core(tmp_path: Path):
     vs = (tmp_path / ".cursor" / "skills" / "harness" / "harness-vision" / "SKILL.md")
     content = vs.read_text(encoding="utf-8")
     assert "Update Vision" in content
+    assert "product and direction artifact" in content
+    assert "implementation choices belong in `plan.md`" in content
+
+
+def test_brainstorm_and_vision_stay_in_harness_workflow(tmp_path: Path):
+    """brainstorm/vision should not switch to Cursor Plan mode."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+
+    brainstorm = (skills_base / "harness-brainstorm" / "SKILL.md").read_text(encoding="utf-8")
+    assert "do NOT call Cursor `SwitchMode` to `plan`" in brainstorm
+    assert "Cursor's built-in Plan mode" in brainstorm
+
+    vision = (skills_base / "harness-vision" / "SKILL.md").read_text(encoding="utf-8")
+    assert "do NOT call Cursor `SwitchMode` to `plan`" in vision
+    assert "Cursor's built-in Plan mode" in vision
 
 
 def test_vision_includes_plan_core(tmp_path: Path):
@@ -1162,6 +1179,14 @@ def test_zh_brainstorm_and_governance_agents_contain_loop_concepts(tmp_path: Pat
     assert "Plan Backlog" in content_bs
     assert "Feedback Ledger" in content_bs
     assert "停止条件" in content_bs
+    assert "不要调用 Cursor 的 `SwitchMode` 切到 `plan`" in content_bs
+    assert "业务/用户语言" in content_bs
+
+    vision = tmp_path / ".cursor" / "skills" / "harness" / "harness-vision" / "SKILL.md"
+    content_vs = vision.read_text(encoding="utf-8")
+    assert "工作流边界" in content_vs
+    assert "不要调用 Cursor 的 `SwitchMode` 切到 `plan`" in content_vs
+    assert "Cursor 内置的 Plan 模式" in content_vs
 
     po = tmp_path / ".cursor" / "agents" / "harness-product-owner.md"
     content_po = po.read_text(encoding="utf-8")

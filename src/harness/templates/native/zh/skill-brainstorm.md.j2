@@ -11,6 +11,12 @@ description: "愿景驱动的持续迭代引擎：通过苏格拉底式提问帮
 **人机交互阶段：** 发散探索 + 结构化愿景
 **自主阶段：** Roadmap / Backlog / Active Plan Loop → Build → Eval → Ship → Feedback
 
+## 工作流边界
+
+- 完成 vision 后继续留在 harness 工作流里；不要调用 Cursor 的 `SwitchMode` 切到 `plan`。
+- 需要进入规划时，直接使用本技能中内嵌的 harness 规划流程（等价于 `/harness-plan`），再继续 `/harness-ship`。
+- 这里的“进入计划阶段”是 workflow 语义，不是切换到 Cursor 内置的 Plan 模式。
+
 **仅在以下情况停止：**
 - 苏格拉底式探索（这正是 brainstorm 的意义 — 与用户互动）
 - Review gate 升级（当 plan_review_gate 要求时）
