@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,36 @@ def get_diff_stat(cwd: Path) -> str:
     """Get diff stat for the current branch relative to main."""
     result = _run_git(["diff", "--stat", "HEAD~1"], cwd)
     return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _find_repo_root(start: Path) -> Optional[Path]:
+    """Walk up from *start* to find the git repository root.
+
+    Returns ``None`` if no ``.git`` directory is found.
+    """
+    cur = start.resolve()
+    for parent in [cur, *cur.parents]:
+        if (parent / ".git").exists() or (parent / ".git").is_file():
+            return parent
+    return None
+
+
+def get_head_commit_epoch(cwd: Path) -> Optional[float]:
+    """Return the author-date epoch of HEAD, or None on failure.
+
+    Resolves the git repo root from *cwd* before running the command so that
+    callers inside ``.agents/tasks/task-NNN/`` still work correctly.
+    """
+    repo = _find_repo_root(cwd)
+    if repo is None:
+        return None
+    try:
+        result = _run_git(["log", "-1", "--format=%at", "HEAD"], repo, timeout=10)
+        if result.returncode != 0:
+            return None
+        return float(result.stdout.strip())
+    except (subprocess.TimeoutExpired, ValueError, OSError):
+        return None
 
 
 def stash_save(cwd: Path) -> bool:

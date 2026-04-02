@@ -121,13 +121,22 @@ def resolve_task_dir(
     session_task_id: str | None = None,
 ) -> Path | None:
     tasks_dir = agents_dir / "tasks"
+
+    def _safe_child(name: str) -> Path | None:
+        """Resolve *name* under tasks_dir, rejecting path-traversal attempts."""
+        if not _TASK_DIR_RE.match(name):
+            return None
+        candidate = (tasks_dir / name).resolve()
+        if not candidate.is_relative_to(tasks_dir.resolve()):
+            return None
+        return candidate if candidate.is_dir() else None
+
     if explicit_task_id:
-        explicit_dir = tasks_dir / explicit_task_id
-        return explicit_dir if explicit_dir.is_dir() else None
+        return _safe_child(explicit_task_id)
     if session_task_id:
-        session_dir = tasks_dir / session_task_id
-        if session_dir.is_dir():
-            return session_dir
+        result = _safe_child(session_task_id)
+        if result:
+            return result
     ordered = iter_task_dirs(agents_dir)
     return ordered[-1] if ordered else None
 
