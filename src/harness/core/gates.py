@@ -243,21 +243,28 @@ def check_ship_readiness(
 
 
 def write_gate_snapshot(task_dir: Path, verdict: GateVerdict) -> bool:
-    """Write the gate verdict back to workflow-state.json (load-merge-save).
+    """Write the gate verdict back to workflow-state.json via sync helper.
 
     Returns True if the snapshot was written, False if skipped (no state file).
     """
-    ws = load_workflow_state(task_dir)
-    if ws is None:
+    state_path = task_dir / "workflow-state.json"
+    if not state_path.exists():
         return False
 
     from datetime import datetime, timezone
+    from harness.core.state import TaskState
+    from harness.core.workflow_state import sync_task_state
 
     status = GateStatus.PASS if verdict.passed else GateStatus.BLOCKED
-    ws.gates.ship_readiness = GateSnapshot(
-        status=status,
-        reason=verdict.summary,
-        updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    sync_task_state(
+        task_dir,
+        gate_updates={
+            "ship_readiness": {
+                "status": status.value,
+                "reason": verdict.summary,
+                "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            },
+        },
+        phase=TaskState.SHIPPING,
     )
-    ws.save(task_dir)
     return True

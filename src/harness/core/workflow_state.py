@@ -29,6 +29,27 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _write_text_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _normalize_artifact_ref(task_dir: Path, ref: str) -> str:
+    ref_path = Path(ref)
+    if ref_path.is_absolute() or ".." in ref_path.parts:
+        raise ValueError(f"artifact ref must stay inside task dir: {ref}")
+
+    task_prefix = Path(".agents") / "tasks" / task_dir.name
+    if ref_path.parts[:2] == (".agents", "tasks"):
+        if len(ref_path.parts) < 4 or ref_path.parts[:3] != task_prefix.parts:
+            raise ValueError(f"artifact ref must point to {task_dir.name}: {ref}")
+        return ref_path.as_posix()
+
+    return (task_prefix / ref_path).as_posix()
+
+
 class GateStatus(str, Enum):
     UNKNOWN = "unknown"
     PENDING = "pending"
@@ -96,10 +117,7 @@ class WorkflowState(BaseModel):
     def save(self, task_dir: Path) -> None:
         task_dir.mkdir(parents=True, exist_ok=True)
         payload = self.model_copy(update={"updated_at": _now_iso()})
-        (task_dir / WORKFLOW_STATE_FILENAME).write_text(
-            payload.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
+        _write_text_atomic(task_dir / WORKFLOW_STATE_FILENAME, payload.model_dump_json(indent=2))
 
 
 def task_dir_number(task_dir: Path) -> int | None:
@@ -179,7 +197,6 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
             f"(got {raw.get('schema_version')!r}, expected {SCHEMA_VERSION})",
             stacklevel=2,
         )
-        return None
     try:
         state = WorkflowState.model_validate(raw)
     except ValidationError as exc:
@@ -187,6 +204,52 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
         return None
     if state.task_id != task_dir.name:
         return None
+    return state
+
+
+def sync_task_state(
+    task_dir: Path,
+    *,
+    artifact_updates: dict[str, str] | None = None,
+    gate_updates: dict[str, dict[str, str]] | None = None,
+    phase: TaskState | None = None,
+    blocker: dict[str, str] | None = None,
+) -> WorkflowState:
+    """Load-merge-save task workflow state through a single entrypoint."""
+    state_path = task_dir / WORKFLOW_STATE_FILENAME
+    state = load_workflow_state(task_dir)
+    if state is None and state_path.exists():
+        raise ValueError("existing workflow-state.json is invalid")
+    if state is None:
+        state = WorkflowState(task_id=task_dir.name)
+
+    if artifact_updates:
+        for key, value in artifact_updates.items():
+            if hasattr(state.artifacts, key):
+                setattr(state.artifacts, key, _normalize_artifact_ref(task_dir, value))
+
+    if gate_updates:
+        for key, payload in gate_updates.items():
+            if not hasattr(state.gates, key):
+                continue
+            current = getattr(state.gates, key)
+            update = {
+                "status": payload.get("status", current.status),
+                "reason": payload.get("reason", current.reason),
+                "updated_at": payload.get("updated_at", _now_iso()),
+            }
+            setattr(state.gates, key, GateSnapshot.model_validate(update))
+
+    if phase is not None:
+        state.phase = phase
+
+    if blocker:
+        state.blocker = WorkflowBlocker.model_validate({
+            "kind": blocker.get("kind", state.blocker.kind),
+            "reason": blocker.get("reason", state.blocker.reason),
+        })
+
+    state.save(task_dir)
     return state
 
 

@@ -15,6 +15,7 @@ from harness.core.artifacts import (
     save_evaluation,
     save_ship_metrics,
 )
+from harness.core.workflow_state import load_workflow_state
 
 runner = CliRunner()
 
@@ -221,6 +222,33 @@ class TestCLISaveEval:
         assert "## Verdict: ITERATE" in text
         assert "5.5/10" in text
 
+    def test_save_eval_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-003"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-003", "phase": "idle"}',
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "save-eval",
+                "--task", "task-003",
+                "--verdict", "PASS",
+                "--score", "8.0",
+                "--body", "# Eval\n\n## Verdict: PASS\n",
+            ],
+        )
+
+        assert result.exit_code == 0
+        state = load_workflow_state(task_dir)
+        assert state is not None
+        assert state.artifacts.evaluation == ".agents/tasks/task-003/evaluation-r1.md"
+        assert state.phase.value == "evaluating"
+        assert state.gates.evaluation.status.value == "pass"
+
 
 class TestCLISaveBuildLog:
     def test_save_build_log_with_body(self, tmp_path: Path, monkeypatch):
@@ -239,3 +267,27 @@ class TestCLISaveBuildLog:
         log_file = tmp_path / ".agents" / "tasks" / "task-001" / "build-r1.log"
         assert log_file.exists()
         assert "deliverables" in log_file.read_text()
+
+    def test_save_build_log_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-004"
+        task_dir.mkdir(parents=True)
+        (task_dir / "workflow-state.json").write_text(
+            '{"schema_version": 1, "task_id": "task-004", "phase": "idle"}',
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "save-build-log",
+                "--task", "task-004",
+                "--body", "# Build Log\n\nWave 1 done.\n",
+            ],
+        )
+
+        assert result.exit_code == 0
+        state = load_workflow_state(task_dir)
+        assert state is not None
+        assert state.artifacts.build_log == ".agents/tasks/task-004/build-r1.log"
+        assert state.phase.value == "building"

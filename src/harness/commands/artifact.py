@@ -39,6 +39,8 @@ def run_save_eval(
 ) -> None:
     """Write evaluation artifact to task directory."""
     from harness.core.artifacts import next_eval_round, save_evaluation
+    from harness.core.state import TaskState
+    from harness.core.workflow_state import sync_task_state
 
     ui = get_ui()
     task_dir = _resolve_task_dir(task)
@@ -61,6 +63,17 @@ def run_save_eval(
             verdict=verdict,
         )
 
+    sync_task_state(
+        task_dir,
+        artifact_updates={"evaluation": f".agents/tasks/{task}/{path.name}"},
+        gate_updates={
+            "evaluation": {
+                "status": "pass" if verdict.upper() == "PASS" else "blocked",
+                "reason": f"{path.name} saved with verdict {verdict.upper()}",
+            },
+        },
+        phase=TaskState.EVALUATING,
+    )
     ui.info(f"✓ evaluation-r{round_num}.md → {path}")
 
 
@@ -71,6 +84,8 @@ def run_save_build_log(
 ) -> None:
     """Write build log artifact to task directory."""
     from harness.core.artifacts import save_build_log
+    from harness.core.state import TaskState
+    from harness.core.workflow_state import sync_task_state
 
     ui = get_ui()
     task_dir = _resolve_task_dir(task)
@@ -83,4 +98,9 @@ def run_save_build_log(
             body = sys.stdin.read()
 
     path = save_build_log(task_dir, body)
+    sync_task_state(
+        task_dir,
+        artifact_updates={"build_log": f".agents/tasks/{task}/{path.name}"},
+        phase=TaskState.BUILDING,
+    )
     ui.info(f"✓ {path.name} → {path}")

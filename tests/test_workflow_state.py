@@ -13,6 +13,7 @@ from harness.core.workflow_state import (
     load_current_workflow_state,
     load_workflow_state,
     resolve_task_dir,
+    sync_task_state,
 )
 
 
@@ -45,15 +46,30 @@ def test_load_workflow_state_invalid_json_returns_none(tmp_path: Path):
     assert load_workflow_state(task_dir) is None
 
 
-def test_load_workflow_state_unknown_schema_returns_none(tmp_path: Path):
+def test_load_workflow_state_unknown_schema_invalid_shape_returns_none(tmp_path: Path):
     task_dir = tmp_path / ".agents" / "tasks" / "task-001"
     task_dir.mkdir(parents=True)
     (task_dir / WORKFLOW_STATE_FILENAME).write_text(
-        '{"schema_version": 999, "task_id": "task-001"}',
+        '{"schema_version": 999, "task_id": "task-001", "phase": "not-a-real-phase"}',
         encoding="utf-8",
     )
 
     assert load_workflow_state(task_dir) is None
+
+
+def test_load_workflow_state_future_schema_loads_when_shape_valid(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir.mkdir(parents=True)
+    (task_dir / WORKFLOW_STATE_FILENAME).write_text(
+        '{"schema_version": 999, "task_id": "task-001", "phase": "building", "iteration": 1}',
+        encoding="utf-8",
+    )
+
+    loaded = load_workflow_state(task_dir)
+
+    assert loaded is not None
+    assert loaded.task_id == "task-001"
+    assert loaded.phase == TaskState.BUILDING
 
 
 def test_load_workflow_state_task_id_directory_mismatch_returns_none(tmp_path: Path):
@@ -175,6 +191,55 @@ def test_artifact_pairs_omits_empty_handoff():
     pairs = artifact_pairs(state)
     labels = [label for label, _ in pairs]
     assert "handoff" not in labels
+
+
+def test_sync_task_state_updates_artifacts_and_gate(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    WorkflowState(task_id="task-001").save(task_dir)
+
+    sync_task_state(
+        task_dir,
+        artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.log"},
+        gate_updates={"plan_review": {"status": "pass", "reason": "approved"}},
+        phase=TaskState.BUILDING,
+    )
+
+    loaded = load_workflow_state(task_dir)
+    assert loaded is not None
+    assert loaded.phase == TaskState.BUILDING
+    assert loaded.artifacts.build_log == ".agents/tasks/task-001/build-r1.log"
+    assert loaded.gates.plan_review.status.value == "pass"
+    assert loaded.gates.plan_review.reason == "approved"
+
+
+def test_sync_task_state_rejects_invalid_existing_state(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir.mkdir(parents=True)
+    state_path = task_dir / WORKFLOW_STATE_FILENAME
+    state_path.write_text("{broken", encoding="utf-8")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
+        sync_task_state(
+            task_dir,
+            artifact_updates={"build_log": ".agents/tasks/task-001/build-r1.log"},
+        )
+
+    assert state_path.read_text(encoding="utf-8") == "{broken"
+
+
+def test_sync_task_state_rejects_artifact_ref_outside_task(tmp_path: Path):
+    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    WorkflowState(task_id="task-001").save(task_dir)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="artifact ref"):
+        sync_task_state(
+            task_dir,
+            artifact_updates={"build_log": "../outside.log"},
+        )
 
 
 # --- B6: HARNESS_TASK_ID env support ---

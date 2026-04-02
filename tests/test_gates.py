@@ -416,6 +416,17 @@ class TestWriteGateSnapshot:
         assert reloaded.artifacts.plan == "plan.md"
         assert reloaded.gates.ship_readiness.status == GateStatus.PASS
 
+    def test_rejects_invalid_existing_state(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        (task_dir / "workflow-state.json").write_text("{broken", encoding="utf-8")
+        verdict = GateVerdict(passed=True, checks=[], summary="all checks passed")
+
+        import pytest
+
+        with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
+            write_gate_snapshot(task_dir, verdict)
+
 
 class TestPermissionFailGraceful:
     def test_unreadable_plan_blocks_without_crash(self, tmp_path: Path):

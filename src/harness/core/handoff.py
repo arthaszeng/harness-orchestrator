@@ -96,7 +96,11 @@ def save_handoff(task_dir: Path, handoff: StageHandoff) -> Path:
 
 
 def load_handoff(task_dir: Path, source_phase: HandoffPhase) -> StageHandoff | None:
-    """Load a specific handoff file.  Returns ``None`` on any failure with a warning."""
+    """Load a specific handoff file.
+
+    Returns ``None`` on missing/corrupt/invalid content. Schema mismatches emit a
+    warning but still attempt to validate known fields for forward compatibility.
+    """
     path = task_dir / _handoff_filename(source_phase)
     if not path.exists():
         return None
@@ -114,7 +118,6 @@ def load_handoff(task_dir: Path, source_phase: HandoffPhase) -> StageHandoff | N
             f"(got {raw.get('schema_version')!r}, expected {HANDOFF_SCHEMA_VERSION})",
             stacklevel=2,
         )
-        return None
     try:
         return StageHandoff.model_validate(raw)
     except ValidationError as exc:

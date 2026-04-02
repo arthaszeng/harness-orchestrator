@@ -106,7 +106,7 @@ class TestLoadHandoff:
         )
         assert load_handoff(task_dir, "plan") is None
 
-    def test_wrong_schema_version_returns_none(self, tmp_path: Path):
+    def test_wrong_schema_version_still_loads_when_shape_valid(self, tmp_path: Path):
         task_dir = tmp_path / "task-001"
         handoff = _make_handoff()
         save_handoff(task_dir, handoff)
@@ -115,7 +115,10 @@ class TestLoadHandoff:
         data["schema_version"] = 999
         path.write_text(json.dumps(data), encoding="utf-8")
 
-        assert load_handoff(task_dir, "plan") is None
+        loaded = load_handoff(task_dir, "plan")
+        assert loaded is not None
+        assert loaded.source_phase == "plan"
+        assert loaded.target_phase == "build"
 
     def test_unknown_extra_fields_ignored(self, tmp_path: Path):
         task_dir = tmp_path / "task-001"
