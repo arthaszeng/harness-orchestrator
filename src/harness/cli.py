@@ -143,7 +143,7 @@ def update(
     Steps:
     1. Check PyPI for newer version and upgrade via pip
     2. Reinstall native artifacts (only after upgrade, or with --force)
-    3. Check .agents/config.toml for new/deprecated keys
+    3. Check .harness-flow/config.toml for new/deprecated keys
     """
     from harness.commands.update import run_update
     run_update(check=check, force=force)

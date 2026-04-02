@@ -35,7 +35,7 @@ def _item(**overrides) -> FeedbackItem:
 
 
 def test_save_feedback_ledger_creates_jsonl_file(tmp_path: Path):
-    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     path = save_feedback_ledger(task_dir, [_item()])
 
     assert path.exists()
@@ -43,7 +43,7 @@ def test_save_feedback_ledger_creates_jsonl_file(tmp_path: Path):
 
 
 def test_load_feedback_ledger_round_trip(tmp_path: Path):
-    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     save_feedback_ledger(task_dir, [_item(), _item(id="fb-002", severity="warn")])
 
     result = load_feedback_ledger(task_dir)
@@ -56,7 +56,7 @@ def test_load_feedback_ledger_round_trip(tmp_path: Path):
 
 
 def test_load_feedback_ledger_reports_bad_line_without_dropping_good_items(tmp_path: Path):
-    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     task_dir.mkdir(parents=True)
     ledger = task_dir / "feedback-ledger.jsonl"
     ledger.write_text(
@@ -78,21 +78,21 @@ def test_load_feedback_ledger_reports_bad_line_without_dropping_good_items(tmp_p
 def test_save_feedback_ledger_updates_workflow_state_ref(tmp_path: Path):
     from harness.core.workflow_state import WorkflowState, load_workflow_state
 
-    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     WorkflowState(task_id="task-001").save(task_dir)
 
     save_feedback_ledger(task_dir, [_item()])
 
     state = load_workflow_state(task_dir)
     assert state is not None
-    assert state.artifacts.feedback_ledger == ".agents/tasks/task-001/feedback-ledger.jsonl"
+    assert state.artifacts.feedback_ledger == ".harness-flow/tasks/task-001/feedback-ledger.jsonl"
 
 
 def test_save_feedback_ledger_keeps_artifact_when_state_sync_fails(tmp_path: Path, monkeypatch):
     from harness.core import workflow_state as workflow_state_module
     from harness.core.workflow_state import WorkflowState
 
-    task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     WorkflowState(task_id="task-001").save(task_dir)
 
     original_save = workflow_state_module.WorkflowState.save

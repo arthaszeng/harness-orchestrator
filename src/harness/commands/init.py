@@ -268,7 +268,7 @@ def run_init(
     from harness import __version__
 
     project_root = Path.cwd()
-    agents_dir = project_root / ".agents"
+    agents_dir = project_root / ".harness-flow"
     config_exists = (agents_dir / "config.toml").exists()
 
     ui = get_ui()
@@ -340,11 +340,11 @@ def run_init(
     _gen = t("init.summary_generated")
     _upd = t("init.summary_updated")
     summary_lines = [
-        f"  [cyber.green]✓[/] .agents/config.toml  [cyber.dim]{_gen}[/]",
+        f"  [cyber.green]✓[/] .harness-flow/config.toml  [cyber.dim]{_gen}[/]",
     ]
     if vision_path.exists():
         summary_lines.append(
-            f"  [cyber.green]✓[/] .agents/vision.md    [cyber.dim]{_gen}[/]",
+            f"  [cyber.green]✓[/] .harness-flow/vision.md    [cyber.dim]{_gen}[/]",
         )
     summary_lines.append(
         f"  [cyber.green]✓[/] .gitignore           [cyber.dim]{_upd}[/]",
@@ -379,17 +379,17 @@ def run_init(
 
 def _update_gitignore(project_root: Path) -> None:
     gitignore = project_root / ".gitignore"
-    marker = ".agents/state.json"
+    marker = ".harness-flow/state.json"
     comment = t("init.gitignore_comment")
     if gitignore.exists():
         content = gitignore.read_text(encoding="utf-8")
         if marker not in content:
             with gitignore.open("a", encoding="utf-8") as f:
                 f.write(f"\n{comment}\n")
-                f.write(".agents/state.json\n")
-                f.write(".agents/.stop\n")
+                f.write(".harness-flow/state.json\n")
+                f.write(".harness-flow/.stop\n")
     else:
         gitignore.write_text(
-            f"{comment}\n.agents/state.json\n.agents/.stop\n",
+            f"{comment}\n.harness-flow/state.json\n.harness-flow/.stop\n",
             encoding="utf-8",
         )

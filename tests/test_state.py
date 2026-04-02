@@ -16,7 +16,7 @@ from harness.core.state import (
 
 def test_session_save_load(tmp_path: Path):
     state = SessionState(session_id="test-001", mode="auto")
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     state.save(agents_dir)
 
     loaded = SessionState.load(agents_dir)
@@ -25,7 +25,7 @@ def test_session_save_load(tmp_path: Path):
 
 
 def test_detect_incomplete(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     assert SessionState.detect_incomplete(agents_dir) is None
 
     state = SessionState(
@@ -41,7 +41,7 @@ def test_detect_incomplete(tmp_path: Path):
 
 def test_detect_incomplete_idle_not_resumable(tmp_path: Path):
     """Idle mode should not be treated as incomplete even with history."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     state = SessionState(session_id="s1", mode="idle", current_task=None)
     state.save(agents_dir)
     assert SessionState.detect_incomplete(agents_dir) is None
@@ -54,7 +54,7 @@ def test_detect_incomplete_idle_not_resumable(tmp_path: Path):
 
 def test_stop_context_backward_compat(tmp_path: Path):
     """Old state.json without stop_context should load() normally."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     old_state = {
         "session_id": "legacy-001",
@@ -76,7 +76,7 @@ def test_stop_context_backward_compat(tmp_path: Path):
 
 def test_safety_stop_context_persisted(tmp_path: Path):
     """Safety stop should persist full stop context to state.json."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     state = SessionState(
         session_id="s1",
@@ -102,7 +102,7 @@ def test_safety_stop_context_persisted(tmp_path: Path):
 
 def test_consecutive_blocked_stop_context(tmp_path: Path):
     """Consecutive blocked breaker should include count and limit in snapshot."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     state = SessionState(
         session_id="s1",
@@ -123,7 +123,7 @@ def test_consecutive_blocked_stop_context(tmp_path: Path):
 
 def test_stop_signal_stop_context(tmp_path: Path):
     """Manual stop signal should record stop_kind=stop_signal."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     state = SessionState(
         session_id="s1",
@@ -143,7 +143,7 @@ def test_stop_signal_stop_context(tmp_path: Path):
 
 def test_vision_drift_stop_context(tmp_path: Path):
     """VISION_DRIFT should persist both reflection_signal and stop context."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     drift_line = "VISION_DRIFT: project deviating from original goals"
     state = SessionState(
@@ -167,7 +167,7 @@ def test_vision_drift_stop_context(tmp_path: Path):
 
 def test_vision_stale_stop_context(tmp_path: Path):
     """VISION_STALE should record the correct stop_kind."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     stale_line = "VISION_STALE: vision document is outdated"
     state = SessionState(
@@ -189,7 +189,7 @@ def test_vision_stale_stop_context(tmp_path: Path):
 
 def test_safety_stop_preserves_prior_reflection_signal(tmp_path: Path):
     """Safety stop should carry forward the previously recorded reflection_signal."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     state = SessionState(
         session_id="s1",
@@ -221,7 +221,7 @@ def test_safety_stop_preserves_prior_reflection_signal(tmp_path: Path):
 
 def test_stop_context_save_load_roundtrip(tmp_path: Path):
     """Full serialize/deserialize roundtrip for stop_context."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     state = SessionState(
         session_id="rt-001",
         mode="auto",
@@ -244,7 +244,7 @@ def test_stop_context_save_load_roundtrip(tmp_path: Path):
 
 def test_stop_context_does_not_affect_progress_display(tmp_path: Path):
     """stop_context should not leak into progress.md display."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(parents=True)
     state = SessionState(
         session_id="s1",
@@ -266,7 +266,7 @@ def test_stop_context_does_not_affect_progress_display(tmp_path: Path):
 
 def test_task_record_and_completed_task_roundtrip(tmp_path: Path):
     """TaskRecord / CompletedTask survive save via SessionState."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     state = SessionState(
         session_id="s-task",
         mode="idle",
@@ -295,7 +295,7 @@ def test_task_record_and_completed_task_roundtrip(tmp_path: Path):
 
 def test_load_invalid_json_returns_default(tmp_path: Path):
     """Corrupt JSON in state.json should not crash; returns default + warns."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "state.json").write_text("{invalid json!!", encoding="utf-8")
 
@@ -309,7 +309,7 @@ def test_load_invalid_json_returns_default(tmp_path: Path):
 
 def test_load_truncated_json_returns_default(tmp_path: Path):
     """Truncated JSON should not crash."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "state.json").write_text('{"session_id": "x', encoding="utf-8")
 
@@ -322,7 +322,7 @@ def test_load_truncated_json_returns_default(tmp_path: Path):
 
 def test_load_valid_json_invalid_schema_returns_default(tmp_path: Path):
     """Valid JSON but invalid Pydantic model should not crash."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "state.json").write_text(
         json.dumps({"mode": 12345, "current_task": "not-a-dict"}),

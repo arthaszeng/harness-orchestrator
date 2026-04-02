@@ -59,7 +59,7 @@ class TestHelpOutput:
 class TestGateCommand:
     def test_gate_pass(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
         task_dir.mkdir(parents=True)
         (task_dir / "plan.md").write_text("# Plan\n\n## Deliverables\n", encoding="utf-8")
         (task_dir / "evaluation-r1.md").write_text(
@@ -75,7 +75,7 @@ class TestGateCommand:
 
     def test_gate_blocked_missing_eval(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
         task_dir.mkdir(parents=True)
         (task_dir / "plan.md").write_text("# Plan\n", encoding="utf-8")
 
@@ -88,13 +88,13 @@ class TestGateCommand:
 
     def test_gate_no_task_dir(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".agents" / "tasks").mkdir(parents=True)
+        (tmp_path / ".harness-flow" / "tasks").mkdir(parents=True)
         result = runner.invoke(app, ["gate"])
         assert result.exit_code == 1
 
     def test_gate_invalid_task_id_exits_with_error(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".agents" / "tasks").mkdir(parents=True)
+        (tmp_path / ".harness-flow" / "tasks").mkdir(parents=True)
         result = runner.invoke(app, ["gate", "--task", "task-999"])
         assert result.exit_code == 1
         clean = _ANSI_RE.sub("", result.output)
@@ -103,10 +103,10 @@ class TestGateCommand:
     def test_gate_auto_detects_latest_task(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         for i in [1, 2]:
-            td = tmp_path / ".agents" / "tasks" / f"task-00{i}"
+            td = tmp_path / ".harness-flow" / "tasks" / f"task-00{i}"
             td.mkdir(parents=True)
             (td / "plan.md").write_text("# Plan\n\n## Deliverables\n", encoding="utf-8")
-        (tmp_path / ".agents" / "tasks" / "task-002" / "evaluation-r1.md").write_text(
+        (tmp_path / ".harness-flow" / "tasks" / "task-002" / "evaluation-r1.md").write_text(
             "# Eval\n\n## Verdict: PASS\n", encoding="utf-8",
         )
 
@@ -121,7 +121,7 @@ class TestGateCommand:
 class TestStatusCommand:
     def test_status_reads_canonical_workflow_state(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
         workflow_state = WorkflowState(
             task_id="task-001",
             phase=TaskState.EVALUATING,
@@ -144,7 +144,7 @@ class TestStatusCommand:
 class TestSaveFeedbackLedgerCommand:
     def test_save_feedback_ledger_writes_file_and_updates_state(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-021"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-021"
         task_dir.mkdir(parents=True)
         WorkflowState(task_id="task-021").save(task_dir)
 
@@ -160,7 +160,7 @@ class TestSaveFeedbackLedgerCommand:
         assert result.exit_code == 0
         assert (task_dir / "feedback-ledger.jsonl").exists()
         state = WorkflowState.model_validate_json((task_dir / "workflow-state.json").read_text(encoding="utf-8"))
-        assert state.artifacts.feedback_ledger == ".agents/tasks/task-021/feedback-ledger.jsonl"
+        assert state.artifacts.feedback_ledger == ".harness-flow/tasks/task-021/feedback-ledger.jsonl"
 
     def test_save_feedback_ledger_rejects_invalid_jsonl(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)

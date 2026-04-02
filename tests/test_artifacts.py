@@ -158,7 +158,7 @@ class TestSaveShipMetrics:
         assert data["eval_rounds"] == 2
 
     def test_updates_workflow_state_ref(self, tmp_path: Path):
-        task_dir = tmp_path / ".agents" / "tasks" / "task-009"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-009"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-009", "phase": "idle"}',
@@ -168,7 +168,7 @@ class TestSaveShipMetrics:
         save_ship_metrics(task_dir, branch="agent/task-009")
         state = load_workflow_state(task_dir)
         assert state is not None
-        assert state.artifacts.ship_metrics == ".agents/tasks/task-009/ship-metrics.json"
+        assert state.artifacts.ship_metrics == ".harness-flow/tasks/task-009/ship-metrics.json"
 
 
 class TestSaveEvaluationRawBody:
@@ -203,7 +203,7 @@ class TestCLIPathTraversal:
 class TestCLISaveEval:
     def test_save_eval_with_body(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".agents" / "tasks" / "task-001").mkdir(parents=True)
+        (tmp_path / ".harness-flow" / "tasks" / "task-001").mkdir(parents=True)
 
         result = runner.invoke(
             app,
@@ -217,13 +217,13 @@ class TestCLISaveEval:
             ],
         )
         assert result.exit_code == 0
-        eval_file = tmp_path / ".agents" / "tasks" / "task-001" / "code-eval-r1.md"
+        eval_file = tmp_path / ".harness-flow" / "tasks" / "task-001" / "code-eval-r1.md"
         assert eval_file.exists()
         assert "PASS" in eval_file.read_text()
 
     def test_save_eval_without_body_generates_template(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".agents" / "tasks" / "task-002").mkdir(parents=True)
+        (tmp_path / ".harness-flow" / "tasks" / "task-002").mkdir(parents=True)
 
         result = runner.invoke(
             app,
@@ -236,7 +236,7 @@ class TestCLISaveEval:
             ],
         )
         assert result.exit_code == 0
-        eval_file = tmp_path / ".agents" / "tasks" / "task-002" / "code-eval-r1.md"
+        eval_file = tmp_path / ".harness-flow" / "tasks" / "task-002" / "code-eval-r1.md"
         assert eval_file.exists()
         text = eval_file.read_text()
         assert "## Verdict: ITERATE" in text
@@ -244,7 +244,7 @@ class TestCLISaveEval:
 
     def test_save_eval_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-003"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-003"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-003", "phase": "idle"}',
@@ -266,14 +266,14 @@ class TestCLISaveEval:
         assert result.exit_code == 0
         state = load_workflow_state(task_dir)
         assert state is not None
-        assert state.artifacts.evaluation == ".agents/tasks/task-003/code-eval-r1.md"
-        assert state.artifacts.code_evaluation == ".agents/tasks/task-003/code-eval-r1.md"
+        assert state.artifacts.evaluation == ".harness-flow/tasks/task-003/code-eval-r1.md"
+        assert state.artifacts.code_evaluation == ".harness-flow/tasks/task-003/code-eval-r1.md"
         assert state.phase.value == "evaluating"
         assert state.gates.evaluation.status.value == "pass"
 
     def test_save_eval_iterate_sets_pending_gate(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-013"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-013"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-013", "phase": "idle"}',
@@ -291,7 +291,7 @@ class TestCLISaveEval:
 
     def test_save_eval_unknown_verdict_sets_blocked_gate(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-031"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-031"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-031", "phase": "idle"}',
@@ -309,7 +309,7 @@ class TestCLISaveEval:
 
     def test_save_plan_eval_updates_plan_gate_only(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-032"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-032"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-032", "phase": "idle"}',
@@ -326,16 +326,16 @@ class TestCLISaveEval:
         assert state.phase.value == "planning"
         assert state.gates.plan_review.status.value == "pass"
         assert state.gates.evaluation.status.value == "unknown"
-        assert state.artifacts.plan_evaluation == ".agents/tasks/task-032/plan-eval-r1.md"
+        assert state.artifacts.plan_evaluation == ".harness-flow/tasks/task-032/plan-eval-r1.md"
         assert state.artifacts.evaluation == ""
 
     def test_save_eval_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-014"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-014"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-014", "phase": "idle", '
-            '"artifacts": {"evaluation": ".agents/tasks/task-014/evaluation-r0.md"}}',
+            '"artifacts": {"evaluation": ".harness-flow/tasks/task-014/evaluation-r0.md"}}',
             encoding="utf-8",
         )
 
@@ -354,7 +354,7 @@ class TestCLISaveEval:
         assert (task_dir / "code-eval-r1.md").exists()
         state_after_fail = load_workflow_state(task_dir)
         assert state_after_fail is not None
-        assert state_after_fail.artifacts.evaluation == ".agents/tasks/task-014/evaluation-r0.md"
+        assert state_after_fail.artifacts.evaluation == ".harness-flow/tasks/task-014/evaluation-r0.md"
 
         monkeypatch.setattr(ws, "sync_task_state", original_sync)
         recovered = runner.invoke(
@@ -364,11 +364,11 @@ class TestCLISaveEval:
         assert recovered.exit_code == 0
         state_after_recover = load_workflow_state(task_dir)
         assert state_after_recover is not None
-        assert state_after_recover.artifacts.evaluation == ".agents/tasks/task-014/code-eval-r2.md"
+        assert state_after_recover.artifacts.evaluation == ".harness-flow/tasks/task-014/code-eval-r2.md"
 
     def test_save_eval_round_shared_between_plan_and_code(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-030"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-030"
         task_dir.mkdir(parents=True)
 
         plan_result = runner.invoke(
@@ -389,7 +389,7 @@ class TestCLISaveEval:
 class TestCLISaveBuildLog:
     def test_save_build_log_with_body(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".agents" / "tasks" / "task-001").mkdir(parents=True)
+        (tmp_path / ".harness-flow" / "tasks" / "task-001").mkdir(parents=True)
 
         result = runner.invoke(
             app,
@@ -400,13 +400,13 @@ class TestCLISaveBuildLog:
             ],
         )
         assert result.exit_code == 0
-        log_file = tmp_path / ".agents" / "tasks" / "task-001" / "build-r1.md"
+        log_file = tmp_path / ".harness-flow" / "tasks" / "task-001" / "build-r1.md"
         assert log_file.exists()
         assert "deliverables" in log_file.read_text()
 
     def test_save_build_log_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-004"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-004"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-004", "phase": "idle"}',
@@ -425,16 +425,16 @@ class TestCLISaveBuildLog:
         assert result.exit_code == 0
         state = load_workflow_state(task_dir)
         assert state is not None
-        assert state.artifacts.build_log == ".agents/tasks/task-004/build-r1.md"
+        assert state.artifacts.build_log == ".harness-flow/tasks/task-004/build-r1.md"
         assert state.phase.value == "building"
 
     def test_save_build_log_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".agents" / "tasks" / "task-015"
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-015"
         task_dir.mkdir(parents=True)
         (task_dir / "workflow-state.json").write_text(
             '{"schema_version": 1, "task_id": "task-015", "phase": "idle", '
-            '"artifacts": {"build_log": ".agents/tasks/task-015/build-r0.md"}}',
+            '"artifacts": {"build_log": ".harness-flow/tasks/task-015/build-r0.md"}}',
             encoding="utf-8",
         )
 
@@ -453,7 +453,7 @@ class TestCLISaveBuildLog:
         assert (task_dir / "build-r1.md").exists()
         state_after_fail = load_workflow_state(task_dir)
         assert state_after_fail is not None
-        assert state_after_fail.artifacts.build_log == ".agents/tasks/task-015/build-r0.md"
+        assert state_after_fail.artifacts.build_log == ".harness-flow/tasks/task-015/build-r0.md"
 
         monkeypatch.setattr(ws, "sync_task_state", original_sync)
         recovered = runner.invoke(
@@ -463,4 +463,4 @@ class TestCLISaveBuildLog:
         assert recovered.exit_code == 0
         state_after_recover = load_workflow_state(task_dir)
         assert state_after_recover is not None
-        assert state_after_recover.artifacts.build_log == ".agents/tasks/task-015/build-r2.md"
+        assert state_after_recover.artifacts.build_log == ".harness-flow/tasks/task-015/build-r2.md"

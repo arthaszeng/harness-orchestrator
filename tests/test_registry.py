@@ -18,7 +18,7 @@ from harness.core.tracker import RunTracker
 
 @pytest.fixture()
 def registry(tmp_path: Path) -> Registry:
-    return Registry(tmp_path / ".agents")
+    return Registry(tmp_path / ".harness-flow")
 
 
 class _Stringable:
@@ -181,7 +181,7 @@ class TestTrackerWithRealRegistry:
     """RunTracker 透传非基础类型元数据不会在写库阶段报错。"""
 
     def test_track_success_branch(self, tmp_path: Path) -> None:
-        reg = Registry(tmp_path / ".agents")
+        reg = Registry(tmp_path / ".harness-flow")
         tracker = RunTracker(registry=reg, events=NullEventEmitter(), task_id="t-1")
 
         with tracker.track(
@@ -203,7 +203,7 @@ class TestTrackerWithRealRegistry:
         assert row.branch == "dev"
 
     def test_track_failure_branch(self, tmp_path: Path) -> None:
-        reg = Registry(tmp_path / ".agents")
+        reg = Registry(tmp_path / ".harness-flow")
         tracker = RunTracker(registry=reg, events=NullEventEmitter(), task_id="t-2")
 
         with tracker.track(
@@ -219,7 +219,7 @@ class TestTrackerWithRealRegistry:
         assert row.status == "failed"
 
     def test_track_exception_branch(self, tmp_path: Path) -> None:
-        reg = Registry(tmp_path / ".agents")
+        reg = Registry(tmp_path / ".harness-flow")
         tracker = RunTracker(registry=reg, events=NullEventEmitter(), task_id="t-3")
 
         with pytest.raises(RuntimeError, match="boom"):

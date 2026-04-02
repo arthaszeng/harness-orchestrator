@@ -20,7 +20,7 @@ def test_default_config():
 
 
 def test_load_from_toml(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test-proj"\n[ci]\ncommand = "pytest"\n',
@@ -40,7 +40,7 @@ def test_deep_merge():
 
 
 def test_models_config_from_toml(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[models]\ndefault = "gpt-4o"\n\n'
@@ -54,7 +54,7 @@ def test_models_config_from_toml(tmp_path: Path):
 
 def test_legacy_drivers_section_ignored(tmp_path: Path):
     """[drivers] and nested keys are ignored (extra='ignore') without error."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[drivers]\ndefault = "codex"\n\n[drivers.roles]\nplanner = "x"\n'
@@ -67,7 +67,7 @@ def test_legacy_drivers_section_ignored(tmp_path: Path):
 
 def test_workflow_strips_removed_fields_from_toml(tmp_path: Path):
     """Removed workflow fields in TOML must not break load (ignored as extra)."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[workflow]\nmode = "orchestrator"\nprofile = "standard"\n'
@@ -80,7 +80,7 @@ def test_workflow_strips_removed_fields_from_toml(tmp_path: Path):
 
 
 def test_native_adversarial_model_aliases_to_evaluator_model(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[native]\nadversarial_model = "gpt-4.1"\n',

@@ -1,4 +1,4 @@
-"""Task-level canonical workflow state stored inside `.agents/tasks/task-NNN/`.
+"""Task-level canonical workflow state stored inside `.harness-flow/tasks/task-NNN/`.
 
 This module provides the machine-readable task state contract used by W1
 workflow-intelligence features. The per-task file is authoritative for phase,
@@ -41,8 +41,8 @@ def _normalize_artifact_ref(task_dir: Path, ref: str) -> str:
     if ref_path.is_absolute() or ".." in ref_path.parts:
         raise ValueError(f"artifact ref must stay inside task dir: {ref}")
 
-    task_prefix = Path(".agents") / "tasks" / task_dir.name
-    if ref_path.parts[:2] == (".agents", "tasks"):
+    task_prefix = Path(".harness-flow") / "tasks" / task_dir.name
+    if ref_path.parts[:2] == (".harness-flow", "tasks"):
         if len(ref_path.parts) < 4 or ref_path.parts[:3] != task_prefix.parts:
             raise ValueError(f"artifact ref must point to {task_dir.name}: {ref}")
         return ref_path.as_posix()

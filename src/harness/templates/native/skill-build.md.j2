@@ -31,16 +31,16 @@ which means DO IT. Implement everything and output the build result.
 
 ## Step 1: Read the Contract
 
-1. Find the current task: most recent `task-NNN` directory under `.agents/tasks/`
+1. Find the current task: most recent `task-NNN` directory under `.harness-flow/tasks/`
 2. **Check for handoff:** If `TASK_DIR/handoff-plan.json` exists, read it first —
    it provides a compact summary of the plan (decisions, risks, open items).
    Use this as your primary context; only read the full `plan.md` for details
    not covered by the handoff.
-3. Read `.agents/tasks/task-NNN/plan.md` — extract the deliverables checklist
+3. Read `.harness-flow/tasks/task-NNN/plan.md` — extract the deliverables checklist
    from the Contract section
 4. If this is a subsequent round (feedback exists from evaluation), also read
-   `.agents/tasks/task-NNN/code-eval-rN.md` for the fix suggestions
-5. If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
+   `.harness-flow/tasks/task-NNN/code-eval-rN.md` for the fix suggestions
+5. If `.harness-flow/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
    source for phase / gate / blocker / artifact refs. Update it when you write
    new build artifacts; do not treat session summaries as a parallel gate source.
 

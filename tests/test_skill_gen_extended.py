@@ -190,7 +190,7 @@ def test_build_context_unavailable_evaluator_model_falls_back_to_default(tmp_pat
 
 def _make_cfg(tmp_path: Path) -> HarnessConfig:
     """Helper: create a minimal config for generation tests."""
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(exist_ok=True)
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test"\n[ci]\ncommand = "pytest"\n',
@@ -200,7 +200,7 @@ def _make_cfg(tmp_path: Path) -> HarnessConfig:
 
 
 def test_generate_deploys_resource_files(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test"\n[ci]\ncommand = "make test"\n',
@@ -223,7 +223,7 @@ def test_generate_deploys_resource_files(tmp_path: Path):
 
 
 def test_generated_skill_contains_project_lang_section(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test"\n[ci]\ncommand = "pytest"\n',
@@ -1001,13 +1001,13 @@ def test_worktrees_json_generated(tmp_path: Path):
 
 
 def test_worktrees_json_unix_scripts_correct(tmp_path: Path):
-    """Unix setup scripts copy .agents/ config and .cursor/ directory."""
+    """Unix setup scripts copy .harness-flow/ config and .cursor/ directory."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     data = json.loads((tmp_path / ".cursor" / "worktrees.json").read_text(encoding="utf-8"))
     unix = data["setup-worktree-unix"]
     assert isinstance(unix, list)
-    assert any("mkdir" in cmd and ".agents/tasks" in cmd for cmd in unix)
+    assert any("mkdir" in cmd and ".harness-flow/tasks" in cmd for cmd in unix)
     assert any("config.toml" in cmd for cmd in unix)
     assert any("vision.md" in cmd for cmd in unix)
     assert any(".cursor" in cmd and "cp" in cmd for cmd in unix)
@@ -1021,7 +1021,7 @@ def test_worktrees_json_windows_scripts_correct(tmp_path: Path):
     data = json.loads((tmp_path / ".cursor" / "worktrees.json").read_text(encoding="utf-8"))
     win = data["setup-worktree-windows"]
     assert isinstance(win, list)
-    assert any("mkdir" in cmd and "agents" in cmd for cmd in win)
+    assert any("mkdir" in cmd and ".harness-flow" in cmd for cmd in win)
     assert any("config.toml" in cmd for cmd in win)
     assert any("vision.md" in cmd for cmd in win)
     assert any("xcopy" in cmd and ".cursor" in cmd for cmd in win)
@@ -1078,7 +1078,7 @@ class TestResolveNativeLang:
         assert resolve_native_lang(lang="fr") == "en"
 
     def test_from_config(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir(parents=True)
         (agents_dir / "config.toml").write_text(
             '[project]\nname = "x"\nlang = "zh"\n',

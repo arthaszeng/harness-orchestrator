@@ -35,7 +35,7 @@ def test_gate_thresholds_rejects_equal():
 
 
 def test_gate_thresholds_from_toml(tmp_path: Path):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test"\n'
@@ -78,7 +78,7 @@ def test_build_context_gate_thresholds_custom(tmp_path: Path):
 
 
 def _make_cfg(tmp_path: Path) -> HarnessConfig:
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir(exist_ok=True)
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "test"\n[ci]\ncommand = "pytest"\n',

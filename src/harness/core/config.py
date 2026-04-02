@@ -168,13 +168,13 @@ class HarnessConfig(BaseModel):
 
     @classmethod
     def load(cls, project_root: Path | None = None) -> HarnessConfig:
-        """Load config from .agents/config.toml with cascading merge.
+        """Load config from .harness-flow/config.toml with cascading merge.
 
         Priority chain (highest wins):
-            env vars (HARNESS_*) → project (.agents/) → global (~/.harness/) → defaults
+            env vars (HARNESS_*) → project (.harness-flow/) → global (~/.harness/) → defaults
         """
         root = project_root or Path.cwd()
-        config_path = root / ".agents" / "config.toml"
+        config_path = root / ".harness-flow" / "config.toml"
 
         data: dict[str, Any] = {}
         if config_path.exists():

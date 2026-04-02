@@ -79,7 +79,7 @@ def get_head_commit_epoch(cwd: Path) -> Optional[float]:
     """Return the author-date epoch of HEAD, or None on failure.
 
     Resolves the git repo root from *cwd* before running the command so that
-    callers inside ``.agents/tasks/task-NNN/`` still work correctly.
+    callers inside ``.harness-flow/tasks/task-NNN/`` still work correctly.
     """
     repo = _find_repo_root(cwd)
     if repo is None:

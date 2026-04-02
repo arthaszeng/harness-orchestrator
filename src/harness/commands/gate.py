@@ -25,7 +25,7 @@ def run_gate(*, task: Optional[str] = None) -> None:
 
     from harness.i18n import t
 
-    agents_dir = Path.cwd() / ".agents"
+    agents_dir = Path.cwd() / ".harness-flow"
     task_dir = resolve_task_dir(agents_dir, explicit_task_id=task)
     if task_dir is None:
         suffix = f" for '{task}'" if task else ""

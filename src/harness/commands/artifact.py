@@ -23,7 +23,7 @@ def _resolve_task_dir(task: str) -> Path:
         raise typer.BadParameter(
             f"Invalid task ID '{task}': must match task-NNN (e.g. task-001)"
         )
-    agents_dir = Path.cwd() / ".agents"
+    agents_dir = Path.cwd() / ".harness-flow"
     task_dir = (agents_dir / "tasks" / task).resolve()
     if not task_dir.is_relative_to((agents_dir / "tasks").resolve()):
         raise typer.BadParameter(f"Invalid task ID '{task}': path traversal detected")
@@ -81,9 +81,9 @@ def run_save_eval(
     )
     gate_key = "evaluation" if kind == "code" else "plan_review"
     phase = TaskState.EVALUATING if kind == "code" else TaskState.PLANNING
-    eval_updates = {f"{kind}_evaluation": f".agents/tasks/{task}/{path.name}"}
+    eval_updates = {f"{kind}_evaluation": f".harness-flow/tasks/{task}/{path.name}"}
     if kind == "code":
-        eval_updates["evaluation"] = f".agents/tasks/{task}/{path.name}"
+        eval_updates["evaluation"] = f".harness-flow/tasks/{task}/{path.name}"
     sync_task_state(
         task_dir,
         artifact_updates=eval_updates,
@@ -121,7 +121,7 @@ def run_save_build_log(
     path = save_build_log(task_dir, body)
     sync_task_state(
         task_dir,
-        artifact_updates={"build_log": f".agents/tasks/{task}/{path.name}"},
+        artifact_updates={"build_log": f".harness-flow/tasks/{task}/{path.name}"},
         phase=TaskState.BUILDING,
     )
     ui.info(f"✓ {path.name} → {path}")

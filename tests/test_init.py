@@ -265,8 +265,8 @@ class TestUpdateGitignore:
         gi = tmp_path / ".gitignore"
         assert gi.exists()
         text = gi.read_text(encoding="utf-8")
-        assert ".agents/state.json" in text
-        assert ".agents/.stop" in text
+        assert ".harness-flow/state.json" in text
+        assert ".harness-flow/.stop" in text
         assert "# harness — do not track runtime state" in text
 
     def test_appends_to_existing_gitignore(self, tmp_path, monkeypatch):
@@ -276,12 +276,12 @@ class TestUpdateGitignore:
         _update_gitignore(tmp_path)
         text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
         assert "node_modules/" in text
-        assert ".agents/state.json" in text
+        assert ".harness-flow/state.json" in text
 
     def test_skips_when_marker_present(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         set_lang("en")
-        original = "foo\n.agents/state.json\nbar\n"
+        original = "foo\n.harness-flow/state.json\nbar\n"
         (tmp_path / ".gitignore").write_text(original, encoding="utf-8")
         _update_gitignore(tmp_path)
         assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == original
@@ -296,7 +296,7 @@ class TestRunInitNonInteractive:
             ci_command="pytest -q",
             non_interactive=True,
         )
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         assert agents.is_dir()
         assert (agents / "tasks").is_dir()
         assert (agents / "archive").is_dir()
@@ -333,7 +333,7 @@ class TestRunInitNonInteractive:
         run_init(non_interactive=True)
         gi = tmp_path / ".gitignore"
         assert gi.exists()
-        assert ".agents/state.json" in gi.read_text(encoding="utf-8")
+        assert ".harness-flow/state.json" in gi.read_text(encoding="utf-8")
 
 
 class TestRunInitReinit:
@@ -342,7 +342,7 @@ class TestRunInitReinit:
     @patch("harness.native.skill_gen.generate_native_artifacts", return_value=42)
     def test_reinit_skips_wizard_regenerates(self, mock_gen, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text(
             '[project]\nname = "existing"\nlang = "zh"\n'
@@ -358,7 +358,7 @@ class TestRunInitReinit:
     @patch("harness.native.skill_gen.generate_native_artifacts", return_value=10)
     def test_reinit_uses_config_lang(self, mock_gen, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text(
             '[project]\nname = "zh-proj"\nlang = "zh"\n'
@@ -373,7 +373,7 @@ class TestRunInitReinit:
 
     def test_reinit_bad_config_exits_with_error(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text("this is not valid toml [[[", encoding="utf-8")
         with pytest.raises(typer.Exit) as exc_info:
@@ -383,7 +383,7 @@ class TestRunInitReinit:
     def test_no_force_config_exists_prompts_overwrite(self, monkeypatch, tmp_path):
         """Without --force, existing config triggers confirm prompt; declining exits."""
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text(
             '[project]\nname = "x"\n[ci]\ncommand = "t"\n',
@@ -400,13 +400,13 @@ class TestRunInitReinit:
         set_lang("en")
         with patch("harness.native.skill_gen.generate_native_artifacts"):
             run_init(non_interactive=True, force=True)
-        assert (tmp_path / ".agents" / "config.toml").exists()
+        assert (tmp_path / ".harness-flow" / "config.toml").exists()
 
     @patch("harness.native.skill_gen.generate_native_artifacts")
     def test_no_force_config_exists_confirm_yes_overwrites(self, _mock_gen, monkeypatch, tmp_path):
         """Confirming overwrite re-runs the wizard and rewrites config."""
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text(
             '[project]\nname = "stale-proj"\n[ci]\ncommand = "t"\n',
@@ -422,7 +422,7 @@ class TestRunInitReinit:
     def test_non_interactive_config_exists_skips_confirm(self, _mock_gen, monkeypatch, tmp_path):
         """non_interactive + existing config skips confirm prompt and overwrites."""
         monkeypatch.chdir(tmp_path)
-        agents = tmp_path / ".agents"
+        agents = tmp_path / ".harness-flow"
         agents.mkdir(parents=True)
         (agents / "config.toml").write_text(
             '[project]\nname = "stale"\n[ci]\ncommand = "x"\n',

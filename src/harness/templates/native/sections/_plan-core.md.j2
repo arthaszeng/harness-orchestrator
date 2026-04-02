@@ -27,16 +27,16 @@ Every decision during planning falls into one of three categories:
 ### Context Gathering
 
 1. Read the user's requirement carefully
-2. Read `.agents/config.toml` and `.agents/vision.md` (if they exist)
+2. Read `.harness-flow/config.toml` and `.harness-flow/vision.md` (if they exist)
 3. Scan the project structure: key directories, languages, frameworks, existing patterns
 4. Run `git log --oneline -10` for recent activity context
-5. Check existing task directories: `ls .agents/tasks/` to determine the next task number
+5. Check existing task directories: `ls .harness-flow/tasks/` to determine the next task number
 
 ### Produce Spec + Contract
 
-Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed).
+Write output to `.harness-flow/tasks/task-NNN/plan.md` (create directory if needed).
 If the workflow uses task-level machine-readable state, initialize or update
-`.agents/tasks/task-NNN/workflow-state.json` as the canonical record for phase,
+`.harness-flow/tasks/task-NNN/workflow-state.json` as the canonical record for phase,
 gate, blocker, and artifact refs. Session summaries or registry/event logs must
 not become parallel gate sources.
 

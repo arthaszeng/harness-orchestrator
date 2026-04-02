@@ -68,7 +68,7 @@ class StopContext(BaseModel):
 
 
 class SessionState(BaseModel):
-    """Full session state, persisted to .agents/state.json."""
+    """Full session state, persisted to .harness-flow/state.json."""
     session_id: str = ""
     mode: str = "idle"
     current_task: TaskRecord | None = None
@@ -78,7 +78,7 @@ class SessionState(BaseModel):
     stop_context: StopContext | None = None
 
     def save(self, agents_dir: Path) -> None:
-        """Persist to .agents/state.json."""
+        """Persist to .harness-flow/state.json."""
         agents_dir.mkdir(parents=True, exist_ok=True)
         state_file = agents_dir / "state.json"
         state_file.write_text(
@@ -88,7 +88,7 @@ class SessionState(BaseModel):
 
     @classmethod
     def load(cls, agents_dir: Path) -> SessionState:
-        """Restore from .agents/state.json.
+        """Restore from .harness-flow/state.json.
 
         Never raises on corrupt or invalid data — returns a fresh default
         state and emits a visible warning so the user knows recovery occurred.

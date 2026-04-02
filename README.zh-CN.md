@@ -122,7 +122,7 @@ harness init
 
 ## 配置
 
-项目设置位于 `.agents/config.toml`：
+项目设置位于 `.harness-flow/config.toml`：
 
 | 键 | 默认值 | 说明 |
 |-----|--------|------|

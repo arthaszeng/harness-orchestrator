@@ -30,7 +30,7 @@ GITDIR=$(git rev-parse --git-dir 2>/dev/null)
 ```
 
 If `$COMMON` ≠ `$GITDIR`, you are in a **Cursor parallel-agent worktree**.
-The worktree was created with `.cursor/` and `.agents/` already copied
+The worktree was created with `.cursor/` and `.harness-flow/` already copied
 (via `worktrees.json`). **Skip steps 3–5** — the worktree is already on the
 correct feature branch. Proceed to the next phase.
 
@@ -60,8 +60,8 @@ If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't ex
 
 1. Determine the next task number:
    ```bash
-   mkdir -p .agents/tasks
-   ls .agents/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
+   mkdir -p .harness-flow/tasks
+   ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
    ```
    If no tasks exist, start with `001`. Otherwise increment the max by 1, zero-padded to 3 digits.
 
