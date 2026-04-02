@@ -35,6 +35,9 @@
 ### 生成 Spec + 合约
 
 将输出写入 `.agents/tasks/task-NNN/plan.md`（如需要则创建目录）。
+如果该工作流使用任务级机器可读状态，请初始化或更新
+`.agents/tasks/task-NNN/workflow-state.json`，把它作为 phase、gate、blocker 与
+artifact refs 的 canonical 记录。会话摘要、registry 或 event 日志不得成为平行 gate 来源。
 
 ```markdown
 # Spec

@@ -35,6 +35,10 @@ Every decision during planning falls into one of three categories:
 ### Produce Spec + Contract
 
 Write output to `.agents/tasks/task-NNN/plan.md` (create directory if needed).
+If the workflow uses task-level machine-readable state, initialize or update
+`.agents/tasks/task-NNN/workflow-state.json` as the canonical record for phase,
+gate, blocker, and artifact refs. Session summaries or registry/event logs must
+not become parallel gate sources.
 
 ```markdown
 # Spec

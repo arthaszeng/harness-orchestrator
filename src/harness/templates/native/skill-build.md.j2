@@ -34,6 +34,9 @@ which means DO IT. Implement everything and output the build result.
 3. Extract the deliverables checklist from the Contract section
 4. If this is a subsequent round (feedback exists from evaluation), also read
    `.agents/tasks/task-NNN/evaluation-rN.md` for the fix suggestions
+5. If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
+   source for phase / gate / blocker / artifact refs. Update it when you write
+   new build artifacts; do not treat session summaries as a parallel gate source.
 
 ---
 
@@ -152,6 +155,10 @@ Write a structured build log to `.agents/tasks/task-NNN/build-rN.log`:
 ## Out-of-Scope Issues Found
 - (issues discovered but not fixed — outside contract scope)
 ```
+
+When the build log is written, also update `workflow-state.json` (if present, or
+if the contract requires task-level state) so the task reflects the latest build
+phase, build artifact ref, iteration, and any blocker reason.
 
 {% if hooks_pre_build or hooks_post_eval or hooks_pre_ship %}
 ---

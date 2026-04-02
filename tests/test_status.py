@@ -21,6 +21,7 @@ from harness.core.state import (
     TaskState,
 )
 from harness.core.ui import CYBER_THEME
+from harness.core.workflow_state import GateStatus, WorkflowState
 
 
 def _make_console():
@@ -56,6 +57,38 @@ class TestRenderCurrent:
         assert "building" in output
         assert "2" in output
         assert "agent/feat" in output
+
+    def test_canonical_workflow_state_overrides_phase_details(self):
+        console, buf = _make_console()
+        state = SessionState(
+            current_task=TaskRecord(
+                id="task-001",
+                requirement="workflow state",
+                state=TaskState.BUILDING,
+                iteration=1,
+                branch="agent/feat",
+            ),
+        )
+        workflow_state = WorkflowState(
+            task_id="task-001",
+            branch="agent/task-001-workflow-intelligence",
+            phase=TaskState.EVALUATING,
+            iteration=3,
+        )
+        workflow_state.active_plan.title = "Canonical Workflow State Artifact"
+        workflow_state.blocker.reason = "missing ship readiness gate"
+        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.gates.evaluation.reason = "awaiting review"
+        workflow_state.gates.evaluation.status = GateStatus.PENDING
+        _render_current(console, state, workflow_state=workflow_state)
+        output = buf.getvalue()
+        assert "workflow state" in output
+        assert "evaluating" in output
+        assert "Canonical Workflow State Artifact" in output
+        assert "missing ship readiness gate" in output
+        assert "plan.md" in output
+        assert "awaiting review" in output
+        assert "workflow-state.json" in output
 
 
 class TestRenderRecentResult:
@@ -119,6 +152,15 @@ class TestRenderNextAction:
         assert "会话可恢复" in output
         assert "harness run" not in output
         assert "harness auto" not in output
+
+    def test_workflow_blocker_message(self):
+        console, buf = _make_console()
+        state = SessionState(mode="idle")
+        workflow_state = WorkflowState(task_id="task-001")
+        workflow_state.blocker.reason = "missing evaluation artifact"
+        _render_next_action(console, state, workflow_state=workflow_state)
+        output = buf.getvalue()
+        assert "missing evaluation artifact" in output
 
 
 class TestRunStatusScenarios:

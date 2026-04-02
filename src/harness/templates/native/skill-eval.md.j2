@@ -28,6 +28,9 @@ pipeline. Run straight through and output the evaluation result at the end.
 5. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
    If Memverse MCP is available, call `search_memory` with key topics from the diff.
    Display any relevant prior learnings (especially pitfalls) before starting the review.
+6. If `.agents/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
+   task state file. Evaluation may append or update gate/blocker snapshots there,
+   but registry/events must remain audit-only and must not become workflow gate sources.
 
 ### Context Degradation Ladder
 

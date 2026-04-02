@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness.core.state import CompletedTask, SessionState
+from harness.core.state import CompletedTask, SessionState, TaskState
+from harness.core.workflow_state import (
+    WorkflowState,
+    artifact_pairs,
+    gate_pairs,
+    load_current_workflow_state,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +37,18 @@ def is_resumable(state: SessionState) -> bool:
     return state.mode != "idle" and state.current_task is not None
 
 
-def suggest_next_action(state: SessionState) -> str:
+def suggest_next_action(
+    state: SessionState,
+    workflow_state: WorkflowState | None = None,
+) -> str:
     """Derive a human-readable next-step suggestion from the current state."""
+    if workflow_state and workflow_state.blocker.reason:
+        return f"当前任务被阻塞 — {workflow_state.blocker.reason}"
+    if workflow_state and workflow_state.phase not in {TaskState.IDLE, TaskState.DONE}:
+        phase = workflow_state.phase.value
+        if workflow_state.active_plan.title:
+            return f"当前任务处于 {phase} 阶段 — 在 Cursor 中继续 `{workflow_state.active_plan.title}`"
+        return f"当前任务处于 {phase} 阶段 — 在 Cursor 中通过 harness 技能继续"
     if is_resumable(state):
         return "会话可恢复 — 在 Cursor 中通过 harness 技能继续当前任务"
     if state.mode != "idle":
@@ -52,6 +68,10 @@ def suggest_next_action(state: SessionState) -> str:
 def update_progress(agents_dir: Path, state: SessionState) -> None:
     """Regenerate progress.md from the current session state."""
     path = agents_dir / "progress.md"
+    _, workflow_state = load_current_workflow_state(
+        agents_dir,
+        session_task_id=state.current_task.id if state.current_task else None,
+    )
     lines: list[str] = []
 
     lines.append("# Progress Report\n")
@@ -76,8 +96,35 @@ def update_progress(agents_dir: Path, state: SessionState) -> None:
             _artifacts.append(f"evaluation: `{t.artifacts.evaluation}`")
         if _artifacts:
             lines.append(f"- Artifacts: {', '.join(_artifacts)}")
+    elif workflow_state:
+        lines.append(f"- **[{workflow_state.task_id}]** canonical workflow state")
     else:
         lines.append("(none)")
+    if workflow_state:
+        lines.append(f"- Canonical phase: **{workflow_state.phase.value}**")
+        if workflow_state.active_plan.title:
+            lines.append(f"- Active plan: `{workflow_state.active_plan.title}`")
+        if workflow_state.blocker.reason:
+            lines.append(f"- Blocker: {workflow_state.blocker.reason}")
+        artifacts = artifact_pairs(workflow_state)
+        if artifacts:
+            lines.append(
+                "- Artifact refs: "
+                + ", ".join(f"{label}: `{value}`" for label, value in artifacts)
+            )
+        gates = gate_pairs(workflow_state)
+        if gates:
+            lines.append(
+                "- Gates: "
+                + ", ".join(
+                    f"{label}={snapshot.status.value}"
+                    + (f" ({snapshot.reason})" if snapshot.reason else "")
+                    for label, snapshot in gates
+                )
+            )
+        lines.append(
+            f"- Workflow state: `.agents/tasks/{workflow_state.task_id}/workflow-state.json`"
+        )
 
     # Recent Completed
     lines.append("\n### Recent Completed\n")
@@ -115,7 +162,7 @@ def update_progress(agents_dir: Path, state: SessionState) -> None:
 
     # Next Action
     lines.append("\n### Next Action\n")
-    lines.append(suggest_next_action(state))
+    lines.append(suggest_next_action(state, workflow_state))
 
     # Full completed list
     lines.append("\n### Completed Tasks\n")

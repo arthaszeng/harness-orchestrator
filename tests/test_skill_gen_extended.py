@@ -267,6 +267,16 @@ def test_generated_eval_includes_trust_boundary(tmp_path: Path):
     assert "UNTRUSTED" in content
 
 
+def test_generated_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, cfg=cfg)
+
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+    for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
+        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "workflow-state.json" in content, f"{name} missing workflow-state reference"
+
+
 def test_generated_ship_includes_bypass_immunity(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
@@ -1199,6 +1209,16 @@ def test_zh_brainstorm_and_governance_agents_contain_loop_concepts(tmp_path: Pat
     assert "长期方向治理边界" in content_pm
     assert "Backlog 健康度" in content_pm
     assert "Direction recommendation" in content_pm
+
+
+def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+
+    skills_base = tmp_path / ".cursor" / "skills" / "harness"
+    for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
+        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "workflow-state.json" in content, f"{name} missing zh workflow-state reference"
 
 
 def test_zh_resources_contain_chinese(tmp_path: Path):

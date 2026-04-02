@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from harness.cli import app
+from harness.core.state import TaskState
+from harness.core.workflow_state import WorkflowState
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -50,3 +53,26 @@ class TestHelpOutput:
         assert result.exit_code == 0
         clean = _ANSI_RE.sub("", result.output)
         assert "--force" in clean
+
+
+class TestStatusCommand:
+    def test_status_reads_canonical_workflow_state(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        workflow_state = WorkflowState(
+            task_id="task-001",
+            phase=TaskState.EVALUATING,
+            iteration=2,
+            branch="agent/task-001-workflow-intelligence",
+        )
+        workflow_state.active_plan.title = "Canonical Workflow State Artifact"
+        workflow_state.blocker.reason = "awaiting ship readiness"
+        workflow_state.save(task_dir)
+
+        result = runner.invoke(app, ["status"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 0
+        assert "task-001" in clean
+        assert "evaluating" in clean
+        assert "Canonical Workflow State Artifact" in clean
+        assert "awaiting ship readiness" in clean

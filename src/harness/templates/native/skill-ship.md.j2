@@ -49,6 +49,9 @@ Run straight through and output the PR URL at the end.
    ```
 
    If a plan exists at `TASK_DIR/plan.md`, read it for context.
+   If `TASK_DIR/workflow-state.json` exists, treat it as the canonical task-level
+   source for phase / gate / blocker / artifact refs. Update it instead of inventing
+   a parallel gate record elsewhere.
 
 6. **Prior Learnings**: If Memverse MCP is available, search for learnings relevant to the
    changed files/modules. Display any prior pitfalls or patterns that apply to this diff.
@@ -474,6 +477,10 @@ Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospecti
 ```
 
 If no task directory exists, write to `.agents/ship-metrics.jsonl` (append one JSON object per line).
+
+If `workflow-state.json` exists (or this branch introduced it), update it with the
+latest ship-readiness gate snapshot, evaluation artifact ref, ship metrics ref, and
+final phase/blocker outcome before finishing.
 
 ---
 

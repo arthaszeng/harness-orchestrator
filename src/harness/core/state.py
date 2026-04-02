@@ -16,6 +16,7 @@ class TaskState(str, Enum):
     CONTRACTED = "contracted"
     BUILDING = "building"
     EVALUATING = "evaluating"
+    SHIPPING = "shipping"
     DONE = "done"
     BLOCKED = "blocked"
 

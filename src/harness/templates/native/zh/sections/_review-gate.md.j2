@@ -55,6 +55,7 @@ Continue? [approve / edit / reject]
 
 **评分 < {{ gate_summary_confirm_min }} → 自动通过**
 记录：`"Plan auto-approved (gate score N, aggregate review score X/10)"` 然后继续。
+如果任务级 `workflow-state.json` 存在，请同步写入本次 plan-review gate snapshot。
 {% else %}
 计划在完成评审后自动批准。立即继续。
 {% endif %}

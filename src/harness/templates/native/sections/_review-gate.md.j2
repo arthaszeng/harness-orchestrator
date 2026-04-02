@@ -55,6 +55,8 @@ Continue? [approve / edit / reject]
 
 **Score < {{ gate_summary_confirm_min }} → AUTO PROCEED**
 Log: `"Plan auto-approved (gate score N, aggregate review score X/10)"` and continue.
+Record the plan-review gate snapshot in `workflow-state.json` when that task-level
+state file exists.
 {% else %}
 Plan is auto-approved after plan review completes. Continue immediately.
 {% endif %}

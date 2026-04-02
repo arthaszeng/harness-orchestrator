@@ -57,7 +57,10 @@ Two modes:
 
 ### `status.py`
 
-Loads **`SessionState`** from `.agents/state.json` and renders progress via **Rich** (`core/ui.py` patterns).
+Loads **`SessionState`** from `.agents/state.json`, then prefers task-level
+**`workflow-state.json`** under `.agents/tasks/task-NNN/` when present so the
+dashboard can render canonical phase / gate / blocker information via **Rich**
+(`core/ui.py` patterns).
 
 ### `update.py`
 
@@ -92,6 +95,14 @@ Minimal constants only:
 ### `state.py`
 
 **`SessionState`**, **`TaskRecord`**, **`CompletedTask`** (and related types) with **JSON** persistence under `.agents/state.json` for resume-friendly dashboards.
+
+### `workflow_state.py`
+
+Task-level canonical workflow state stored at
+`.agents/tasks/task-NNN/workflow-state.json`. It tracks phase, active plan,
+artifact refs, gate snapshots, blocker reason, and deterministic task discovery.
+`SessionState` is a session-summary compatibility layer; registry/events remain
+audit-only metadata, not gate authorities.
 
 ### `progress.py`
 
@@ -175,6 +186,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 - `progress.md` — human-readable progress log.
 - `.stop` — optional graceful stop flag (typically gitignored).
 - `tasks/`, `archive/` — task artifacts and history (convention from harness workflow docs).
+- `tasks/task-NNN/workflow-state.json` — canonical task-level phase/gate/blocker/artifact state.
 
 **Generated IDE (`.cursor/`)**
 

@@ -16,6 +16,12 @@ from harness.core.progress import (
 )
 from harness.core.state import SessionState
 from harness.core.ui import get_ui
+from harness.core.workflow_state import (
+    WorkflowState,
+    artifact_pairs,
+    gate_pairs,
+    load_current_workflow_state,
+)
 
 log = logging.getLogger("harness.commands.status")
 
@@ -43,18 +49,22 @@ def run_status() -> None:
 
     agents_dir = Path.cwd() / ".agents"
     state = SessionState.load(agents_dir)
+    _, workflow_state = load_current_workflow_state(
+        agents_dir,
+        session_task_id=state.current_task.id if state.current_task else None,
+    )
 
-    if state.mode == "idle" and not state.completed and not state.blocked:
+    if state.mode == "idle" and not state.completed and not state.blocked and workflow_state is None:
         ui.info("no active session.")
         return
 
     pass_threshold = _load_pass_threshold()
 
     _render_header(console, state)
-    _render_current(console, state)
-    _render_agents(console, state, agents_dir)
+    _render_current(console, state, workflow_state=workflow_state)
+    _render_agents(console, state, agents_dir, workflow_state=workflow_state)
     _render_recent_result(console, state, pass_threshold=pass_threshold)
-    _render_next_action(console, state)
+    _render_next_action(console, state, workflow_state=workflow_state)
     _render_stats(console, state)
 
 
@@ -67,11 +77,46 @@ def _render_header(console, state: SessionState) -> None:
     ))
 
 
-def _render_current(console, state: SessionState) -> None:
-    if not state.current_task:
+def _render_current(
+    console,
+    state: SessionState,
+    *,
+    workflow_state: WorkflowState | None = None,
+) -> None:
+    if not state.current_task and workflow_state is None:
+        return
+    task_label = "current task"
+    if state.current_task:
+        task_label = state.current_task.requirement
+    elif workflow_state:
+        task_label = workflow_state.active_plan.title or workflow_state.task_id
+    console.print(f"\n[cyber.magenta]Current Task:[/] {task_label}")
+    if workflow_state:
+        console.print(f"  Task ID:   {workflow_state.task_id}")
+        console.print(f"  Phase:     {workflow_state.phase.value}")
+        console.print(f"  Iteration: {workflow_state.iteration}")
+        console.print(f"  Branch:    [cyber.dim]{workflow_state.branch}[/]")
+        if workflow_state.active_plan.title:
+            console.print(f"  Plan:      {workflow_state.active_plan.title}")
+        if workflow_state.blocker.reason:
+            console.print(f"  Blocker:   [cyber.red]{workflow_state.blocker.reason}[/]")
+        artifacts = artifact_pairs(workflow_state)
+        if artifacts:
+            rendered = ", ".join(f"{label}={value}" for label, value in artifacts)
+            console.print(f"  Artifacts: [cyber.dim]{rendered}[/]")
+        gates = gate_pairs(workflow_state)
+        if gates:
+            rendered = ", ".join(
+                f"{label}={snapshot.status.value}"
+                + (f" ({snapshot.reason})" if snapshot.reason else "")
+                for label, snapshot in gates
+            )
+            console.print(f"  Gates:     [cyber.dim]{rendered}[/]")
+        console.print(
+            f"  State:     [cyber.dim].agents/tasks/{workflow_state.task_id}/workflow-state.json[/]"
+        )
         return
     t = state.current_task
-    console.print(f"\n[cyber.magenta]Current Task:[/] {t.requirement}")
     console.print(f"  Phase:     {t.state.value}")
     console.print(f"  Iteration: {t.iteration}")
     console.print(f"  Branch:    [cyber.dim]{t.branch}[/]")
@@ -107,17 +152,29 @@ def _render_recent_result(
         )
 
 
-def _render_next_action(console, state: SessionState) -> None:
-    action = suggest_next_action(state)
+def _render_next_action(
+    console,
+    state: SessionState,
+    *,
+    workflow_state: WorkflowState | None = None,
+) -> None:
+    action = suggest_next_action(state, workflow_state)
     console.print(f"\n[cyber.magenta]Next Action:[/] {action}")
 
 
-def _render_agents(console, state: SessionState, agents_dir: Path) -> None:
+def _render_agents(
+    console,
+    state: SessionState,
+    agents_dir: Path,
+    *,
+    workflow_state: WorkflowState | None = None,
+) -> None:
     """Show agent-level runs for the current task from the SQLite registry."""
-    if not state.current_task:
+    task_id = state.current_task.id if state.current_task else ""
+    if not task_id and workflow_state:
+        task_id = workflow_state.task_id
+    if not task_id:
         return
-
-    task_id = state.current_task.id
     db_path = agents_dir / "registry.db"
     if not db_path.exists():
         return

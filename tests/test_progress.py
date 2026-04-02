@@ -17,6 +17,7 @@ from harness.core.state import (
     TaskRecord,
     TaskState,
 )
+from harness.core.workflow_state import GateStatus, WorkflowState
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +91,14 @@ class TestIsResumable:
 
 
 class TestSuggestNextAction:
+    def test_workflow_blocker_takes_precedence(self):
+        state = SessionState(mode="idle")
+        workflow_state = WorkflowState(task_id="task-001")
+        workflow_state.blocker.reason = "missing evaluation artifact"
+        action = suggest_next_action(state, workflow_state)
+        assert "阻塞" in action
+        assert "missing evaluation artifact" in action
+
     def test_resumable_run(self):
         state = SessionState(
             mode="run",
@@ -172,6 +181,34 @@ class TestUpdateProgress:
         assert "building" in content
         assert "iteration 2" in content
         assert "agent/api" in content
+
+    def test_includes_canonical_workflow_state_details(self, tmp_path: Path):
+        agents_dir = tmp_path / ".agents"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        agents_dir.mkdir(exist_ok=True)
+        workflow_state = WorkflowState(
+            task_id="task-001",
+            phase=TaskState.EVALUATING,
+            iteration=3,
+        )
+        workflow_state.active_plan.title = "Canonical Workflow State Artifact"
+        workflow_state.blocker.reason = "awaiting eval gate"
+        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.gates.ship_readiness.status = GateStatus.PENDING
+        workflow_state.gates.ship_readiness.reason = "waiting for evaluation"
+        workflow_state.save(task_dir)
+
+        state = SessionState(mode="idle")
+        update_progress(agents_dir, state)
+        content = (agents_dir / "progress.md").read_text(encoding="utf-8")
+        assert "Canonical phase" in content
+        assert "evaluating" in content
+        assert "awaiting eval gate" in content
+        assert "Artifact refs" in content
+        assert "plan.md" in content
+        assert "ship_readiness=pending" in content
+        assert "workflow-state.json" in content
 
     def test_resumable_section(self, tmp_path: Path):
         agents_dir = tmp_path / ".agents"
