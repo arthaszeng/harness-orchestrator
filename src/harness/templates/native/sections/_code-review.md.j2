@@ -55,7 +55,11 @@ After all responses arrive:
    - **Out-of-scope + CRITICAL**: re-tag as `[CROSS-ROLE]` and keep
    - **Out-of-scope + WARN/INFO**: mark `[OUT-OF-SCOPE]` and exclude from scoring
 3. **Cross-validate:** If 2+ roles flag the same issue → mark `[HIGH CONFIDENCE]`
-4. **Compute dimension scores** (map role to evaluation dimension):
+4. **Direction/governance synthesis:** Keep role-specific recommendations separate:
+   - Product Owner → `Value recommendation`
+   - Project Manager → `Delivery recommendation`
+   - Do NOT collapse them into one generic direction field
+5. **Compute dimension scores** (map role to evaluation dimension):
    ```
    Design:        [architect score]/10
    Completeness:  [product-owner score]/10
@@ -65,7 +69,7 @@ After all responses arrive:
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-5. **Determine verdict:**
+6. **Determine verdict:**
    - All PASS and avg ≥ {{ pass_threshold }} → `PASS`
    - Any CRITICAL finding → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`

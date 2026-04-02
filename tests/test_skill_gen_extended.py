@@ -915,6 +915,9 @@ def test_plan_includes_plan_review(tmp_path: Path):
     content = pl.read_text(encoding="utf-8")
     assert "5-Role Parallel Dispatch" in content
     assert "Re-Plan Loop" in content
+    assert "Value recommendation" in content
+    assert "Delivery recommendation" in content
+    assert "Do NOT collapse them into one generic direction field" in content
 
 
 def test_plan_includes_ship_invocation(tmp_path: Path):
@@ -941,6 +944,8 @@ def test_eval_uses_five_role_code_review(tmp_path: Path):
     assert "harness-qa" in content
     assert "harness-product-owner" in content
     assert "harness-project-manager" in content
+    assert "Value recommendation" in content
+    assert "Delivery recommendation" in content
     assert "Pass 1:" not in content
     assert "Pass 2:" not in content
     assert "Pass 3:" not in content
@@ -1214,6 +1219,16 @@ def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
     for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
         content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
         assert "workflow-state.json" in content, f"{name} missing zh workflow-state reference"
+
+    plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "方向/治理合成" in plan_content
+    assert "Value recommendation" in plan_content
+    assert "Delivery recommendation" in plan_content
+
+    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "方向/治理合成" in eval_content
+    assert "Value recommendation" in eval_content
+    assert "Delivery recommendation" in eval_content
 
 
 def test_zh_resources_contain_chinese(tmp_path: Path):

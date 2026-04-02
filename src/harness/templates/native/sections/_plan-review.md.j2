@@ -51,9 +51,13 @@ After all responses arrive:
    - **Out-of-scope + CRITICAL**: re-tag as `[CROSS-ROLE]` and keep
    - **Out-of-scope + WARN/INFO**: mark `[OUT-OF-SCOPE]` and exclude from scoring
 3. **Cross-validate:** If 2+ roles flag the same issue → mark `[HIGH CONFIDENCE]`
-4. **Resolve conflicts:** If roles contradict each other, present both perspectives
+4. **Direction/governance synthesis:** Keep role-specific recommendations separate:
+   - Product Owner → `Value recommendation`
+   - Project Manager → `Delivery recommendation`
+   - Do NOT collapse them into one generic direction field
+5. **Resolve conflicts:** If roles contradict each other, present both perspectives
    and mark as `[TASTE DECISION]` for the review gate
-5. **Compute aggregate score:**
+6. **Compute aggregate score:**
    ```
    Architecture:  [architect score]/10
    Product:       [product-owner score]/10
@@ -63,7 +67,7 @@ After all responses arrive:
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-6. **Determine verdict:**
+7. **Determine verdict:**
    - All PASS and avg ≥ {{ pass_threshold }} → `PLAN_APPROVED`
    - Any CRITICAL finding → `PLAN_NEEDS_REVISION`
    - avg < {{ pass_threshold }} → `PLAN_NEEDS_REVISION`

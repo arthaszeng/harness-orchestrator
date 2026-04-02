@@ -50,9 +50,12 @@
    - **范围外 + CRITICAL**：重新标记为 `[CROSS-ROLE]` 并保留
    - **范围外 + WARN/INFO**：标记 `[OUT-OF-SCOPE]` 并从评分中排除
 3. **交叉验证：** 如果 2+ 个角色标记同一问题 → 标记 `[HIGH CONFIDENCE]`
-4. **解决冲突：** 如果角色之间相互矛盾，呈现双方观点
+4. **方向/治理合成：** 保持角色建议字段并列，不要合并为单一方向字段：
+   - Product Owner → `Value recommendation`
+   - Project Manager → `Delivery recommendation`
+5. **解决冲突：** 如果角色之间相互矛盾，呈现双方观点
    并标记为 `[TASTE DECISION]` 交由 review gate 处理
-5. **计算综合评分：**
+6. **计算综合评分：**
    ```
    Architecture:  [architect score]/10
    Product:       [product-owner score]/10
@@ -62,7 +65,7 @@
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-6. **确定裁定：**
+7. **确定裁定：**
    - 全部 PASS 且 avg ≥ {{ pass_threshold }} → `PLAN_APPROVED`
    - 任何 CRITICAL 发现 → `PLAN_NEEDS_REVISION`
    - avg < {{ pass_threshold }} → `PLAN_NEEDS_REVISION`

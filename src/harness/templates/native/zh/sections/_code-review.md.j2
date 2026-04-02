@@ -54,7 +54,10 @@
    - **范围外 + CRITICAL**：重新标记为 `[CROSS-ROLE]` 并保留
    - **范围外 + WARN/INFO**：标记 `[OUT-OF-SCOPE]` 并从评分中排除
 3. **交叉验证：** 如果 2+ 个角色标记同一问题 → 标记 `[HIGH CONFIDENCE]`
-4. **计算维度评分**（将角色映射到评审维度）：
+4. **方向/治理合成：** 保持角色建议字段并列，不要合并为单一方向字段：
+   - Product Owner → `Value recommendation`
+   - Project Manager → `Delivery recommendation`
+5. **计算维度评分**（将角色映射到评审维度）：
    ```
    Design:        [architect score]/10
    Completeness:  [product-owner score]/10
@@ -64,7 +67,7 @@
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-5. **确定裁定：**
+6. **确定裁定：**
    - 全部 PASS 且 avg ≥ {{ pass_threshold }} → `PASS`
    - 任何 CRITICAL 发现 → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`
