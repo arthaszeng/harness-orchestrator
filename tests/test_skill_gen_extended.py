@@ -738,8 +738,9 @@ def test_role_agents_have_output_contract(tmp_path: Path):
 
 
 def test_role_agents_have_memverse_integration(tmp_path: Path):
-    """Each role agent has Memverse integration section."""
+    """Each role agent has Memverse integration section when Memverse is enabled."""
     cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
     generate_native_artifacts(tmp_path, cfg=cfg)
     agents_dir = tmp_path / ".cursor" / "agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
@@ -1530,3 +1531,150 @@ def test_config_rule_activation_invalid_value_warns():
         _w.simplefilter("always")
         NativeModeConfig(rule_activation={"harness-workflow": "invalid_mode"})
     assert any("Invalid native.rule_activation" in str(w.message) for w in ws)
+
+
+# --- B5: Workflow Memory Pack ---
+
+
+def test_memverse_disabled_agents_no_memverse_content(tmp_path: Path):
+    """Memverse disabled → agents do not contain Memverse instructions."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "search_memory" not in content, f"{name} leaks Memverse when disabled"
+        assert "add_memories" not in content, f"{name} leaks Memverse when disabled"
+
+
+def test_memverse_enabled_agents_have_memverse_content(tmp_path: Path):
+    """Memverse enabled → agents contain Memverse instructions + correct domain."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    cfg.integrations.memverse.domain_prefix = "my-custom-domain"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "search_memory" in content, f"{name} missing Memverse when enabled"
+
+
+def test_memverse_disabled_eval_no_memverse(tmp_path: Path):
+    """Memverse disabled → eval skill does not reference search_memory/add_memories."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "search_memory" not in content
+    assert "add_memories" not in content
+
+
+def test_memverse_enabled_eval_has_memverse(tmp_path: Path):
+    """Memverse enabled → eval skill references Memverse."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    assert "search_memory" in content
+    assert "add_memories" in content
+
+
+def test_memverse_disabled_ship_no_memverse(tmp_path: Path):
+    """Memverse disabled → ship skill does not reference prior learnings."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
+    assert "search_memory" not in content
+
+
+def test_memverse_disabled_learn_shows_not_enabled(tmp_path: Path):
+    """Memverse disabled → learn skill shows 'not enabled' message."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-learn" / "SKILL.md").read_text(encoding="utf-8")
+    assert "search_memory" not in content
+    assert "not enabled" in content.lower() or "未启用" in content
+
+
+def test_memverse_enabled_learn_has_full_content(tmp_path: Path):
+    """Memverse enabled → learn skill has full Memverse content."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-learn" / "SKILL.md").read_text(encoding="utf-8")
+    assert "search_memory" in content
+    assert "add_memories" in content
+
+
+def test_memverse_domain_fallback_to_project_name(tmp_path: Path):
+    """Empty domain_prefix falls back to project_name."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    cfg.integrations.memverse.domain_prefix = ""
+    cfg.project.name = "test-proj"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-learn" / "SKILL.md").read_text(encoding="utf-8")
+    assert "test-proj" in content
+
+
+def test_memverse_domain_uses_prefix_when_set(tmp_path: Path):
+    """Non-empty domain_prefix is used as memverse_domain."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    cfg.integrations.memverse.domain_prefix = "custom-domain"
+    generate_native_artifacts(tmp_path, cfg=cfg)
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-learn" / "SKILL.md").read_text(encoding="utf-8")
+    assert "custom-domain" in content
+
+
+def test_layer0_context_includes_memverse_keys(tmp_path: Path):
+    """Layer 0 context includes memverse_enabled and memverse_domain."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    cfg.integrations.memverse.domain_prefix = "my-proj"
+    ctx = _build_layered_context(cfg, "agent", "harness-architect", lang="en")
+    assert "memverse_enabled" in ctx
+    assert ctx["memverse_enabled"] == "true"
+    assert "memverse_domain" in ctx
+    assert ctx["memverse_domain"] == "my-proj"
+
+
+def test_layer0_context_memverse_disabled(tmp_path: Path):
+    """Layer 0 context reflects disabled state."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    ctx = _build_layered_context(cfg, "skill", "harness-eval", lang="en")
+    assert ctx["memverse_enabled"] == "false"
+
+
+def test_zh_memverse_disabled_no_leakage(tmp_path: Path):
+    """ZH templates: Memverse disabled → no search_memory/add_memories in agents."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = False
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "search_memory" not in content, f"ZH {name} leaks Memverse when disabled"
+
+
+def test_zh_memverse_enabled_has_content(tmp_path: Path):
+    """ZH templates: Memverse enabled → agents contain Memverse."""
+    cfg = _make_cfg(tmp_path)
+    cfg.integrations.memverse.enabled = True
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    agents_dir = tmp_path / ".cursor" / "agents"
+    for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                 "harness-qa", "harness-project-manager"):
+        content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
+        assert "search_memory" in content, f"ZH {name} missing Memverse when enabled"
