@@ -14,7 +14,7 @@ For module-level behavior, read the code and docstrings. For day-to-day usage, s
                              │
          ┌───────────────────┼───────────────────┐
          ▼                   ▼                   ▼
-   .agents/*            core/*              native/skill_gen
+   .harness-flow/*            core/*              native/skill_gen
    config, vision,      config, state,      Jinja2 → .cursor/
    state, progress      scanner, ui, …      skills, agents, rules
                              │
@@ -51,15 +51,15 @@ Built with **Typer**. Three commands:
 
 Two modes:
 
-- **Wizard mode** (no `.agents/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → evaluator model), writes config, generates artifacts.
-- **Reinit mode** (`.agents/config.toml` exists): loads existing config, regenerates all `.cursor/` artifacts with `force=True`.
+- **Wizard mode** (no `.harness-flow/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → evaluator model), writes config, generates artifacts.
+- **Reinit mode** (`.harness-flow/config.toml` exists): loads existing config, regenerates all `.cursor/` artifacts with `force=True`.
 
-**Writes:** `.agents/config.toml` (from `templates/config.toml.j2`), `.agents/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files (e.g. `.agents/state.json`, `.agents/.stop`).
+**Writes:** `.harness-flow/config.toml` (from `templates/config.toml.j2`), `.harness-flow/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files (e.g. `.harness-flow/state.json`, `.harness-flow/.stop`).
 
 ### `status.py`
 
-Loads **`SessionState`** from `.agents/state.json`, then prefers task-level
-**`workflow-state.json`** under `.agents/tasks/task-NNN/` when present so the
+Loads **`SessionState`** from `.harness-flow/state.json`, then prefers task-level
+**`workflow-state.json`** under `.harness-flow/tasks/task-NNN/` when present so the
 dashboard can render canonical phase / gate / blocker information via **Rich**
 (`core/ui.py` patterns).
 
@@ -77,7 +77,7 @@ Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** w
 
 - **`HarnessConfig` uses `ConfigDict(extra="ignore")`** so older TOML keys do not break loading.
 - **`HarnessConfig.load()`** builds the effective config by deep-merging, then validates:
-  - Start from **project** `.agents/config.toml` (if present).
+  - Start from **project** `.harness-flow/config.toml` (if present).
   - Merge **`~/.harness/config.toml`** under it so **project wins** on conflicts.
   - Merge **`HARNESS_*` environment variables** on top (highest precedence).
   - Missing keys fall back to **model defaults**.
@@ -95,12 +95,12 @@ Minimal constants only:
 
 ### `state.py`
 
-**`SessionState`**, **`TaskRecord`**, **`CompletedTask`** (and related types) with **JSON** persistence under `.agents/state.json` for resume-friendly dashboards.
+**`SessionState`**, **`TaskRecord`**, **`CompletedTask`** (and related types) with **JSON** persistence under `.harness-flow/state.json` for resume-friendly dashboards.
 
 ### `workflow_state.py`
 
 Task-level canonical workflow state stored at
-`.agents/tasks/task-NNN/workflow-state.json`. It tracks phase, active plan,
+`.harness-flow/tasks/task-NNN/workflow-state.json`. It tracks phase, active plan,
 artifact refs, gate snapshots, blocker reason, and deterministic task discovery.
 `resolve_task_dir` resolves the active task with priority:
 `explicit_task_id` → `HARNESS_TASK_ID` env → `session_task_id` → latest numeric.
@@ -121,7 +121,7 @@ Structured stage handoff contract. Each pipeline stage (plan → build → eval 
 writes a compact JSON summary at its exit point via `save_handoff()`. The next stage
 reads that handoff via `load_handoff()` or `load_latest_handoff()` instead of
 re-processing full upstream artifacts. Handoff files live at
-`.agents/tasks/task-NNN/handoff-<phase>.json` with `PHASE_ORDER = (plan, build, eval, ship)`.
+`.harness-flow/tasks/task-NNN/handoff-<phase>.json` with `PHASE_ORDER = (plan, build, eval, ship)`.
 Schema uses Pydantic with `extra="ignore"` and versioning for forward compatibility.
 
 ### `gates.py`
@@ -134,7 +134,7 @@ verdict to `workflow-state.json` via load-merge-save. Used by `harness gate` CLI
 
 ### `progress.py`
 
-**`suggest_next_action`** and **`update_progress`** helpers for markdown progress narratives (e.g. `.agents/progress.md`) aligned with native workflows.
+**`suggest_next_action`** and **`update_progress`** helpers for markdown progress narratives (e.g. `.harness-flow/progress.md`) aligned with native workflows.
 
 ### `scanner.py`
 
@@ -215,7 +215,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 
 ## Artifact layout (high level)
 
-**Project (`.agents/`)**
+**Project (`.harness-flow/`)**
 
 - `config.toml` — harness configuration.
 - `vision.md` — product/engineering vision for skills.

@@ -8,7 +8,7 @@ Send a SINGLE message containing all 5 Task tool calls:
 | # | Subagent | Prompt extras |
 |---|----------|---------------|
 | 1 | `harness-architect` | `mode: plan-review`, plan path, `ARCHITECTURE.md` path if exists |
-| 2 | `harness-product-owner` | `mode: plan-review`, plan path, `.agents/vision.md` path, roadmap/backlog summary or path when available |
+| 2 | `harness-product-owner` | `mode: plan-review`, plan path, `.harness-flow/vision.md` path, roadmap/backlog summary or path when available |
 | 3 | `harness-engineer` | `mode: plan-review`, plan path, source directory listing |
 | 4 | `harness-qa` | `mode: plan-review`, plan path, test directory listing, `ci_command: {{ ci_command }}` |
 | 5 | `harness-project-manager` | `mode: plan-review`, plan path, deliverable count, file impact count, roadmap/backlog/stop-rule summary when available |

@@ -109,7 +109,7 @@ The same 5 specialized roles review both **plans** and **code**, dispatched in p
 | **QA** | Test strategy, boundary values, regression risk | Test coverage, edge cases, CI health |
 | **Project Manager** | Task decomposition, parallelism, scope | Scope drift, plan completion, delivery risk |
 
-Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.agents/config.toml`. Invalid or locally unavailable model pins are dropped during artifact generation so agents fall back to the IDE default model instead of hard-failing on a bad config.
+Findings from 2+ roles are flagged as **high confidence**. Each role can use a different model via `[native.role_models]` in `.harness-flow/config.toml`. Invalid or locally unavailable model pins are dropped during artifact generation so agents fall back to the IDE default model instead of hard-failing on a bad config.
 
 ### Fix-First auto-remediation
 
@@ -150,7 +150,7 @@ harness init --force
 
 ## Configuration
 
-Project settings live in `.agents/config.toml`:
+Project settings live in `.harness-flow/config.toml`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -181,10 +181,10 @@ Project settings live in `.agents/config.toml`:
 
 ## Task artifacts
 
-All task state lives under `.agents/`:
+All task state lives under `.harness-flow/`:
 
 ```
-.agents/
+.harness-flow/
 ├── config.toml            # Project configuration
 ├── vision.md              # Project vision
 ├── tasks/

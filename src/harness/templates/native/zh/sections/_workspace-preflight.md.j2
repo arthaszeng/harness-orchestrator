@@ -30,7 +30,7 @@ GITDIR=$(git rev-parse --git-dir 2>/dev/null)
 ```
 
 如果 `$COMMON` ≠ `$GITDIR`，你在 **Cursor parallel-agent worktree** 中。
-该 worktree 创建时已复制了 `.cursor/` 和 `.agents/`
+该 worktree 创建时已复制了 `.cursor/` 和 `.harness-flow/`
 （通过 `worktrees.json`）。**跳过步骤 3–5** — worktree 已经在
 正确的 feature branch 上。继续下一阶段。
 
@@ -60,8 +60,8 @@ git pull origin {{ trunk_branch }}
 
 1. 确定下一个任务编号：
    ```bash
-   mkdir -p .agents/tasks
-   ls .agents/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
+   mkdir -p .harness-flow/tasks
+   ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
    ```
    如果没有任务，从 `001` 开始。否则将最大值加 1，零填充到 3 位数字。
 

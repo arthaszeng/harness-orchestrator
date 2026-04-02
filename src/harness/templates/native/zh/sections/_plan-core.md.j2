@@ -27,16 +27,16 @@
 ### 上下文收集
 
 1. 仔细阅读用户的需求
-2. 读取 `.agents/config.toml` 和 `.agents/vision.md`（如果存在）
+2. 读取 `.harness-flow/config.toml` 和 `.harness-flow/vision.md`（如果存在）
 3. 扫描项目结构：关键目录、语言、框架、已有模式
 4. 运行 `git log --oneline -10` 了解最近的活动上下文
-5. 检查已有任务目录：`ls .agents/tasks/` 确定下一个任务编号
+5. 检查已有任务目录：`ls .harness-flow/tasks/` 确定下一个任务编号
 
 ### 生成 Spec + 合约
 
-将输出写入 `.agents/tasks/task-NNN/plan.md`（如需要则创建目录）。
+将输出写入 `.harness-flow/tasks/task-NNN/plan.md`（如需要则创建目录）。
 如果该工作流使用任务级机器可读状态，请初始化或更新
-`.agents/tasks/task-NNN/workflow-state.json`，把它作为 phase、gate、blocker 与
+`.harness-flow/tasks/task-NNN/workflow-state.json`，把它作为 phase、gate、blocker 与
 artifact refs 的 canonical 记录。会话摘要、registry 或 event 日志不得成为平行 gate 来源。
 
 ```markdown

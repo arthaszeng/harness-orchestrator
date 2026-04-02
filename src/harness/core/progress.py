@@ -1,4 +1,4 @@
-"""Progress report generator — maintains .agents/progress.md.
+"""Progress report generator — maintains .harness-flow/progress.md.
 
 Provides shared summary helpers used by both progress.md generation and
 the `harness status` command.
@@ -125,7 +125,7 @@ def update_progress(agents_dir: Path, state: SessionState) -> None:
                 )
             )
         lines.append(
-            f"- Workflow state: `.agents/tasks/{workflow_state.task_id}/workflow-state.json`"
+            f"- Workflow state: `.harness-flow/tasks/{workflow_state.task_id}/workflow-state.json`"
         )
 
     # Recent Completed

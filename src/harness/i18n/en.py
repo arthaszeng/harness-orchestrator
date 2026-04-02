@@ -2,7 +2,7 @@
 
 MESSAGES: dict[str, str] = {
     # ── init command ──────────────────────────────────────────────
-    "init.config_exists": ".agents/config.toml already exists. Overwrite?",
+    "init.config_exists": ".harness-flow/config.toml already exists. Overwrite?",
     "init.cancelled": "Cancelled. Use --force to regenerate artifacts without the wizard.",
     "init.enter_range": "  Please enter a number between 1 and {n}",
     "init.step1_label": "Project Info",
@@ -65,14 +65,14 @@ MESSAGES: dict[str, str] = {
     "init.guide_build": "Implement according to plan",
     "init.guide_eval": "5-role parallel code review",
     "init.guide_ship": "Direct ship: test → eval → fix → commit → push → PR",
-    "init.guide_edit_vision": "Edit .agents/vision.md to set your project vision,",
+    "init.guide_edit_vision": "Edit .harness-flow/vision.md to set your project vision,",
     "init.guide_use_vision": "then use /harness-vision in Cursor.",
     "init.gitignore_comment": "# harness — do not track runtime state",
 
     # ── reinit mode ────────────────────────────────────────────────
     "init.reinit_title": "Config detected — regenerating artifacts",
     "init.reinit_done": "{count} artifact(s) regenerated",
-    "init.reinit_hint": "To apply config changes → edit .agents/config.toml → harness init --force",
+    "init.reinit_hint": "To apply config changes → edit .harness-flow/config.toml → harness init --force",
     "init.reinit_config_error": "Failed to load config: {error}",
 
     # ── update command ─────────────────────────────────────────────
@@ -104,7 +104,7 @@ MESSAGES: dict[str, str] = {
 
     # ── gate command ─────────────────────────────────────────────
     "gate.no_task": "no task directory found{suffix}",
-    "gate.no_task_hint": "run from a project with .agents/tasks/task-NNN/ directories",
+    "gate.no_task_hint": "run from a project with .harness-flow/tasks/task-NNN/ directories",
     "gate.config_fallback": "could not load harness config — defaulting to review_gate_mode='eng'",
     "gate.pass": "GATE: PASS — ready to ship",
     "gate.blocked": "GATE: BLOCKED — {summary}",

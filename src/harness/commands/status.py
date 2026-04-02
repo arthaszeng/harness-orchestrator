@@ -48,7 +48,7 @@ def run_status() -> None:
 
     ui.banner("status", __version__)
 
-    agents_dir = Path.cwd() / ".agents"
+    agents_dir = Path.cwd() / ".harness-flow"
     state = SessionState.load(agents_dir)
     wt = detect_worktree()
     _, workflow_state = load_current_workflow_state(
@@ -121,7 +121,7 @@ def _render_current(
             )
             console.print(f"  Gates:     [cyber.dim]{rendered}[/]")
         console.print(
-            f"  State:     [cyber.dim].agents/tasks/{workflow_state.task_id}/workflow-state.json[/]"
+            f"  State:     [cyber.dim].harness-flow/tasks/{workflow_state.task_id}/workflow-state.json[/]"
         )
         return
     t = state.current_task

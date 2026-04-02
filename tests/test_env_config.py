@@ -35,7 +35,7 @@ def test_env_overrides_single_segment(monkeypatch):
 
 
 def test_load_with_env_override(tmp_path: Path, monkeypatch):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[project]\nname = "fromfile"\n[ci]\ncommand = "make test"\n',
@@ -48,7 +48,7 @@ def test_load_with_env_override(tmp_path: Path, monkeypatch):
 
 
 def test_load_without_env_is_unchanged(tmp_path: Path, monkeypatch):
-    agents_dir = tmp_path / ".agents"
+    agents_dir = tmp_path / ".harness-flow"
     agents_dir.mkdir()
     (agents_dir / "config.toml").write_text(
         '[ci]\ncommand = "make test"\n',

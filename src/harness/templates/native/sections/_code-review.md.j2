@@ -8,7 +8,7 @@ Send a SINGLE message containing all 5 Task tool calls:
 | # | Subagent | Prompt extras |
 |---|----------|---------------|
 | 1 | `harness-architect` | `mode: code-eval`, diff range, architecture docs paths |
-| 2 | `harness-product-owner` | `mode: code-eval`, diff range, `.agents/vision.md` path, plan path, roadmap/backlog/feedback context when available |
+| 2 | `harness-product-owner` | `mode: code-eval`, diff range, `.harness-flow/vision.md` path, plan path, roadmap/backlog/feedback context when available |
 | 3 | `harness-engineer` | `mode: code-eval`, diff range, source directory listing |
 | 4 | `harness-qa` | `mode: code-eval`, diff range, `ci_command: {{ ci_command }}`, test directory listing |
 | 5 | `harness-project-manager` | `mode: code-eval`, diff range, plan path, deliverable checklist, feedback/continue-pause context when available |
@@ -16,7 +16,7 @@ Send a SINGLE message containing all 5 Task tool calls:
 Each prompt must include:
 - `response_language: {{ artifact_lang }}`
 - `diff_range: {{ trunk_branch }}..HEAD`
-- `plan_path: .agents/tasks/task-NNN/plan.md` (if available)
+- `plan_path: .harness-flow/tasks/task-NNN/plan.md` (if available)
 {% if memverse_enabled == "true" %}
 - `memverse_domain: {{ memverse_domain }}`
 {% endif %}

@@ -37,17 +37,17 @@ Run straight through and output the PR URL at the end.
 
 3. Run `git diff {{ trunk_branch }}...HEAD --stat` and `git log {{ trunk_branch }}..HEAD --oneline` to understand what's being shipped.
 
-4. Check `.agents/config.toml` exists.
+4. Check `.harness-flow/config.toml` exists.
 
 5. **Detect or create the task directory** (deterministic algorithm):
-   1. Scan `.agents/tasks/` for all `task-NNN` directories
+   1. Scan `.harness-flow/tasks/` for all `task-NNN` directories
    2. Let `L` = directory with the largest NNN (by numeric sort)
    3. If `L` exists and `L/plan.md` exists → reuse `L` as `TASK_DIR`
    4. Otherwise → create `task-{max(NNN)+1}` (or `task-001` if none exist) as `TASK_DIR`
    5. All eval artifacts, ship-metrics, and build logs go into `TASK_DIR`
 
    ```bash
-   mkdir -p .agents/tasks/task-NNN
+   mkdir -p .harness-flow/tasks/task-NNN
    ```
 
    If a handoff file exists (e.g. `TASK_DIR/handoff-build.json` or
@@ -199,7 +199,7 @@ For each GAP path:
 
 ## Step 3.5: Plan Completion Audit
 
-If a plan file exists at `.agents/tasks/task-NNN/plan.md`:
+If a plan file exists at `.harness-flow/tasks/task-NNN/plan.md`:
 
 1. Extract every actionable item (checkboxes, numbered steps, imperative statements)
 2. Cross-reference against `git diff {{ trunk_branch }}...HEAD`
@@ -469,7 +469,7 @@ If no documentation issues are found: skip silently.
 
 ## Step 8.75: Ship Metrics Persistence
 
-Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospective consumption:
+Write ship metrics to `.harness-flow/tasks/task-NNN/ship-metrics.json` for retrospective consumption:
 
 ```json
 {
@@ -488,7 +488,7 @@ Write ship metrics to `.agents/tasks/task-NNN/ship-metrics.json` for retrospecti
 }
 ```
 
-If no task directory exists, write to `.agents/ship-metrics.jsonl` (append one JSON object per line).
+If no task directory exists, write to `.harness-flow/ship-metrics.jsonl` (append one JSON object per line).
 
 If `workflow-state.json` exists (or this branch introduced it), run `harness gate --task TASK_ID`
 one final time to persist the ship-readiness gate snapshot, then update the evaluation
@@ -521,7 +521,7 @@ Update `workflow-state.json` → `artifacts.handoff` to `"handoff-ship.json"`.
 
 ## State Persistence
 
-All state is persisted in `.agents/tasks/task-NNN/`:
+All state is persisted in `.harness-flow/tasks/task-NNN/`:
 - `plan.md` — the plan (if exists)
 - `build-rN.md` — build logs per round
 - `plan-eval-rN.md` — plan evaluations per round

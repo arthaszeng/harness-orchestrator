@@ -2,7 +2,7 @@
 
 MESSAGES: dict[str, str] = {
     # ── init command ──────────────────────────────────────────────
-    "init.config_exists": ".agents/config.toml 已存在，是否覆盖？",
+    "init.config_exists": ".harness-flow/config.toml 已存在，是否覆盖？",
     "init.cancelled": "已取消。使用 --force 可跳过向导直接重新生成 artifacts。",
     "init.enter_range": "  请输入 1-{n} 之间的数字",
     "init.step1_label": "项目信息",
@@ -66,14 +66,14 @@ MESSAGES: dict[str, str] = {
     "init.guide_build": "按计划实现代码",
     "init.guide_eval": "5 角色并行代码评审",
     "init.guide_ship": "直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
-    "init.guide_edit_vision": "编辑 .agents/vision.md 设定项目愿景，",
+    "init.guide_edit_vision": "编辑 .harness-flow/vision.md 设定项目愿景，",
     "init.guide_use_vision": "然后在 Cursor 中使用 /harness-vision。",
     "init.gitignore_comment": "# harness — 不跟踪运行时状态",
 
     # ── reinit mode ────────────────────────────────────────────────
     "init.reinit_title": "检测到已有配置 — 正在重新生成产物",
     "init.reinit_done": "已重新生成 {count} 个 native 产物",
-    "init.reinit_hint": "如需应用配置变更 → 编辑 .agents/config.toml → harness init --force",
+    "init.reinit_hint": "如需应用配置变更 → 编辑 .harness-flow/config.toml → harness init --force",
     "init.reinit_config_error": "配置加载失败: {error}",
 
     # ── update command ─────────────────────────────────────────────
@@ -105,7 +105,7 @@ MESSAGES: dict[str, str] = {
 
     # ── gate command ─────────────────────────────────────────────
     "gate.no_task": "未找到任务目录{suffix}",
-    "gate.no_task_hint": "请在包含 .agents/tasks/task-NNN/ 目录的项目中运行",
+    "gate.no_task_hint": "请在包含 .harness-flow/tasks/task-NNN/ 目录的项目中运行",
     "gate.config_fallback": "无法加载 harness 配置 — 回退到 review_gate_mode='eng'",
     "gate.pass": "门禁通过：可以交付",
     "gate.blocked": "门禁阻塞 — {summary}",

@@ -77,8 +77,8 @@ def _pip_upgrade() -> bool:
 
 
 def _migrate_config(project_root: Path) -> int:
-    """Check .agents/config.toml for missing/deprecated keys. Returns count of warnings."""
-    config_path = project_root / ".agents" / "config.toml"
+    """Check .harness-flow/config.toml for missing/deprecated keys. Returns count of warnings."""
+    config_path = project_root / ".harness-flow" / "config.toml"
     if not config_path.exists():
         return 0
 

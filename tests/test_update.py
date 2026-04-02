@@ -53,7 +53,7 @@ class TestMigrateConfig:
         assert _migrate_config(tmp_path) == 0
 
     def test_valid_config_reports_ok(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         (agents_dir / "config.toml").write_text(
             '[project]\nname = "test"\n[ci]\ncommand = "make test"\n'
@@ -63,7 +63,7 @@ class TestMigrateConfig:
 
     def test_workflow_without_legacy_keys_ok(self, tmp_path: Path):
         """Workflow section without removed orchestrator keys is valid."""
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         (agents_dir / "config.toml").write_text(
             '[project]\nname = "test"\n[ci]\ncommand = "make test"\n'
@@ -72,20 +72,20 @@ class TestMigrateConfig:
         assert _migrate_config(tmp_path) == 0
 
     def test_missing_sections_warns(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         (agents_dir / "config.toml").write_text('[drivers]\ndefault = "auto"\n')
         warnings = _migrate_config(tmp_path)
         assert warnings >= 2
 
     def test_invalid_toml_returns_warning(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         (agents_dir / "config.toml").write_text("this is not valid toml [[[")
         assert _migrate_config(tmp_path) == 1
 
     def test_deprecated_adversarial_model_warns(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         (agents_dir / "config.toml").write_text(
             '[project]\nname = "t"\n[ci]\ncommand = "t"\n'

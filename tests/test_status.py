@@ -77,7 +77,7 @@ class TestRenderCurrent:
         )
         workflow_state.active_plan.title = "Canonical Workflow State Artifact"
         workflow_state.blocker.reason = "missing ship readiness gate"
-        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.artifacts.plan = ".harness-flow/tasks/task-001/plan.md"
         workflow_state.gates.evaluation.reason = "awaiting review"
         workflow_state.gates.evaluation.status = GateStatus.PENDING
         _render_current(console, state, workflow_state=workflow_state)

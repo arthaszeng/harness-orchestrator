@@ -155,14 +155,14 @@ class TestSuggestNextAction:
 
 class TestUpdateProgress:
     def test_creates_file(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(session_id="s1", mode="run")
         update_progress(agents_dir, state)
         assert (agents_dir / "progress.md").exists()
 
     def test_contains_session_meta(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(session_id="2026-01-01T00:00:00", mode="auto")
         update_progress(agents_dir, state)
@@ -172,7 +172,7 @@ class TestUpdateProgress:
         assert "active" in content
 
     def test_contains_current_task(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(
             session_id="s1",
@@ -193,7 +193,7 @@ class TestUpdateProgress:
         assert "agent/api" in content
 
     def test_includes_canonical_workflow_state_details(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         task_dir = agents_dir / "tasks" / "task-001"
         task_dir.mkdir(parents=True)
         agents_dir.mkdir(exist_ok=True)
@@ -204,7 +204,7 @@ class TestUpdateProgress:
         )
         workflow_state.active_plan.title = "Canonical Workflow State Artifact"
         workflow_state.blocker.reason = "awaiting eval gate"
-        workflow_state.artifacts.plan = ".agents/tasks/task-001/plan.md"
+        workflow_state.artifacts.plan = ".harness-flow/tasks/task-001/plan.md"
         workflow_state.gates.ship_readiness.status = GateStatus.PENDING
         workflow_state.gates.ship_readiness.reason = "waiting for evaluation"
         workflow_state.save(task_dir)
@@ -221,7 +221,7 @@ class TestUpdateProgress:
         assert "workflow-state.json" in content
 
     def test_resumable_section(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(
             session_id="s1",
@@ -234,7 +234,7 @@ class TestUpdateProgress:
         assert "harness 技能" in content
 
     def test_idle_not_resumable(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(session_id="s1", mode="idle")
         update_progress(agents_dir, state)
@@ -242,7 +242,7 @@ class TestUpdateProgress:
         assert "无可恢复会话" in content
 
     def test_contains_next_action(self, tmp_path: Path):
-        agents_dir = tmp_path / ".agents"
+        agents_dir = tmp_path / ".harness-flow"
         agents_dir.mkdir()
         state = SessionState(session_id="s1", mode="idle")
         update_progress(agents_dir, state)

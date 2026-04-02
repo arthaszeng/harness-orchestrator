@@ -6,7 +6,7 @@ the full upstream artifact, keeping context windows focused and enabling
 reliable resume after interruption.
 
 Handoff files live alongside other task artifacts in
-``.agents/tasks/task-NNN/handoff-<phase>.json``.
+``.harness-flow/tasks/task-NNN/handoff-<phase>.json``.
 """
 
 from __future__ import annotations

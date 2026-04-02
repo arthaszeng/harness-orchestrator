@@ -8,7 +8,7 @@
 | # | 子代理 | Prompt 附加内容 |
 |---|--------|----------------|
 | 1 | `harness-architect` | `mode: code-eval`、diff 范围、架构文档路径 |
-| 2 | `harness-product-owner` | `mode: code-eval`、diff 范围、`.agents/vision.md` 路径、计划路径、roadmap/backlog/feedback 上下文（如存在） |
+| 2 | `harness-product-owner` | `mode: code-eval`、diff 范围、`.harness-flow/vision.md` 路径、计划路径、roadmap/backlog/feedback 上下文（如存在） |
 | 3 | `harness-engineer` | `mode: code-eval`、diff 范围、源代码目录列表 |
 | 4 | `harness-qa` | `mode: code-eval`、diff 范围、`ci_command: {{ ci_command }}`、测试目录列表 |
 | 5 | `harness-project-manager` | `mode: code-eval`、diff 范围、计划路径、交付物清单、feedback/continue-pause 上下文（如存在） |
@@ -16,7 +16,7 @@
 每个 prompt 必须包含：
 - `response_language: {{ artifact_lang }}`
 - `diff_range: {{ trunk_branch }}..HEAD`
-- `plan_path: .agents/tasks/task-NNN/plan.md`（如可用）
+- `plan_path: .harness-flow/tasks/task-NNN/plan.md`（如可用）
 {% if memverse_enabled == "true" %}
 - `memverse_domain: {{ memverse_domain }}`
 {% endif %}
