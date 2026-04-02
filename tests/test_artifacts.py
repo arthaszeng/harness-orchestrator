@@ -1,0 +1,214 @@
+"""Tests for programmatic artifact writers (core/artifacts.py + CLI commands)."""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from harness.cli import app
+from harness.core.artifacts import (
+    next_build_round,
+    next_eval_round,
+    save_build_log,
+    save_evaluation,
+    save_ship_metrics,
+)
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+runner = CliRunner()
+
+
+class TestNextRound:
+    def test_empty_dir(self, tmp_path: Path):
+        assert next_eval_round(tmp_path) == 1
+        assert next_build_round(tmp_path) == 1
+
+    def test_single_round(self, tmp_path: Path):
+        (tmp_path / "evaluation-r1.md").write_text("x")
+        (tmp_path / "build-r1.log").write_text("x")
+        assert next_eval_round(tmp_path) == 2
+        assert next_build_round(tmp_path) == 2
+
+    def test_multiple_rounds(self, tmp_path: Path):
+        for i in (1, 2, 3):
+            (tmp_path / f"evaluation-r{i}.md").write_text("x")
+        assert next_eval_round(tmp_path) == 4
+
+    def test_nonexistent_dir(self, tmp_path: Path):
+        missing = tmp_path / "nope"
+        assert next_eval_round(missing) == 1
+
+    def test_ignores_unrelated_files(self, tmp_path: Path):
+        (tmp_path / "evaluation-summary.md").write_text("x")
+        (tmp_path / "build-notes.txt").write_text("x")
+        assert next_eval_round(tmp_path) == 1
+        assert next_build_round(tmp_path) == 1
+
+
+class TestSaveEvaluation:
+    def test_creates_file(self, tmp_path: Path):
+        path = save_evaluation(tmp_path, verdict="PASS")
+        assert path.exists()
+        assert path.name == "evaluation-r1.md"
+
+    def test_auto_increments(self, tmp_path: Path):
+        save_evaluation(tmp_path, round_num=1, verdict="ITERATE")
+        path = save_evaluation(tmp_path, verdict="PASS")
+        assert path.name == "evaluation-r2.md"
+
+    def test_verdict_line(self, tmp_path: Path):
+        path = save_evaluation(tmp_path, verdict="PASS")
+        text = path.read_text()
+        assert "## Verdict: PASS" in text
+
+    def test_scores_in_table(self, tmp_path: Path):
+        scores = {
+            "Design": {"role": "architect", "score": 8},
+            "Quality": {"role": "engineer", "score": 9},
+        }
+        path = save_evaluation(tmp_path, scores=scores, verdict="PASS")
+        text = path.read_text()
+        assert "architect" in text
+        assert "8/10" in text
+        assert "9/10" in text
+        assert "8.5/10" in text  # weighted average
+
+    def test_findings_listed(self, tmp_path: Path):
+        path = save_evaluation(
+            tmp_path,
+            findings=["SQL injection in views.py", "Unused import"],
+            verdict="ITERATE",
+        )
+        text = path.read_text()
+        assert "SQL injection" in text
+        assert "Unused import" in text
+
+    def test_creates_parent_dirs(self, tmp_path: Path):
+        deep = tmp_path / "a" / "b" / "c"
+        path = save_evaluation(deep, verdict="PASS")
+        assert path.exists()
+
+    def test_explicit_round(self, tmp_path: Path):
+        path = save_evaluation(tmp_path, round_num=5, verdict="PASS")
+        assert path.name == "evaluation-r5.md"
+
+
+class TestSaveBuildLog:
+    def test_creates_file(self, tmp_path: Path):
+        path = save_build_log(tmp_path, "build output here")
+        assert path.exists()
+        assert path.name == "build-r1.log"
+        assert path.read_text() == "build output here"
+
+    def test_auto_increments(self, tmp_path: Path):
+        save_build_log(tmp_path, "round 1", round_num=1)
+        path = save_build_log(tmp_path, "round 2")
+        assert path.name == "build-r2.log"
+        assert path.read_text() == "round 2"
+
+    def test_creates_parent_dirs(self, tmp_path: Path):
+        deep = tmp_path / "x" / "y"
+        path = save_build_log(deep, "log content")
+        assert path.exists()
+
+
+class TestSaveShipMetrics:
+    def test_creates_file(self, tmp_path: Path):
+        path = save_ship_metrics(
+            tmp_path,
+            branch="agent/feat-123",
+            test_count=42,
+            pr_quality_score=8.5,
+        )
+        assert path.exists()
+        assert path.name == "ship-metrics.json"
+
+    def test_valid_json(self, tmp_path: Path):
+        path = save_ship_metrics(tmp_path, branch="main")
+        data = json.loads(path.read_text())
+        assert data["branch"] == "main"
+        assert "timestamp" in data
+        assert isinstance(data["models_used"], list)
+
+    def test_all_fields_present(self, tmp_path: Path):
+        path = save_ship_metrics(
+            tmp_path,
+            branch="agent/feat",
+            pr_quality_score=9.0,
+            test_count=100,
+            eval_rounds=2,
+            findings_critical=1,
+            findings_informational=3,
+            auto_fixed=2,
+            plan_total=5,
+            plan_done=4,
+            coverage_pct=85,
+        )
+        data = json.loads(path.read_text())
+        assert data["coverage_pct"] == 85
+        assert data["plan_total"] == 5
+        assert data["plan_done"] == 4
+        assert data["eval_rounds"] == 2
+
+
+class TestCLISaveEval:
+    def test_save_eval_with_body(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".agents" / "tasks" / "task-001").mkdir(parents=True)
+
+        result = runner.invoke(
+            app,
+            [
+                "save-eval",
+                "--task", "task-001",
+                "--verdict", "PASS",
+                "--score", "8.0",
+                "--body", "# Eval\n\n## Verdict: PASS\n",
+            ],
+        )
+        assert result.exit_code == 0
+        eval_file = tmp_path / ".agents" / "tasks" / "task-001" / "evaluation-r1.md"
+        assert eval_file.exists()
+        assert "PASS" in eval_file.read_text()
+
+    def test_save_eval_without_body_generates_template(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".agents" / "tasks" / "task-002").mkdir(parents=True)
+
+        result = runner.invoke(
+            app,
+            [
+                "save-eval",
+                "--task", "task-002",
+                "--verdict", "ITERATE",
+                "--score", "5.5",
+            ],
+        )
+        assert result.exit_code == 0
+        eval_file = tmp_path / ".agents" / "tasks" / "task-002" / "evaluation-r1.md"
+        assert eval_file.exists()
+        text = eval_file.read_text()
+        assert "## Verdict: ITERATE" in text
+        assert "5.5/10" in text
+
+
+class TestCLISaveBuildLog:
+    def test_save_build_log_with_body(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".agents" / "tasks" / "task-001").mkdir(parents=True)
+
+        result = runner.invoke(
+            app,
+            [
+                "save-build-log",
+                "--task", "task-001",
+                "--body", "# Build Log\n\nAll deliverables complete.\n",
+            ],
+        )
+        assert result.exit_code == 0
+        log_file = tmp_path / ".agents" / "tasks" / "task-001" / "build-r1.log"
+        assert log_file.exists()
+        assert "deliverables" in log_file.read_text()

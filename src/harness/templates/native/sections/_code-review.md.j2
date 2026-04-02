@@ -82,9 +82,10 @@ Log: `[AUTO-FIXED] file:line — Problem → What you did`
 
 ### Final Verdict
 
-Write the evaluation summary to `.agents/tasks/task-NNN/evaluation-rN.md`:
+**Save the evaluation using the CLI** (mandatory — do NOT skip this step):
 
-```markdown
+```bash
+harness save-eval --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
 # Code Evaluation — Round N
 
 ## Dimension Scores
@@ -107,4 +108,9 @@ Write the evaluation summary to `.agents/tasks/task-NNN/evaluation-rN.md`:
 [items requiring user decision]
 
 ## Verdict: PASS | ITERATE
+EVAL_EOF
+)"
 ```
+
+Replace `task-NNN`, scores, and `PASS`/`ITERATE` with actual values.
+The command creates `evaluation-rN.md` with auto-incremented round number.

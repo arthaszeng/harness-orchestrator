@@ -81,9 +81,10 @@
 
 ### 最终裁定
 
-将评审摘要写入 `.agents/tasks/task-NNN/evaluation-rN.md`：
+**使用 CLI 保存评审结果**（必须执行 — 不可跳过）：
 
-```markdown
+```bash
+harness save-eval --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'EVAL_EOF'
 # Code Evaluation — Round N
 
 ## Dimension Scores
@@ -106,4 +107,9 @@
 [items requiring user decision]
 
 ## Verdict: PASS | ITERATE
+EVAL_EOF
+)"
 ```
+
+将 `task-NNN`、分数和 `PASS`/`ITERATE` 替换为实际值。
+命令会以自动递增的轮次编号创建 `evaluation-rN.md`。

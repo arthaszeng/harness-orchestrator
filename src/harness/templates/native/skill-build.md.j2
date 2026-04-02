@@ -133,9 +133,10 @@ in the build log and stop.
 
 ## Step 5: Write Build Log
 
-Write a structured build log to `.agents/tasks/task-NNN/build-rN.log`:
+**Save the build log using the CLI** (mandatory — do NOT skip this step):
 
-```markdown
+```bash
+harness save-build-log --task task-NNN --body "$(cat <<'BUILD_EOF'
 # Build Log — Round N
 
 ## Deliverables
@@ -158,7 +159,12 @@ Write a structured build log to `.agents/tasks/task-NNN/build-rN.log`:
 
 ## Out-of-Scope Issues Found
 - (issues discovered but not fixed — outside contract scope)
+BUILD_EOF
+)"
 ```
+
+Replace `task-NNN` and fill in actual values.
+The command creates `build-rN.log` with auto-incremented round number.
 
 When the build log is written, also update `workflow-state.json` (if present, or
 if the contract requires task-level state) so the task reflects the latest build

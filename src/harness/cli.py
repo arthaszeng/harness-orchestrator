@@ -65,6 +65,46 @@ def status() -> None:
     run_status()
 
 
+@app.command(name="save-eval")
+def save_eval(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    verdict: str = typer.Option(
+        "PASS", "--verdict",
+        help="Evaluation verdict: PASS or ITERATE",
+    ),
+    score: float = typer.Option(
+        0.0, "--score",
+        help="Weighted average score (0-10)",
+    ),
+    body: str = typer.Option(
+        "", "--body",
+        help="Full evaluation body (markdown). If empty, generates minimal template.",
+    ),
+) -> None:
+    """Save evaluation results to task directory (programmatic artifact write)."""
+    from harness.commands.artifact import run_save_eval
+    run_save_eval(task=task, verdict=verdict, score=score, body=body)
+
+
+@app.command(name="save-build-log")
+def save_build_log(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    body: str = typer.Option(
+        "", "--body",
+        help="Build log content. If empty, reads from stdin.",
+    ),
+) -> None:
+    """Save build log to task directory (programmatic artifact write)."""
+    from harness.commands.artifact import run_save_build_log
+    run_save_build_log(task=task, body=body)
+
+
 @app.command()
 def update(
     check: bool = typer.Option(
