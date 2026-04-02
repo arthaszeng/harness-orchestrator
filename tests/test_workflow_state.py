@@ -93,6 +93,20 @@ def test_resolve_task_dir_prefers_explicit_then_session_then_numeric_latest(tmp_
     assert latest is not None and latest.name == "task-010"
 
 
+def test_resolve_task_dir_rejects_path_traversal(tmp_path: Path):
+    agents_dir = tmp_path / ".agents"
+    tasks_dir = agents_dir / "tasks"
+    tasks_dir.mkdir(parents=True)
+    (tasks_dir / "task-001").mkdir()
+
+    assert resolve_task_dir(agents_dir, explicit_task_id="../../etc") is None
+    assert resolve_task_dir(agents_dir, explicit_task_id="../passwords") is None
+    # session_task_id traversal is rejected, but fallback to latest task still kicks in
+    result = resolve_task_dir(agents_dir, session_task_id="../../etc")
+    assert result is not None and result.name == "task-001"
+    assert resolve_task_dir(agents_dir, explicit_task_id="task-001") is not None
+
+
 def test_load_current_workflow_state_prefers_session_task_dir(tmp_path: Path):
     agents_dir = tmp_path / ".agents"
     task1 = agents_dir / "tasks" / "task-001"

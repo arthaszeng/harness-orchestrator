@@ -32,10 +32,11 @@ class TestVersionOutput:
 
 
 class TestHelpOutput:
-    def test_help_lists_three_commands(self):
+    def test_help_lists_core_commands(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "init" in result.output
+        assert "gate" in result.output
         assert "status" in result.output
         assert "update" in result.output
 
@@ -53,6 +54,68 @@ class TestHelpOutput:
         assert result.exit_code == 0
         clean = _ANSI_RE.sub("", result.output)
         assert "--force" in clean
+
+
+class TestGateCommand:
+    def test_gate_pass(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        (task_dir / "plan.md").write_text("# Plan\n\n## Deliverables\n", encoding="utf-8")
+        (task_dir / "evaluation-r1.md").write_text(
+            "# Eval\n\n## Verdict: PASS\n", encoding="utf-8",
+        )
+
+        from unittest.mock import patch as mock_patch
+        with mock_patch("harness.core.gates.get_head_commit_epoch", return_value=0.0):
+            result = runner.invoke(app, ["gate", "--task", "task-001"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 0
+        assert "PASS" in clean
+
+    def test_gate_blocked_missing_eval(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".agents" / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        (task_dir / "plan.md").write_text("# Plan\n", encoding="utf-8")
+
+        from unittest.mock import patch as mock_patch
+        with mock_patch("harness.core.gates.get_head_commit_epoch", return_value=0.0):
+            result = runner.invoke(app, ["gate", "--task", "task-001"])
+        assert result.exit_code == 1
+        clean = _ANSI_RE.sub("", result.output)
+        assert "BLOCKED" in clean
+
+    def test_gate_no_task_dir(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".agents" / "tasks").mkdir(parents=True)
+        result = runner.invoke(app, ["gate"])
+        assert result.exit_code == 1
+
+    def test_gate_invalid_task_id_exits_with_error(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".agents" / "tasks").mkdir(parents=True)
+        result = runner.invoke(app, ["gate", "--task", "task-999"])
+        assert result.exit_code == 1
+        clean = _ANSI_RE.sub("", result.output)
+        assert "task-999" in clean
+
+    def test_gate_auto_detects_latest_task(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        for i in [1, 2]:
+            td = tmp_path / ".agents" / "tasks" / f"task-00{i}"
+            td.mkdir(parents=True)
+            (td / "plan.md").write_text("# Plan\n\n## Deliverables\n", encoding="utf-8")
+        (tmp_path / ".agents" / "tasks" / "task-002" / "evaluation-r1.md").write_text(
+            "# Eval\n\n## Verdict: PASS\n", encoding="utf-8",
+        )
+
+        from unittest.mock import patch as mock_patch
+        with mock_patch("harness.core.gates.get_head_commit_epoch", return_value=0.0):
+            result = runner.invoke(app, ["gate"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 0
+        assert "task-002" in clean
 
 
 class TestStatusCommand:

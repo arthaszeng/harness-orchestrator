@@ -39,6 +39,7 @@ Built with **Typer**. Three commands:
 | Command   | Purpose |
 |-----------|---------|
 | `init`    | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
+| `gate`    | Check ship-readiness gates for the current task (hard + soft checks). |
 | `status`  | Load session state and render a Rich dashboard. |
 | `update`  | Check PyPI, optional pip upgrade, reinstall artifacts, config migration hints. |
 
@@ -103,6 +104,14 @@ Task-level canonical workflow state stored at
 artifact refs, gate snapshots, blocker reason, and deterministic task discovery.
 `SessionState` is a session-summary compatibility layer; registry/events remain
 audit-only metadata, not gate authorities.
+
+### `gates.py`
+
+Ship-readiness gate validation. `check_ship_readiness(task_dir)` runs hard checks
+(plan exists, eval exists, eval verdict parseable, eval ship-eligible) and soft
+checks (build exists, eval freshness, workflow-state gate populated). Returns a
+structured `GateVerdict` with per-item results. `write_gate_snapshot` persists the
+verdict to `workflow-state.json` via load-merge-save. Used by `harness gate` CLI.
 
 ### `progress.py`
 

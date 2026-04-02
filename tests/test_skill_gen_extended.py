@@ -376,7 +376,7 @@ def test_ship_has_eval_artifact_gate(tmp_path: Path):
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
     assert "Eval Artifact Gate" in content
-    assert "evaluation-r*.md" in content
+    assert "harness gate" in content
     gate_pos = content.index("Eval Artifact Gate")
     step6_pos = content.index("## Step 6:")
     assert gate_pos < step6_pos, "Eval gate must appear before Step 6"
@@ -1312,3 +1312,18 @@ def test_zh_ship_skill_contains_chinese(tmp_path: Path):
     content = ship_skill.read_text(encoding="utf-8")
     assert "自动化管线" in content or "交付管线" in content
     assert "pytest" in content, "CI command should still be present"
+
+
+def test_ship_en_and_zh_reference_harness_gate(tmp_path: Path):
+    """Both en and zh ship templates reference 'harness gate' CLI command."""
+    cfg = _make_cfg(tmp_path)
+
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship_en = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content_en = ship_en.read_text(encoding="utf-8")
+    assert "harness gate" in content_en, "en ship template must reference 'harness gate'"
+
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    ship_zh = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content_zh = ship_zh.read_text(encoding="utf-8")
+    assert "harness gate" in content_zh, "zh ship template must reference 'harness gate'"
