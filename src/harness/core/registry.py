@@ -132,6 +132,12 @@ class Registry:
             self._conn.commit()
             log.debug("registry schema initialized (version=%d)", _SCHEMA_VERSION)
 
+    def _execute_commit(self, sql: str, params: tuple[object, ...]) -> sqlite3.Cursor:
+        """Execute a write statement and commit once for this public call."""
+        cur = self._conn.execute(sql, params)
+        self._conn.commit()
+        return cur
+
     # ── write operations ──────────────────────────────────────────
 
     def register(
@@ -153,7 +159,7 @@ class Registry:
         ``runtime`` is stored in the SQLite ``driver`` column for schema compatibility.
         """
         prompt_str = str(prompt) if prompt else ""
-        cur = self._conn.execute(
+        cur = self._execute_commit(
             """INSERT INTO agent_runs
                (task_id, parent_run_id, role, driver, agent_name, iteration,
                 status, readonly, cwd, branch, prompt_hash, prompt_len, started_at)
@@ -169,7 +175,6 @@ class Registry:
                 _now_iso(),
             ),
         )
-        self._conn.commit()
         run_id = cur.lastrowid
         log.debug("registered run #%d  role=%s runtime=%s", run_id, role, runtime)
         return run_id  # type: ignore[return-value]
@@ -185,7 +190,7 @@ class Registry:
         session_id: str | None = None,
     ) -> None:
         """Mark a run as completed."""
-        self._conn.execute(
+        self._execute_commit(
             """UPDATE agent_runs
                SET status='completed', exit_code=?, output_len=?,
                    elapsed_ms=?, ended_at=?, log_path=?, session_id=COALESCE(?, session_id)
@@ -193,7 +198,6 @@ class Registry:
             (exit_code, output_len, elapsed_ms, _now_iso(),
              _to_text(log_path), _to_text(session_id), run_id),
         )
-        self._conn.commit()
 
     def fail(
         self,
@@ -207,7 +211,7 @@ class Registry:
     ) -> None:
         """Mark a run as failed."""
         err_text = _to_text(error)
-        self._conn.execute(
+        self._execute_commit(
             """UPDATE agent_runs
                SET status='failed', error=?, exit_code=?, output_len=?,
                    elapsed_ms=?, ended_at=?, log_path=?
@@ -215,7 +219,6 @@ class Registry:
             (err_text[:2000] if err_text else None, exit_code, output_len,
              elapsed_ms, _now_iso(), _to_text(log_path), run_id),
         )
-        self._conn.commit()
 
     def update_telemetry(
         self,
@@ -227,7 +230,7 @@ class Registry:
         cost: float | None = None,
     ) -> None:
         """Upsert telemetry for a run (fire-and-forget from stream callbacks)."""
-        self._conn.execute(
+        self._execute_commit(
             """INSERT INTO telemetry (run_id, tokens_in, tokens_out, cached_tokens, cost)
                VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(run_id) DO UPDATE SET
@@ -237,15 +240,13 @@ class Registry:
                    cost=excluded.cost""",
             (run_id, tokens_in, tokens_out, cached_tokens, cost),
         )
-        self._conn.commit()
 
     def set_session_id(self, run_id: int, session_id: str) -> None:
         """Set the agent session/thread id (for future resume support)."""
-        self._conn.execute(
+        self._execute_commit(
             "UPDATE agent_runs SET session_id=? WHERE id=?",
             (_to_text(session_id), run_id),
         )
-        self._conn.commit()
 
     # ── read operations ───────────────────────────────────────────
 

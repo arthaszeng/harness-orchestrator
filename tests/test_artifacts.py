@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from typer.testing import CliRunner
 
@@ -18,6 +19,14 @@ from harness.core.artifacts import (
 from harness.core.workflow_state import load_workflow_state
 
 runner = CliRunner()
+
+
+def _seed_workflow_state(task_dir: Path, task_id: str, artifacts: dict[str, Any] | None = None) -> None:
+    task_dir.mkdir(parents=True)
+    payload: dict[str, Any] = {"schema_version": 1, "task_id": task_id, "phase": "idle"}
+    if artifacts is not None:
+        payload["artifacts"] = artifacts
+    (task_dir / "workflow-state.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 class TestNextRound:
@@ -245,11 +254,7 @@ class TestCLISaveEval:
     def test_save_eval_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-003"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-003", "phase": "idle"}',
-            encoding="utf-8",
-        )
+        _seed_workflow_state(task_dir, "task-003")
 
         result = runner.invoke(
             app,
@@ -274,11 +279,7 @@ class TestCLISaveEval:
     def test_save_eval_iterate_sets_pending_gate(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-013"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-013", "phase": "idle"}',
-            encoding="utf-8",
-        )
+        _seed_workflow_state(task_dir, "task-013")
 
         result = runner.invoke(
             app,
@@ -292,11 +293,7 @@ class TestCLISaveEval:
     def test_save_eval_unknown_verdict_sets_blocked_gate(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-031"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-031", "phase": "idle"}',
-            encoding="utf-8",
-        )
+        _seed_workflow_state(task_dir, "task-031")
 
         result = runner.invoke(
             app,
@@ -310,11 +307,7 @@ class TestCLISaveEval:
     def test_save_plan_eval_updates_plan_gate_only(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-032"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-032", "phase": "idle"}',
-            encoding="utf-8",
-        )
+        _seed_workflow_state(task_dir, "task-032")
 
         result = runner.invoke(
             app,
@@ -332,11 +325,10 @@ class TestCLISaveEval:
     def test_save_eval_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-014"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-014", "phase": "idle", '
-            '"artifacts": {"evaluation": ".harness-flow/tasks/task-014/evaluation-r0.md"}}',
-            encoding="utf-8",
+        _seed_workflow_state(
+            task_dir,
+            "task-014",
+            artifacts={"evaluation": ".harness-flow/tasks/task-014/evaluation-r0.md"},
         )
 
         import harness.core.workflow_state as ws
@@ -407,11 +399,7 @@ class TestCLISaveBuildLog:
     def test_save_build_log_updates_workflow_state_when_present(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-004"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-004", "phase": "idle"}',
-            encoding="utf-8",
-        )
+        _seed_workflow_state(task_dir, "task-004")
 
         result = runner.invoke(
             app,
@@ -431,11 +419,10 @@ class TestCLISaveBuildLog:
     def test_save_build_log_failure_in_state_sync_keeps_artifact_and_recovers(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-015"
-        task_dir.mkdir(parents=True)
-        (task_dir / "workflow-state.json").write_text(
-            '{"schema_version": 1, "task_id": "task-015", "phase": "idle", '
-            '"artifacts": {"build_log": ".harness-flow/tasks/task-015/build-r0.md"}}',
-            encoding="utf-8",
+        _seed_workflow_state(
+            task_dir,
+            "task-015",
+            artifacts={"build_log": ".harness-flow/tasks/task-015/build-r0.md"},
         )
 
         import harness.core.workflow_state as ws

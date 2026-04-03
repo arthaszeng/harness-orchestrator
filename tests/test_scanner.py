@@ -91,6 +91,17 @@ class TestScanProject:
         scan = scan_project(project_dir)
         assert scan.has_architecture_check
 
+    def test_make_targets_keep_phony_order_and_dedup_declared_targets(self, project_dir):
+        makefile = project_dir / "Makefile"
+        makefile.write_text(
+            ".PHONY: test test lint\n"
+            "test:\n\tpytest\n"
+            "lint:\n\techo lint\n"
+        )
+        scan = scan_project(project_dir)
+        assert scan.make_targets[:3] == ["test", "test", "lint"]
+        assert scan.make_targets.count("test") == 2
+
 
 class TestBuildSuggestions:
     def test_makefile_check_test_is_top_priority(self, project_dir):
@@ -143,3 +154,10 @@ class TestFormatScanReport:
         assert any("pytest" in line for line in report)
         assert any("check_architecture" in line for line in report)
         assert any("pyproject" in line for line in report)
+
+    def test_report_respects_make_target_order(self, project_dir):
+        makefile = project_dir / "Makefile"
+        makefile.write_text(".PHONY: lint test ci\nlint:\ntest:\nci:\n")
+        scan = scan_project(project_dir)
+        report = format_scan_report(scan)
+        assert report[0] == "Makefile (targets: lint, test, ci)"

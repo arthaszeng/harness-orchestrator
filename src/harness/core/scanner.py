@@ -45,16 +45,22 @@ def _detect_makefile(root: Path, scan: ProjectScan) -> None:
     scan.has_makefile = True
     content = makefile.read_text(encoding="utf-8", errors="ignore")
 
-    # Parse .PHONY targets
-    for m in re.finditer(r"\.PHONY:\s*(.+)", content):
-        targets = m.group(1).split()
-        scan.make_targets.extend(targets)
+    scan.make_targets.extend(_parse_phony_targets(content))
+    _append_declared_targets(content, scan.make_targets)
 
-    # Also parse standalone target lines (target: deps)
+
+def _parse_phony_targets(content: str) -> list[str]:
+    targets: list[str] = []
+    for m in re.finditer(r"\.PHONY:\s*(.+)", content):
+        targets.extend(m.group(1).split())
+    return targets
+
+
+def _append_declared_targets(content: str, target_list: list[str]) -> None:
     for m in re.finditer(r"^([a-zA-Z_][\w-]*):", content, re.MULTILINE):
-        t = m.group(1)
-        if t not in scan.make_targets:
-            scan.make_targets.append(t)
+        target = m.group(1)
+        if target not in target_list:
+            target_list.append(target)
 
 
 def _detect_pytest(root: Path, scan: ProjectScan) -> None:
