@@ -336,6 +336,19 @@ def test_load_valid_json_invalid_schema_returns_default(tmp_path: Path):
     assert any("Corrupt session state" in str(x.message) for x in w)
 
 
+def test_load_non_utf8_state_returns_default(tmp_path: Path):
+    """Non-UTF8 state.json should not crash; returns default + warns."""
+    agents_dir = tmp_path / ".harness-flow"
+    agents_dir.mkdir()
+    (agents_dir / "state.json").write_bytes(b"\xff\xfe")
+
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
+        loaded = SessionState.load(agents_dir)
+    assert loaded.mode == "idle"
+    assert any("Corrupt session state" in str(x.message) for x in w)
+
+
 # ---------------------------------------------------------------------------
 # D3: i18n — suggest_next_action respects language
 # ---------------------------------------------------------------------------

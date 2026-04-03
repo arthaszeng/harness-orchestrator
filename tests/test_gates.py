@@ -176,6 +176,19 @@ class TestEvalChecks:
         blocked_names = [c.name for c in verdict.hard_blocked]
         assert "eval_verdict_parseable" in blocked_names
 
+    def test_invalid_utf8_eval_blocks_without_crash(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        (task_dir / "evaluation-r1.md").write_bytes(b"\xff\xfe\xfa")
+
+        with patch("harness.core.gates.get_head_commit_epoch", return_value=0.0):
+            verdict = check_ship_readiness(task_dir)
+
+        assert isinstance(verdict, GateVerdict)
+        blocked_names = [c.name for c in verdict.hard_blocked]
+        assert "eval_verdict_parseable" in blocked_names
+
 
 class TestVerdictEligibility:
     def test_iterate_blocks_in_eng_mode(self, tmp_path: Path):
@@ -426,6 +439,18 @@ class TestWriteGateSnapshot:
 
         with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
             write_gate_snapshot(task_dir, verdict)
+
+    def test_does_not_change_phase(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_workflow_state(task_dir, phase="evaluating")
+        verdict = GateVerdict(passed=True, checks=[], summary="all checks passed")
+
+        write_gate_snapshot(task_dir, verdict)
+
+        ws = load_workflow_state(task_dir)
+        assert ws is not None
+        assert ws.phase == "evaluating"
 
 
 class TestPermissionFailGraceful:

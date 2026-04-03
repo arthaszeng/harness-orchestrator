@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings as _warnings
 from pathlib import Path
 
 from harness.core.state import TaskState
@@ -79,6 +80,17 @@ def test_load_workflow_state_task_id_directory_mismatch_returns_none(tmp_path: P
         '{"schema_version": 1, "task_id": "task-002", "phase": "idle"}',
         encoding="utf-8",
     )
+
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
+        assert load_workflow_state(task_dir) is None
+    assert any("task_id mismatch" in str(x.message) for x in w)
+
+
+def test_load_workflow_state_non_utf8_returns_none(tmp_path: Path):
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+    task_dir.mkdir(parents=True)
+    (task_dir / WORKFLOW_STATE_FILENAME).write_bytes(b"\xff\xfe")
 
     assert load_workflow_state(task_dir) is None
 

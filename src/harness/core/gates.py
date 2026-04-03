@@ -100,7 +100,7 @@ def _file_exists_and_nonempty(path: Path) -> bool:
         with open(resolved, "r", encoding="utf-8") as f:
             head = f.read(64)
         return bool(head.strip())
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
 
 
@@ -142,7 +142,7 @@ def check_ship_readiness(
     if latest_eval and latest_eval.exists():
         try:
             content = latest_eval.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             content = ""
         m = _VERDICT_LINE_RE.search(content)
         if m:
@@ -262,7 +262,6 @@ def write_gate_snapshot(task_dir: Path, verdict: GateVerdict) -> bool:
         return False
 
     from datetime import datetime, timezone
-    from harness.core.state import TaskState
     from harness.core.workflow_state import sync_task_state
 
     status = GateStatus.PASS if verdict.passed else GateStatus.BLOCKED
@@ -275,6 +274,5 @@ def write_gate_snapshot(task_dir: Path, verdict: GateVerdict) -> bool:
                 "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             },
         },
-        phase=TaskState.SHIPPING,
     )
     return True

@@ -106,7 +106,7 @@ def load_handoff(task_dir: Path, source_phase: HandoffPhase) -> StageHandoff | N
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         warnings.warn(f"Corrupt handoff at {path} ({type(exc).__name__})", stacklevel=2)
         return None
     if not isinstance(raw, dict):

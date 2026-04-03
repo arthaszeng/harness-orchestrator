@@ -59,7 +59,15 @@ def load_feedback_ledger(task_dir: Path) -> FeedbackLedgerLoadResult:
 
     items: list[FeedbackItem] = []
     errors: list[str] = []
-    for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        return FeedbackLedgerLoadResult(
+            path=str(path),
+            errors=[f"file: {type(exc).__name__}: {exc}"],
+        )
+
+    for idx, line in enumerate(lines, start=1):
         if not line.strip():
             continue
         try:

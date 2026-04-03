@@ -44,7 +44,11 @@ def run_gate(*, task: Optional[str] = None) -> None:
 
     _render_verdict(console, task_dir, verdict)
 
-    write_gate_snapshot(task_dir, verdict)
+    try:
+        write_gate_snapshot(task_dir, verdict)
+    except ValueError as exc:
+        ui.error(str(exc))
+        raise typer.Exit(code=1) from exc
 
     if not verdict.passed:
         raise typer.Exit(code=1)

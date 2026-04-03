@@ -139,6 +139,12 @@ class TestLoadHandoff:
         (task_dir / "handoff-plan.json").write_text("[1, 2, 3]", encoding="utf-8")
         assert load_handoff(task_dir, "plan") is None
 
+    def test_non_utf8_json_returns_none(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        (task_dir / "handoff-plan.json").write_bytes(b"\xff\xfe")
+        assert load_handoff(task_dir, "plan") is None
+
 
 class TestSaveHandoff:
     def test_creates_task_dir(self, tmp_path: Path):

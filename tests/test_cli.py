@@ -117,6 +117,23 @@ class TestGateCommand:
         assert result.exit_code == 0
         assert "task-002" in clean
 
+    def test_gate_invalid_workflow_state_exits_cleanly(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        (task_dir / "plan.md").write_text("# Plan\n\n## Deliverables\n", encoding="utf-8")
+        (task_dir / "evaluation-r1.md").write_text(
+            "# Eval\n\n## Verdict: PASS\n", encoding="utf-8",
+        )
+        (task_dir / "workflow-state.json").write_text("{broken", encoding="utf-8")
+
+        from unittest.mock import patch as mock_patch
+        with mock_patch("harness.core.gates.get_head_commit_epoch", return_value=0.0):
+            result = runner.invoke(app, ["gate", "--task", "task-001"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 1
+        assert "existing workflow-state.json is invalid" in clean
+
 
 class TestStatusCommand:
     def test_status_reads_canonical_workflow_state(self, tmp_path: Path, monkeypatch):

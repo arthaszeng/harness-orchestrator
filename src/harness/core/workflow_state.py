@@ -184,7 +184,7 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         warnings.warn(
             f"Corrupt workflow state at {path} ({type(exc).__name__})",
             stacklevel=2,
@@ -205,6 +205,11 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
         warnings.warn(f"Invalid workflow state at {path} ({exc})", stacklevel=2)
         return None
     if state.task_id != task_dir.name:
+        warnings.warn(
+            f"Workflow state task_id mismatch at {path} "
+            f"(task_id={state.task_id!r}, dir={task_dir.name!r})",
+            stacklevel=2,
+        )
         return None
     return state
 

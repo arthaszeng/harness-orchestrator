@@ -99,7 +99,7 @@ class SessionState(BaseModel):
         try:
             data = json.loads(state_file.read_text(encoding="utf-8"))
             return cls.model_validate(data)
-        except (json.JSONDecodeError, ValidationError, OSError) as exc:
+        except (json.JSONDecodeError, ValidationError, OSError, UnicodeDecodeError) as exc:
             warnings.warn(
                 f"Corrupt session state at {state_file} ({type(exc).__name__}: {exc}); "
                 "using fresh default state",

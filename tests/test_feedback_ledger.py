@@ -111,3 +111,15 @@ def test_save_feedback_ledger_keeps_artifact_when_state_sync_fails(tmp_path: Pat
 
     ledger_path = task_dir / "feedback-ledger.jsonl"
     assert ledger_path.exists()
+
+
+def test_load_feedback_ledger_non_utf8_reports_file_error(tmp_path: Path):
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+    task_dir.mkdir(parents=True)
+    (task_dir / "feedback-ledger.jsonl").write_bytes(b"\xff\xfe")
+
+    result = load_feedback_ledger(task_dir)
+
+    assert result.items == []
+    assert result.errors
+    assert result.errors[0].startswith("file:")
