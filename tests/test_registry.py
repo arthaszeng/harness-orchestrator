@@ -174,6 +174,34 @@ class TestSetSessionIdNormalization:
         assert row.session_id == "sess-77"
 
 
+# ── Registry.update_telemetry ─────────────────────────────────
+
+
+class TestUpdateTelemetry:
+    """update_telemetry() 可写入并覆盖 telemetry 字段。"""
+
+    def test_insert_telemetry(self, registry: Registry) -> None:
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
+        registry.update_telemetry(run_id, tokens_in=10, tokens_out=20, cached_tokens=3, cost=1.25)
+        row = registry.get(run_id)
+        assert row is not None
+        assert row.tokens_in == 10
+        assert row.tokens_out == 20
+        assert row.cached_tokens == 3
+        assert row.cost == 1.25
+
+    def test_upsert_overwrites_existing(self, registry: Registry) -> None:
+        run_id = registry.register(role="builder", runtime="cursor", agent_name="b")
+        registry.update_telemetry(run_id, tokens_in=1, tokens_out=2, cached_tokens=0, cost=0.5)
+        registry.update_telemetry(run_id, tokens_in=7, tokens_out=8, cached_tokens=2, cost=None)
+        row = registry.get(run_id)
+        assert row is not None
+        assert row.tokens_in == 7
+        assert row.tokens_out == 8
+        assert row.cached_tokens == 2
+        assert row.cost is None
+
+
 # ── RunTracker.track — 真实 Registry 路径 ─────────────────────
 
 
