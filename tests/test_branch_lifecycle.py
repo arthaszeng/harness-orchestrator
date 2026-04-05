@@ -107,3 +107,27 @@ def test_sync_feature_with_trunk_reports_abort_failure(tmp_path: Path, monkeypat
     assert result.ok is False
     assert result.code == "REBASE_ABORT_FAILED"
 
+
+def test_prepare_task_branch_resumes_existing_branch(tmp_path: Path, monkeypatch):
+    manager = _manager(tmp_path)
+    monkeypatch.setattr(
+        "harness.core.branch_lifecycle.ensure_clean_result",
+        lambda _cwd: GitOperationResult(ok=True, code="OK"),
+    )
+    monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
+    responses = iter(
+        [
+            GitOperationResult(ok=True, code="OK", message="checkout trunk"),
+            GitOperationResult(ok=True, code="OK", message="pull trunk"),
+            GitOperationResult(ok=False, code="BRANCH_CREATE_FAILED", message="exists"),
+            GitOperationResult(ok=True, code="OK", message="resume branch"),
+        ]
+    )
+    monkeypatch.setattr(
+        "harness.core.branch_lifecycle.run_git_result",
+        lambda *args, **kwargs: next(responses),
+    )
+    result = manager.prepare_task_branch("task-001", "demo")
+    assert result.ok is True
+    assert result.context.get("created") == "false"
+
