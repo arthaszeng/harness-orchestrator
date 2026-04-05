@@ -41,6 +41,8 @@ Built with **Typer**. Three commands:
 | `init`    | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
 | `gate`    | Check ship-readiness gates for the current task (hard + soft checks). |
 | `status`  | Load session state and render a Rich dashboard. |
+| `git-preflight` | Structured git preflight checks with deterministic result codes. |
+| `git-prepare-branch` | Create/resume task branch on top of configured trunk. |
 | `update`  | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes. |
 
 ---

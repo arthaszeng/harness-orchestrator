@@ -135,7 +135,12 @@ def _resolver_for_agents_dir(agents_dir: Path) -> TaskIdentityResolver:
     try:
         cfg = HarnessConfig.load(agents_dir.parent)
         return TaskIdentityResolver.from_config(cfg)
-    except Exception:
+    except Exception as exc:
+        warnings.warn(
+            f"failed to load task identity strategy from config ({type(exc).__name__}); "
+            "falling back to default resolver",
+            stacklevel=2,
+        )
         return TaskIdentityResolver()
 
 

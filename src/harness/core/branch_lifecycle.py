@@ -74,6 +74,14 @@ class BranchLifecycleManager:
                 code="INVALID_TASK_KEY",
                 message=f"task key '{task_key}' does not match strategy '{self.resolver.strategy}'",
             )
+        wt = detect_worktree(self.project_root)
+        if wt is not None:
+            return GitOperationResult(
+                ok=True,
+                code="WORKTREE_SKIP",
+                message="worktree detected; skip automatic branch preparation",
+                context={"branch": wt.branch, "trunk": self.trunk_branch},
+            )
         desc = _sanitize_short_desc(short_desc)
         branch_name = f"{self.branch_prefix}/{task_key}"
         if desc:
@@ -147,6 +155,22 @@ class BranchLifecycleManager:
         if rebase.ok:
             return GitOperationResult(ok=True, code="OK", message="feature branch is synced with trunk")
 
-        run_git_result(["rebase", "--abort"], self.project_root, code_on_error="REBASE_ABORT_FAILED")
+        abort = run_git_result(
+            ["rebase", "--abort"],
+            self.project_root,
+            code_on_error="REBASE_ABORT_FAILED",
+            message="failed to abort rebase after error",
+        )
+        if not abort.ok:
+            return GitOperationResult(
+                ok=False,
+                code="REBASE_ABORT_FAILED",
+                message="rebase failed and abort failed",
+                stderr=(abort.stderr or rebase.stderr),
+                context={
+                    "rebase_code": rebase.code,
+                    "abort_code": abort.code,
+                },
+            )
         return rebase
 
