@@ -150,3 +150,4 @@
 1. **task-013（P0）**：落地 `e2e_total_time` / `manual_interventions_per_task` / `first_pass_rate` 指标采集与报告输出。
 2. **task-014（P1）**：引入 ship 风险分层执行策略，并增加命令能力探测与降级提示。
 3. **task-015（P2）**：建立阶段耗时与人工介入热区的趋势分析与回归门槛。
+
