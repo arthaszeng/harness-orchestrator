@@ -6,6 +6,7 @@ from pathlib import Path
 
 from harness.core.post_ship_pending import (
     enqueue_pending_post_ship,
+    has_pending_post_ship,
     reconcile_pending_post_ship,
 )
 from harness.integrations.git_ops import GitOperationResult
@@ -31,6 +32,24 @@ def test_enqueue_pending_dedupes(tmp_path: Path):
     added_dup = enqueue_pending_post_ship(tmp_path, task_key="task-009", pr_number=99, branch="agent/task-009-a")
     assert added is True
     assert added_dup is False
+
+
+def test_has_pending_post_ship_false_when_queue_missing(tmp_path: Path):
+    assert has_pending_post_ship(tmp_path) is False
+
+
+def test_has_pending_post_ship_true_when_queue_non_empty(tmp_path: Path):
+    queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+    queue.parent.mkdir(parents=True, exist_ok=True)
+    queue.write_text('{"task_key":"task-009"}\n', encoding="utf-8")
+    assert has_pending_post_ship(tmp_path) is True
+
+
+def test_has_pending_post_ship_false_when_queue_empty(tmp_path: Path):
+    queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+    queue.parent.mkdir(parents=True, exist_ok=True)
+    queue.write_text("", encoding="utf-8")
+    assert has_pending_post_ship(tmp_path) is False
 
 
 def test_reconcile_pending_keeps_open_entries(tmp_path: Path):

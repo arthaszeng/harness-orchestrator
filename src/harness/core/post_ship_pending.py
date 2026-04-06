@@ -20,6 +20,15 @@ def _pending_path(project_root: Path) -> Path:
     return project_root / ".harness-flow" / PENDING_FILENAME
 
 
+def has_pending_post_ship(project_root: Path) -> bool:
+    """Fast check for whether fallback queue may contain entries."""
+    path = _pending_path(project_root)
+    try:
+        return path.exists() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
 def _load_pending(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []

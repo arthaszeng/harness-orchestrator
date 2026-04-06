@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -31,10 +32,14 @@ def main(
 ) -> None:
     """Cursor-native multi-agent development framework."""
     # Best-effort post-ship fallback reconciliation for cross-session resilience.
-    if ctx.invoked_subcommand in {"git-post-ship", "git-post-ship-reconcile", "git-post-ship-watch"}:
-        return
     try:
-        from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
+        from harness.commands.git_lifecycle import (
+            run_git_post_ship_reconcile_background,
+            should_run_background_reconcile,
+        )
+
+        if not should_run_background_reconcile(Path.cwd(), ctx.invoked_subcommand):
+            return
 
         run_git_post_ship_reconcile_background(max_items=20)
     except Exception:

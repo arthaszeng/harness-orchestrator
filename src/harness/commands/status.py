@@ -8,6 +8,7 @@ from pathlib import Path
 from rich.panel import Panel
 from rich.table import Table
 
+from harness.core.post_ship_pending import has_pending_post_ship
 from harness.core.config import HarnessConfig, WorkflowConfig
 from harness.core.progress import (
     get_recent_blocked,
@@ -240,7 +241,9 @@ def _render_agents(
 
 def _render_stats(console, state: SessionState) -> None:
     s = state.stats
+    reconcile_mode = "hit" if has_pending_post_ship(Path.cwd()) else "skip"
     console.print(
         f"\n[cyber.dim]Stats: {s.completed} done, {s.blocked} blocked | "
-        f"Avg: {s.avg_score:.1f} | Iters: {s.total_iterations}[/]",
+        f"Avg: {s.avg_score:.1f} | Iters: {s.total_iterations} | "
+        f"Auto reconcile: {reconcile_mode}[/]",
     )

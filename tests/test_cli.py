@@ -171,6 +171,31 @@ class TestStatusCommand:
         assert "Canonical Workflow State Artifact" in clean
         assert "awaiting ship readiness" in clean
 
+    def test_status_renders_auto_reconcile_skip_by_default(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        WorkflowState(task_id="task-001").save(task_dir)
+        result = runner.invoke(app, ["status"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 0
+        assert "Auto reconcile: skip" in clean
+
+    def test_status_renders_auto_reconcile_hit_when_pending_exists(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "harness.commands.git_lifecycle.should_run_background_reconcile",
+            lambda *_a, **_k: False,
+        )
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        WorkflowState(task_id="task-001").save(task_dir)
+        queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+        queue.parent.mkdir(parents=True, exist_ok=True)
+        queue.write_text('{"task_key":"task-013"}\n', encoding="utf-8")
+        result = runner.invoke(app, ["status"])
+        clean = _ANSI_RE.sub("", result.output)
+        assert result.exit_code == 0
+        assert "Auto reconcile: hit" in clean
+
 
 class TestSaveFeedbackLedgerCommand:
     def test_save_feedback_ledger_writes_file_and_updates_state(self, tmp_path: Path, monkeypatch):
@@ -244,6 +269,45 @@ class TestSaveFeedbackLedgerCommand:
 
 
 class TestGitLifecycleCommands:
+    def test_should_run_background_reconcile_false_without_pending(self, tmp_path: Path):
+        from harness.commands.git_lifecycle import should_run_background_reconcile
+        assert should_run_background_reconcile(tmp_path, "status") is False
+
+    def test_should_run_background_reconcile_true_with_pending(self, tmp_path: Path):
+        from harness.commands.git_lifecycle import should_run_background_reconcile
+        queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+        queue.parent.mkdir(parents=True, exist_ok=True)
+        queue.write_text('{"task_key":"task-013"}\n', encoding="utf-8")
+        assert should_run_background_reconcile(tmp_path, "status") is True
+
+    def test_should_run_background_reconcile_false_for_post_ship_commands(self, tmp_path: Path):
+        from harness.commands.git_lifecycle import should_run_background_reconcile
+        queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+        queue.parent.mkdir(parents=True, exist_ok=True)
+        queue.write_text('{"task_key":"task-013"}\n', encoding="utf-8")
+        assert should_run_background_reconcile(tmp_path, "git-post-ship") is False
+
+    def test_should_run_background_reconcile_false_when_subcommand_none(self, tmp_path: Path):
+        from harness.commands.git_lifecycle import should_run_background_reconcile
+        queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
+        queue.parent.mkdir(parents=True, exist_ok=True)
+        queue.write_text('{"task_key":"task-013"}\n', encoding="utf-8")
+        assert should_run_background_reconcile(tmp_path, None) is False
+
+    def test_git_post_ship_background_reconcile_skips_manager_when_no_pending(self, monkeypatch):
+        from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
+
+        called = {"create": False}
+
+        def _create(*_args, **_kwargs):
+            called["create"] = True
+            return object()
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.has_pending_post_ship", lambda *_a, **_k: False)
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", _create)
+        run_git_post_ship_reconcile_background(max_items=20)
+        assert called["create"] is False
+
     def test_git_preflight_json_output(self, monkeypatch):
         from harness.integrations.git_ops import GitOperationResult
 
