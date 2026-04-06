@@ -13,6 +13,12 @@
 | 4 | `harness-qa` | {% if role_models_qa %}不指定（继承父代理模型）{% else %}`model: "fast"`{% endif %} | diff（`{{ trunk_branch }}..HEAD`）、测试目录列表、`ci_command: {{ ci_command }}` | — |
 | 5 | `harness-project-manager` | {% if role_models_project_manager %}不指定（继承父代理模型）{% else %}`model: "fast"`{% endif %} | plan、diff `--stat` + commit log、交付物清单 | feedback/continue-pause 上下文 |
 
+**禁止附加（按角色预算）：** 组合 Task 提示词时，父代理**不得**：
+
+- 把**同一份完整** `git diff {{ trunk_branch }}..HEAD` 贴进**每一个**子代理——仅 Architect、Engineer、QA 按表格需要完整 diff。
+- 默认向 **Product Owner** 或 **Project Manager** 提供**完整**统一 diff。二者仅接收 `plan`、`git diff ... --stat`、commit log、交付物清单；仅当统计与 plan 明显矛盾时按「可选 context」追加**少量针对性 diff 片段**。
+- 向任一 Task 附加无关长会话记录、流水日志或**其他角色的完整评审原文**——只放该行 Required/Optional 所列内容。
+
 **模型控制**：Task 工具 `model` 参数仅接受 `"fast"` 或省略（继承父代理模型）。
 当 `[native.role_models]` 为某角色配置了模型时，生成的 agent 定义会包含 `model:` 字段
 作为 IDE 级别的信号；此时省略 Task `model` 参数以让 agent 定义生效。
@@ -37,6 +43,12 @@
 **CI 所有权：** 只有 `harness-qa` 运行 `{{ ci_command }}`。其他角色
 对 diff 执行只读分析。
 
+**Task 提示词组合（固定协议 vs 本次事实）**
+
+- **固定协议：** 子代理行为**只能**来自 agent 模板中 **「评审代码时（mode: code-eval）」** 对应段落（或英文等价标题）。禁止在 Task 正文中改写角色职责。
+- **本次事实：** 仅附加表格允许的内容——diff 范围、stat 摘要、路径、有边界的片段、`ci_command`、目录列表。若角色只需清单，优先指针而非重复粘贴整份 plan。
+- **禁止（广播）：** 不要把**相同的大块**上下文（整份 plan + 整份 diff + 整份日志）复制进**全部五个** Task；按每行的必需/可选列裁剪。
+
 **降级阶梯**（如果 Task 工具调用失败）：
 - **5/5 响应：** 按下述方式完整合成
 - **3-4/5 响应：** 使用可用的评审结果继续，注明缺失的视角
@@ -47,8 +59,9 @@
 
 所有响应到达后：
 
-1. **合并发现** — 将所有 5 位审查者的发现合并为统一列表
-2. **过滤超范围发现** — 使用角色→职责映射：
+1. **归一化并聚类发现** — 归一化表述（去掉套话）；将**同一根因**的发现归为一簇；记录每簇由哪些角色贡献（用于 `[HIGH CONFIDENCE]`，并与下方重复签名惩罚对齐）。
+2. **合并发现** — 由簇生成统一列表（每簇一条规范表述，保留角色来源/标签）。
+3. **过滤超范围发现** — 使用角色→职责映射：
    | 角色 | 负责 | 不得报告 |
    |------|------|---------|
    | Architect | 设计、模块、依赖、安全设计 | 代码质量、测试、交付、用户价值 |
@@ -61,11 +74,11 @@
    - **范围内**：保持原样
    - **范围外 + CRITICAL**：重新标记为 `[CROSS-ROLE]` 并保留
    - **范围外 + WARN/INFO**：标记 `[OUT-OF-SCOPE]` 并从评分中排除
-3. **交叉验证：** 如果 2+ 个角色标记同一问题 → 标记 `[HIGH CONFIDENCE]`
-4. **方向/治理合成：** 保持角色建议字段并列，不要合并为单一方向字段：
+4. **交叉验证：** 如果 2+ 个角色标记同一问题（或同一簇） → 标记 `[HIGH CONFIDENCE]`
+5. **方向/治理合成：** 保持角色建议字段并列，不要合并为单一方向字段：
    - Product Owner → `Value recommendation`
    - Project Manager → `Delivery recommendation`
-5. **计算维度评分**（将角色映射到评审维度）：
+6. **计算维度评分**（将角色映射到评审维度）：
    ```
    Design:        [architect score]/10
    Completeness:  [product-owner score]/10
@@ -75,7 +88,7 @@
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-6. **确定裁定：**
+7. **确定裁定：**
    - 全部 PASS 且 avg ≥ {{ pass_threshold }} → `PASS`
    - 任何 CRITICAL 发现 → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`

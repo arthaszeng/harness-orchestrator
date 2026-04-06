@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
     _build_full_context,
@@ -1916,3 +1918,48 @@ class TestShipFastPathAndResume:
         plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
         content = plan.read_text(encoding="utf-8")
         assert "Continuity guarantee" in content or "continuity guarantee" in content
+
+
+class TestRoadmapA2InstructionPrecision:
+    """Phase A2: progress envelope, Task protocol/facts split, clustering synthesis."""
+
+    @pytest.mark.parametrize("lang", ["en", "zh"])
+    def test_core_skills_contain_harness_progress(self, tmp_path: Path, lang: str):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang=lang, cfg=cfg)
+        base = tmp_path / ".cursor" / "skills" / "harness"
+        for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
+            text = (base / name / "SKILL.md").read_text(encoding="utf-8")
+            assert "HARNESS_PROGRESS" in text, f"{lang}/{name} missing HARNESS_PROGRESS"
+
+    def test_en_plan_review_task_composition_and_clustering(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+        plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+        content = plan.read_text(encoding="utf-8")
+        assert "Task prompt composition (protocol vs facts)" in content
+        assert "Normalize and cluster findings" in content
+
+    def test_zh_plan_review_task_composition_and_clustering(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+        plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+        content = plan.read_text(encoding="utf-8")
+        assert "Task 提示词组合（固定协议 vs 本次事实）" in content
+        assert "归一化并聚类发现" in content
+
+    def test_en_code_review_do_not_attach_and_clustering(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+        eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+        content = eval_skill.read_text(encoding="utf-8")
+        assert "Do NOT attach (per-role budget)" in content
+        assert "Normalize and cluster findings" in content
+
+    def test_zh_code_review_do_not_attach_and_clustering(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+        eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+        content = eval_skill.read_text(encoding="utf-8")
+        assert "禁止附加（按角色预算）" in content
+        assert "归一化并聚类发现" in content

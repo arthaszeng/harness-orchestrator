@@ -1,0 +1,19 @@
+## 框架进度行（强制）
+
+在本 SKILL 的**每个编号步骤边界**（开始或结束一个主要 Step 时），输出**恰好一行**，使用以下可解析格式（字段名保持英文）：
+
+`HARNESS_PROGRESS step=<current>/<total> phase=<slug> next=<一句祈使说明>`
+
+规则：
+
+- 该行**只有一行**，同一行内不要追加其他句子。
+- `step` 表示你在**本 SKILL**编号步骤中的位置（例如 `2/8`）。
+- `phase` 为短标签，与本工作流一致：使用 `plan` | `build` | `eval` | `ship` 之一。
+- `next` 是你**紧接着**要做的动作，面向用户、祈使语气。
+- 在**进入**某个 Step 时输出（或在上一步结束时输出，二选一但要一致）。连续跳过超过一个编号 Step 而不输出进度行是禁止的。
+
+示例（仅作格式说明）：
+
+`HARNESS_PROGRESS step=1/6 phase=eval next=收集任务上下文并读取 plan.md`
+
+`HARNESS_PROGRESS step=2/8 phase=ship next=在最新 {{ trunk_branch }} 上 rebase`

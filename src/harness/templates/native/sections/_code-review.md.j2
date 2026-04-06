@@ -13,6 +13,12 @@ Send a SINGLE message containing all 5 Task tool calls:
 | 4 | `harness-qa` | {% if role_models_qa %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | diff (`{{ trunk_branch }}..HEAD`), test directory listing, `ci_command: {{ ci_command }}` | — |
 | 5 | `harness-project-manager` | {% if role_models_project_manager %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, diff `--stat` + commit log, deliverable checklist | feedback/continue-pause context |
 
+**Do NOT attach (per-role budget):** When composing Task prompts, the parent agent MUST NOT:
+
+- Paste the **same full** `git diff {{ trunk_branch }}..HEAD` output into **every** subagent — only Architect, Engineer, and QA receive the full diff as required.
+- Give **Product Owner** or **Project Manager** the **full** unified diff by default. They get `plan`, `git diff ... --stat`, commit log, and deliverable checklist only; add **small targeted diff snippets** when stats contradict the plan (per Optional context).
+- Attach unrelated long transcripts, session logs, or **other roles' full review outputs** to any Task — include only what that row lists.
+
 **Model control**: The Task tool `model` parameter only accepts `"fast"` or omission (inherit
 parent model). When `[native.role_models]` is configured for a role, the generated agent
 definition includes a `model:` field as an additional IDE-level signal; in this case, omit
@@ -40,6 +46,12 @@ Each prompt must include:
 **CI Ownership:** Only `harness-qa` runs `{{ ci_command }}`. Other roles
 perform read-only analysis on the diff.
 
+**Task prompt composition (protocol vs facts)**
+
+- **Fixed protocol:** Subagent behavior MUST come **only** from the agent template section **"When reviewing code (mode: code-eval)"** (or non-English equivalent). Do not paraphrase or rewrite role duties inside the Task body.
+- **Facts for this run:** Attach only what the table allows — diff range, stat summary, paths, bounded snippets, `ci_command`, listings. Prefer pointers over duplicating the entire plan into roles that only need the checklist.
+- **Forbidden (broadcasting):** Do not paste **identical** large context blocks (full plan + full diff + full logs) into **all five** Tasks. Tailor each Task payload to that row's Required/Optional columns.
+
 **Degradation ladder** (if Task tool calls fail):
 - **5/5 respond:** Full synthesis as described below
 - **3-4/5 respond:** Proceed with available reviews, note missing perspectives
@@ -50,8 +62,9 @@ perform read-only analysis on the diff.
 
 After all responses arrive:
 
-1. **Merge findings** from all 5 reviewers into a unified list
-2. **Filter out-of-scope findings** using the role→responsibility map:
+1. **Normalize and cluster findings** — Normalize wording (strip boilerplate); group items that share the **same root cause** into one cluster; record which roles contributed (feeds `[HIGH CONFIDENCE]` and aligns with repeat-signature penalties below).
+2. **Merge findings** — Build one unified list from clusters (one canonical entry per cluster, preserve role lineage / tags).
+3. **Filter out-of-scope findings** using the role→responsibility map:
    | Role | Owns | Must NOT report |
    |------|------|----------------|
    | Architect | Design, modules, deps, security design | Code quality, tests, delivery, user value |
@@ -64,12 +77,12 @@ After all responses arrive:
    - **In-scope**: keep as-is
    - **Out-of-scope + CRITICAL**: re-tag as `[CROSS-ROLE]` and keep
    - **Out-of-scope + WARN/INFO**: mark `[OUT-OF-SCOPE]` and exclude from scoring
-3. **Cross-validate:** If 2+ roles flag the same issue → mark `[HIGH CONFIDENCE]`
-4. **Direction/governance synthesis:** Keep role-specific recommendations separate:
+4. **Cross-validate:** If 2+ roles flag the same issue (or the same cluster) → mark `[HIGH CONFIDENCE]`
+5. **Direction/governance synthesis:** Keep role-specific recommendations separate:
    - Product Owner → `Value recommendation`
    - Project Manager → `Delivery recommendation`
    - Do NOT collapse them into one generic direction field
-5. **Compute dimension scores** (map role to evaluation dimension):
+6. **Compute dimension scores** (map role to evaluation dimension):
    ```
    Design:        [architect score]/10
    Completeness:  [product-owner score]/10
@@ -79,7 +92,7 @@ After all responses arrive:
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-6. **Determine verdict:**
+7. **Determine verdict:**
    - All PASS and avg ≥ {{ pass_threshold }} → `PASS`
    - Any CRITICAL finding → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`
