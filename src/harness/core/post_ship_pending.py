@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from harness.core.post_ship import PostShipManager
-from harness.integrations.git_ops import GitOperationResult
 
 PENDING_FILENAME = "post-ship-pending.jsonl"
 
