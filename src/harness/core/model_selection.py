@@ -76,6 +76,15 @@ def resolve_effective_model(*candidates: str, available_models: list[str] | None
 
     Empty string means: do not pin a model in agent frontmatter, which lets
     Cursor use the IDE default model.
+
+    Integration with Task tool dispatch:
+    - Non-empty result → written into agent frontmatter ``model:`` field;
+      dispatch tables instruct the parent to omit the Task ``model`` parameter
+      so the agent definition can take effect.
+    - Empty result → no ``model:`` in frontmatter; dispatch tables instruct
+      the parent to pass ``model: "fast"`` for cost-efficient dispatch.
+    - The Task tool ``model`` parameter only accepts ``"fast"`` or omission
+      (inherit parent); arbitrary model names cannot be passed through it.
     """
     available = set(available_models or [])
     for candidate in candidates:

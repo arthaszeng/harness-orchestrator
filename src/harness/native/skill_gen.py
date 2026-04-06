@@ -127,12 +127,13 @@ _LAYER_KEYS: dict[int, set[str]] = {
         "retro_window_days",
         "memverse_enabled",
         "memverse_domain",
+        # role_models_* in L0: needed by dispatch tables in plan/eval/ship sections
+        *(f"role_models_{rn}" for rn in sorted(NATIVE_REVIEW_ROLES)),
     },
     1: {
         "planner_principles",
         "builder_principles",
         "evaluator_model",
-        *(f"role_models_{rn}" for rn in sorted(NATIVE_REVIEW_ROLES)),
     },
     2: {
         "review_gate",
@@ -148,17 +149,17 @@ _LAYER_KEYS: dict[int, set[str]] = {
 ArtifactType = str  # "skill" | "agent" | "rule"
 
 _ARTIFACT_LAYERS: dict[tuple[ArtifactType, str], set[int]] = {
-    # Skills — need all layers (base + role + stage)
-    ("skill", "harness-brainstorm"): {0, 1, 2},
-    ("skill", "harness-vision"): {0, 1, 2},
-    ("skill", "harness-plan"): {0, 1, 2},
-    ("skill", "harness-build"): {0, 1, 2},
-    ("skill", "harness-eval"): {0, 1, 2},
-    ("skill", "harness-ship"): {0, 1, 2},
-    ("skill", "harness-investigate"): {0, 1, 2},
-    ("skill", "harness-learn"): {0, 1, 2},
-    ("skill", "harness-doc-release"): {0, 1, 2},
-    ("skill", "harness-retro"): {0, 1, 2},
+    # Skills — layers per actual template key usage
+    ("skill", "harness-brainstorm"): {0, 1, 2},  # L1: planner_principles; L2: review_gate, hooks, gates
+    ("skill", "harness-vision"): {0, 1, 2},       # L1: planner_principles; L2: review_gate, hooks, gates
+    ("skill", "harness-plan"): {0, 1, 2},          # L1: planner_principles; L2: plan_review_gate, gates
+    ("skill", "harness-build"): {0, 1, 2},         # L1: builder_principles; L2: hooks
+    ("skill", "harness-eval"): {0, 2},             # L2: hooks_post_eval; no L1 keys used
+    ("skill", "harness-ship"): {0, 2},             # L2: review_gate, hooks; no L1 keys used
+    ("skill", "harness-investigate"): {0},         # base only — no L1/L2 keys referenced
+    ("skill", "harness-learn"): {0},               # base only — no L1/L2 keys referenced
+    ("skill", "harness-doc-release"): {0},         # base only — no L1/L2 keys referenced
+    ("skill", "harness-retro"): {0},               # base only — no L1/L2 keys referenced
     # Agents — base + role (no stage hooks)
     ("agent", "harness-architect"): {0, 1},
     ("agent", "harness-product-owner"): {0, 1},
