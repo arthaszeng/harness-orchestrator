@@ -31,7 +31,7 @@ def main(
 ) -> None:
     """Cursor-native multi-agent development framework."""
     # Best-effort post-ship fallback reconciliation for cross-session resilience.
-    if ctx.invoked_subcommand in {"git-post-ship", "git-post-ship-reconcile"}:
+    if ctx.invoked_subcommand in {"git-post-ship", "git-post-ship-reconcile", "git-post-ship-watch"}:
         return
     try:
         from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
@@ -133,7 +133,7 @@ def git_post_ship(
         help="Timeout (seconds) when --wait-merge is enabled",
     ),
     poll_interval_sec: int = typer.Option(
-        15,
+        30,
         "--poll-interval-sec",
         help="Polling interval (seconds) when --wait-merge is enabled",
     ),
@@ -147,6 +147,36 @@ def git_post_ship(
         pr=pr,
         branch=branch,
         wait_merge=wait_merge,
+        timeout_sec=timeout_sec,
+        poll_interval_sec=poll_interval_sec,
+        as_json=as_json,
+    )
+
+
+@app.command(name="git-post-ship-watch")
+def git_post_ship_watch(
+    task_key: str = typer.Option("", "--task-key", "-t", help="Task key (e.g. task-001 or PROJ-123)"),
+    pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
+    branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
+    timeout_sec: int = typer.Option(
+        86400,
+        "--timeout-sec",
+        help="Watcher timeout (seconds) before auto-stop",
+    ),
+    poll_interval_sec: int = typer.Option(
+        30,
+        "--poll-interval-sec",
+        help="Polling interval (seconds) for merge detection",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
+) -> None:
+    """Start detached post-ship watcher and return immediately."""
+    from harness.commands.git_lifecycle import run_git_post_ship_watch_start
+
+    run_git_post_ship_watch_start(
+        task_key=task_key,
+        pr=pr,
+        branch=branch,
         timeout_sec=timeout_sec,
         poll_interval_sec=poll_interval_sec,
         as_json=as_json,

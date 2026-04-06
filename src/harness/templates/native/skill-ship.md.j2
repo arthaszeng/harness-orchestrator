@@ -458,9 +458,9 @@ Immediately after PR creation/update, auto-start post-ship watcher (no manual po
 
 1. Resolve `TASK_KEY` from current branch or task directory.
 2. Resolve `PR_NUMBER` from the created/updated PR URL.
-3. Start watcher with merge wait mode:
+3. Start detached watcher (returns immediately):
    ```bash
-   harness git-post-ship --task-key TASK_KEY --pr PR_NUMBER --wait-merge --json
+   harness git-post-ship-watch --task-key TASK_KEY --pr PR_NUMBER --json
    ```
 4. Behavior contract:
    - If PR is merged during wait window: auto-run trunk sync + local branch cleanup.

@@ -453,9 +453,9 @@ harness gate --task TASK_ID
 
 1. 从当前分支或任务目录解析 `TASK_KEY`。
 2. 从创建/更新后的 PR URL 解析 `PR_NUMBER`。
-3. 以等待合并模式启动 watcher：
+3. 启动后台 watcher（命令立即返回）：
    ```bash
-   harness git-post-ship --task-key TASK_KEY --pr PR_NUMBER --wait-merge --json
+   harness git-post-ship-watch --task-key TASK_KEY --pr PR_NUMBER --json
    ```
 4. 行为约定：
    - 若 PR 在等待窗口内已合并：自动执行 trunk 同步 + 本地分支清理。

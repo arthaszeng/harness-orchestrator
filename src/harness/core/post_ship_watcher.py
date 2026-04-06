@@ -27,7 +27,7 @@ class PostShipWatcher:
         pr_number: int | None,
         branch: str | None = None,
         timeout_sec: int = 86400,
-        poll_interval_sec: int = 15,
+        poll_interval_sec: int = 30,
     ) -> GitOperationResult:
         start = time.time()
         while (time.time() - start) < timeout_sec:

@@ -65,6 +65,7 @@ class TestHelpOutput:
         assert "git-prepare-branch" in clean
         assert "git-sync-trunk" in clean
         assert "git-post-ship" in clean
+        assert "git-post-ship-watch" in clean
         assert "git-post-ship-reconcile" in clean
 
 
@@ -358,6 +359,28 @@ class TestGitLifecycleCommands:
         assert payload["ok"] is True
         assert payload["code"] == "POST_SHIP_RECONCILED"
         assert payload["context"]["audit_write"] == "ok"
+
+    def test_git_post_ship_watch_json_output(self, monkeypatch, tmp_path: Path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "harness.commands.git_lifecycle.subprocess.Popen",
+            lambda *_a, **_k: type("P", (), {"pid": 43210})(),
+        )
+
+        class _Manager:
+            def infer_task_key_from_branch(self, _branch=None):
+                return "task-010"
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
+        result = runner.invoke(
+            app,
+            ["git-post-ship-watch", "--task-key", "task-010", "--pr", "70", "--json"],
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["code"] == "PR_WATCH_STARTED"
+        assert payload["context"]["poll_interval_sec"] == "30"
 
     def test_git_post_ship_requires_selector(self):
         result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -74,7 +77,7 @@ def run_git_post_ship(
     branch: str = "",
     wait_merge: bool = False,
     timeout_sec: int = 86400,
-    poll_interval_sec: int = 15,
+    poll_interval_sec: int = 30,
     as_json: bool = False,
 ) -> None:
     manager = PostShipManager.create(Path.cwd())
@@ -191,4 +194,89 @@ def run_git_post_ship_reconcile_background(*, max_items: int = 20) -> None:
         return
     manager = PostShipManager.create(Path.cwd())
     reconcile_pending_post_ship(manager, max_items=max_items)
+
+
+def run_git_post_ship_watch_start(
+    *,
+    task_key: str = "",
+    pr: Optional[int] = None,
+    branch: str = "",
+    timeout_sec: int = 86400,
+    poll_interval_sec: int = 30,
+    as_json: bool = False,
+) -> None:
+    """Start a detached post-ship watcher process.
+
+    The spawned watcher polls every `poll_interval_sec` and self-terminates
+    when merge cleanup finishes, PR is closed-unmerged, or timeout is reached.
+    """
+    manager = PostShipManager.create(Path.cwd())
+    inferred_from_branch = manager.infer_task_key_from_branch(branch or None) if branch else None
+    if not task_key and inferred_from_branch:
+        task_key = inferred_from_branch
+    if not task_key:
+        raise typer.BadParameter("task key is required (provide --task-key or run from task branch)")
+    if pr is None and not branch:
+        raise typer.BadParameter("either --pr or --branch is required for PR lookup")
+    if branch and inferred_from_branch and task_key != inferred_from_branch:
+        raise typer.BadParameter("task key does not match provided branch")
+    if pr is not None and pr < 1:
+        raise typer.BadParameter("pr must be a positive integer")
+    if timeout_sec < 1:
+        raise typer.BadParameter("timeout_sec must be >= 1")
+    if poll_interval_sec < 1:
+        raise typer.BadParameter("poll_interval_sec must be >= 1")
+
+    runtime_dir = Path.cwd() / ".harness-flow" / "post-ship-watchers"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    selector = f"pr{pr}" if pr is not None else "branch"
+    log_path = runtime_dir / f"watch-{task_key}-{selector}-{stamp}.log"
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "harness",
+        "git-post-ship",
+        "--task-key",
+        task_key,
+        "--wait-merge",
+        "--timeout-sec",
+        str(timeout_sec),
+        "--poll-interval-sec",
+        str(poll_interval_sec),
+        "--json",
+    ]
+    if pr is not None:
+        cmd.extend(["--pr", str(pr)])
+    if branch:
+        cmd.extend(["--branch", branch])
+
+    with log_path.open("a", encoding="utf-8") as log_handle:
+        proc = subprocess.Popen(  # noqa: S603,S607 - internal self-invocation
+            cmd,
+            cwd=str(Path.cwd()),
+            stdout=log_handle,
+            stderr=log_handle,
+            start_new_session=True,
+        )
+
+    payload = {
+        "ok": True,
+        "code": "PR_WATCH_STARTED",
+        "message": "detached post-ship watcher started",
+        "context": {
+            "task_key": task_key,
+            "pr": str(pr or ""),
+            "branch": branch,
+            "pid": str(proc.pid),
+            "timeout_sec": str(timeout_sec),
+            "poll_interval_sec": str(poll_interval_sec),
+            "log_path": str(log_path),
+        },
+    }
+    if as_json:
+        typer.echo(json.dumps(payload, ensure_ascii=False))
+    else:
+        typer.echo(f"[{payload['code']}] {payload['message']}")
 
