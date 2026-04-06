@@ -235,20 +235,33 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
     return state
 
 
+# EVALUATING, PLANNING, and BUILDING are "lateral" transitions — they record
+# the current activity rather than gating pipeline progression.  CLI artifact
+# commands (save-eval, save-build-log) can set these from any phase.
+_LATERAL_PHASES: frozenset[TaskState] = frozenset({
+    TaskState.EVALUATING,
+    TaskState.PLANNING,
+    TaskState.BUILDING,
+})
+
 _VALID_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
     TaskState.IDLE: frozenset({
         TaskState.PLANNING,
         TaskState.BUILDING,       # hotfix fast-path
+        TaskState.EVALUATING,     # standalone eval
         TaskState.BLOCKED,
     }),
     TaskState.PLANNING: frozenset({
         TaskState.CONTRACTED,
         TaskState.BUILDING,       # small tasks without formal contract
+        TaskState.EVALUATING,     # plan-eval
         TaskState.BLOCKED,
         TaskState.IDLE,           # cancellation
     }),
     TaskState.CONTRACTED: frozenset({
         TaskState.BUILDING,
+        TaskState.EVALUATING,     # plan-eval after contract
+        TaskState.PLANNING,       # re-planning
         TaskState.BLOCKED,
         TaskState.IDLE,           # cancellation
     }),
@@ -259,6 +272,7 @@ _VALID_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
     }),
     TaskState.EVALUATING: frozenset({
         TaskState.BUILDING,       # fix loop
+        TaskState.PLANNING,       # re-plan after eval
         TaskState.SHIPPING,
         TaskState.BLOCKED,
         TaskState.DONE,
@@ -267,10 +281,13 @@ _VALID_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
         TaskState.DONE,
         TaskState.BLOCKED,
         TaskState.EVALUATING,     # ship eval ITERATE fallback
+        TaskState.BUILDING,       # rebuild during ship
     }),
     TaskState.DONE: frozenset({
         TaskState.IDLE,           # new task
         TaskState.PLANNING,       # follow-up iteration
+        TaskState.BUILDING,       # post-done rebuild
+        TaskState.EVALUATING,     # re-eval after done
     }),
     TaskState.BLOCKED: frozenset(TaskState),  # unblock to any state
 }
