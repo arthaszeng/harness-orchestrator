@@ -338,6 +338,7 @@ class TestGitLifecycleCommands:
         payload = json.loads(result.output)
         assert payload["ok"] is True
         assert payload["code"] == "PR_WATCH_DEFERRED"
+        assert payload["context"]["fallback_reason"] == "timeout"
 
     def test_git_post_ship_reconcile_json_output(self, monkeypatch):
         monkeypatch.setattr(
@@ -380,7 +381,36 @@ class TestGitLifecycleCommands:
         payload = json.loads(result.output)
         assert payload["ok"] is True
         assert payload["code"] == "PR_WATCH_STARTED"
-        assert payload["context"]["poll_interval_sec"] == "30"
+        assert payload["context"]["poll_interval_sec"] == "10"
+
+    def test_git_post_ship_wait_merge_branch_changed_is_deferred(self, monkeypatch):
+        from harness.integrations.git_ops import GitOperationResult
+
+        class _Watcher:
+            def wait_and_finalize(self, **_kwargs):
+                return GitOperationResult(
+                    ok=False,
+                    code="POST_SHIP_DEFERRED_BRANCH_CHANGED",
+                    message="deferred",
+                )
+
+        class _Manager:
+            def infer_task_key_from_branch(self, _branch=None):
+                return "task-011"
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
+        monkeypatch.setattr("harness.commands.git_lifecycle.enqueue_pending_post_ship", lambda *_a, **_k: True)
+
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-011", "--pr", "70", "--wait-merge", "--json"],
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["code"] == "PR_WATCH_DEFERRED"
+        assert payload["context"]["fallback_reason"] == "branch_changed"
 
     def test_git_post_ship_requires_selector(self):
         result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])

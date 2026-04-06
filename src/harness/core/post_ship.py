@@ -116,10 +116,6 @@ class PostShipManager:
         if not merged.ok:
             return merged
 
-        clean = ensure_clean_result(self.project_root)
-        if not clean.ok:
-            return clean
-
         task_branch = self._resolve_task_branch(
             task_key=task_key,
             branch=branch,
@@ -148,6 +144,29 @@ class PostShipManager:
                 code="PROTECTED_BRANCH",
                 message=f"refusing to cleanup protected trunk branch '{self.trunk_branch}'",
             )
+
+        active_before = current_branch(self.project_root)
+        allowed = {self.trunk_branch}
+        if task_branch:
+            allowed.add(task_branch)
+        if active_before not in allowed:
+            return GitOperationResult(
+                ok=False,
+                code="POST_SHIP_DEFERRED_BRANCH_CHANGED",
+                message="active branch changed during watcher interval; deferred cleanup",
+                context={
+                    "task_key": task_key,
+                    "task_branch": task_branch,
+                    "active_branch": active_before,
+                    "trunk": self.trunk_branch,
+                    "pr": merged.context.get("pr", ""),
+                    "url": merged.context.get("url", ""),
+                },
+            )
+
+        clean = ensure_clean_result(self.project_root)
+        if not clean.ok:
+            return clean
 
         checkout = run_git_result(
             ["checkout", self.trunk_branch],

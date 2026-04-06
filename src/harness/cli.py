@@ -133,7 +133,7 @@ def git_post_ship(
         help="Timeout (seconds) when --wait-merge is enabled",
     ),
     poll_interval_sec: int = typer.Option(
-        30,
+        10,
         "--poll-interval-sec",
         help="Polling interval (seconds) when --wait-merge is enabled",
     ),
@@ -164,7 +164,7 @@ def git_post_ship_watch(
         help="Watcher timeout (seconds) before auto-stop",
     ),
     poll_interval_sec: int = typer.Option(
-        30,
+        10,
         "--poll-interval-sec",
         help="Polling interval (seconds) for merge detection",
     ),

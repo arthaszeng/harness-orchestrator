@@ -77,7 +77,7 @@ def run_git_post_ship(
     branch: str = "",
     wait_merge: bool = False,
     timeout_sec: int = 86400,
-    poll_interval_sec: int = 30,
+    poll_interval_sec: int = 10,
     as_json: bool = False,
 ) -> None:
     manager = PostShipManager.create(Path.cwd())
@@ -109,7 +109,7 @@ def run_git_post_ship(
             timeout_sec=timeout_sec,
             poll_interval_sec=poll_interval_sec,
         )
-        if result.code == "PR_WAIT_TIMEOUT":
+        if result.code in {"PR_WAIT_TIMEOUT", "POST_SHIP_DEFERRED_BRANCH_CHANGED"}:
             queued = enqueue_pending_post_ship(
                 Path.cwd(),
                 task_key=task_key,
@@ -117,14 +117,21 @@ def run_git_post_ship(
                 branch=branch or None,
             )
             status = "queued" if queued else "already_queued"
+            reason = "timeout" if result.code == "PR_WAIT_TIMEOUT" else "branch_changed"
+            deferred_message = (
+                "merge watcher timed out; registered fallback reconciliation"
+                if reason == "timeout"
+                else "merge detected but cleanup deferred due to branch switch; registered fallback reconciliation"
+            )
             result = GitOperationResult(
                 ok=True,
                 code="PR_WATCH_DEFERRED",
-                message="merge watcher timed out; registered fallback reconciliation",
+                message=deferred_message,
                 context={
                     "task_key": task_key,
                     "timeout_sec": str(timeout_sec),
                     "fallback_status": status,
+                    "fallback_reason": reason,
                 },
             )
     else:
@@ -202,7 +209,7 @@ def run_git_post_ship_watch_start(
     pr: Optional[int] = None,
     branch: str = "",
     timeout_sec: int = 86400,
-    poll_interval_sec: int = 30,
+    poll_interval_sec: int = 10,
     as_json: bool = False,
 ) -> None:
     """Start a detached post-ship watcher process.

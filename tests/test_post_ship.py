@@ -146,6 +146,32 @@ def test_finalize_after_merge_rejects_protected_branch(tmp_path: Path, monkeypat
     assert result.code == "PROTECTED_BRANCH"
 
 
+def test_finalize_after_merge_defers_when_active_branch_switched(tmp_path: Path, monkeypatch):
+    manager = _manager(tmp_path)
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager.check_pr_state",
+        lambda self, **kwargs: GitOperationResult(
+            ok=True,
+            code="PR_MERGED",
+            message="merged",
+            context={"pr": "70", "url": "https://example/pr/70"},
+        ),
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager._resolve_task_branch",
+        lambda self, **kwargs: "agent/task-011-post-watcher-30s",
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.current_branch",
+        lambda _cwd: "agent/task-012-other-work",
+    )
+
+    result = manager.finalize_after_merge(task_key="task-011", pr_number=70)
+    assert result.ok is False
+    assert result.code == "POST_SHIP_DEFERRED_BRANCH_CHANGED"
+    assert result.context.get("active_branch") == "agent/task-012-other-work"
+
+
 def test_finalize_after_merge_rejects_ambiguous_branch_resolution(tmp_path: Path, monkeypatch):
     manager = _manager(tmp_path)
     monkeypatch.setattr(
