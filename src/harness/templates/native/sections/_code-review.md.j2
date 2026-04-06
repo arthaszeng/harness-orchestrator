@@ -74,6 +74,17 @@ After all responses arrive:
    - Any CRITICAL finding → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`
 
+### Score Calibration Rules (signal quality)
+
+Apply these calibration rules before finalizing dimension scores:
+- Repeated finding signatures across rounds reduce score confidence:
+  - each repeated signature: `-0.30`
+  - cap total repeat penalty at `-1.50`
+- If a repeated finding is tagged `[HIGH CONFIDENCE]`, apply an additional `-0.50`.
+- Keep PASS/ITERATE gate semantics unchanged:
+  - CRITICAL still forces `ITERATE`
+  - threshold check still uses `{{ pass_threshold }}`.
+
 ### Fix-First Triage
 
 Apply the Fix-First heuristic from `.cursor/rules/harness-fix-first.mdc`:

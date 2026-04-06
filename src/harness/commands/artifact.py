@@ -174,3 +174,27 @@ def run_save_feedback_ledger(
 
     path = save_feedback_ledger(task_dir, items)
     ui.info(f"✓ {path.name} → {path}")
+
+
+def run_save_intervention_audit(
+    *,
+    task: str,
+    event_type: str,
+    command: str,
+    summary: str = "",
+) -> None:
+    """Append one intervention-audit event for the given task."""
+    from harness.core.intervention_audit import record_intervention_event
+
+    ui = get_ui()
+    task_dir = _resolve_task_dir(task)
+    ok = record_intervention_event(
+        Path.cwd(),
+        task_id=task_dir.name,
+        event_type=event_type,
+        command=command,
+        summary=summary,
+    )
+    if not ok:
+        raise typer.BadParameter("failed to write intervention audit event")
+    ui.info(f"✓ intervention-audit.jsonl updated for {task_dir.name}")

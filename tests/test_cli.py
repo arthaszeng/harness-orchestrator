@@ -40,6 +40,7 @@ class TestHelpOutput:
         assert "gate" in result.output
         assert "status" in result.output
         assert "update" in result.output
+        assert "save-intervention-audit" in result.output
 
     def test_help_does_not_list_install(self):
         result = runner.invoke(app, ["--help"])
@@ -198,6 +199,47 @@ class TestSaveFeedbackLedgerCommand:
         )
         assert result.exit_code != 0
 
+    def test_save_intervention_audit_writes_event(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-023"
+        task_dir.mkdir(parents=True)
+        WorkflowState(task_id="task-023").save(task_dir)
+        result = runner.invoke(
+            app,
+            [
+                "save-intervention-audit",
+                "--task",
+                "task-023",
+                "--event-type",
+                "manual_retry",
+                "--command",
+                "harness eval",
+                "--summary",
+                "rerun after failure",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (task_dir / "intervention-audit.jsonl").exists()
+
+    def test_save_intervention_audit_rejects_invalid_event_type(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-024"
+        task_dir.mkdir(parents=True)
+        WorkflowState(task_id="task-024").save(task_dir)
+        result = runner.invoke(
+            app,
+            [
+                "save-intervention-audit",
+                "--task",
+                "task-024",
+                "--event-type",
+                "bad_type",
+                "--command",
+                "unknown",
+            ],
+        )
+        assert result.exit_code != 0
+
 
 class TestGitLifecycleCommands:
     def test_git_preflight_json_output(self, monkeypatch):
@@ -301,6 +343,10 @@ class TestGitLifecycleCommands:
             "harness.commands.git_lifecycle.reconcile_pending_post_ship",
             lambda *_a, **_k: {"processed": 2, "merged": 1, "closed": 0, "retained": 1, "failed": 0},
         )
+        monkeypatch.setattr(
+            "harness.commands.git_lifecycle.record_intervention_event",
+            lambda *_a, **_k: True,
+        )
 
         class _Manager:
             pass
@@ -311,6 +357,7 @@ class TestGitLifecycleCommands:
         payload = json.loads(result.output)
         assert payload["ok"] is True
         assert payload["code"] == "POST_SHIP_RECONCILED"
+        assert payload["context"]["audit_write"] == "ok"
 
     def test_git_post_ship_requires_selector(self):
         result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])

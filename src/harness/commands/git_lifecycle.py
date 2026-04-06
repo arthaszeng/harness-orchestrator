@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 
 from harness.core.branch_lifecycle import BranchLifecycleManager
+from harness.core.intervention_audit import record_intervention_event
 from harness.core.post_ship import PostShipManager
 from harness.core.post_ship_pending import enqueue_pending_post_ship, reconcile_pending_post_ship
 from harness.core.post_ship_watcher import PostShipWatcher
@@ -155,10 +156,33 @@ def run_git_post_ship_reconcile(*, as_json: bool = False, max_items: int = 20) -
         "message": "post-ship pending queue reconciled",
         "context": {k: str(v) for k, v in stats.items()},
     }
+    # Explicit reconcile invocation is treated as a manual compensation action.
+    audit_ok = True
+    audit_error = ""
+    try:
+        ok = record_intervention_event(
+            Path.cwd(),
+            event_type="manual_compensation",
+            command="git-post-ship-reconcile",
+            summary="manual reconciliation command invoked",
+            metadata={"max_items": max_items, "processed": stats.get("processed", 0)},
+        )
+        if not ok:
+            audit_ok = False
+            audit_error = "task_dir_unresolved_or_invalid_event_type"
+    except Exception:
+        audit_ok = False
+        audit_error = "audit_write_failed"
+
+    payload["context"]["audit_write"] = "ok" if audit_ok else "failed"
+    if audit_error:
+        payload["context"]["audit_error"] = audit_error
     if as_json:
         typer.echo(json.dumps(payload, ensure_ascii=False))
     else:
         typer.echo(f"[{payload['code']}] {payload['message']}")
+        if not audit_ok:
+            typer.echo(f"[WARN] intervention audit not written ({audit_error})")
 
 
 def run_git_post_ship_reconcile_background(*, max_items: int = 20) -> None:

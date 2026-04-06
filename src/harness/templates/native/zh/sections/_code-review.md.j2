@@ -72,6 +72,17 @@
    - 任何 CRITICAL 发现 → `ITERATE`
    - avg < {{ pass_threshold }} → `ITERATE`
 
+### 分数校准规则（提升信号区分度）
+
+在最终落分前应用以下规则：
+- 跨轮次重复出现的问题签名会降低分数置信度：
+  - 每个重复签名：`-0.30`
+  - 重复惩罚总和上限 `-1.50`
+- 若重复项被标记为 `[HIGH CONFIDENCE]`，额外 `-0.50`。
+- 不改变 PASS/ITERATE 的门禁语义：
+  - 出现 CRITICAL 仍然强制 `ITERATE`
+  - 阈值判断仍使用 `{{ pass_threshold }}`。
+
 ### Fix-First 分类
 
 应用 `.cursor/rules/harness-fix-first.mdc` 中的 Fix-First 启发式：

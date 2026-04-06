@@ -226,6 +226,31 @@ def save_feedback_ledger(
     run_save_feedback_ledger(task=task, body=body)
 
 
+@app.command(name="save-intervention-audit")
+def save_intervention_audit(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    event_type: str = typer.Option(
+        ..., "--event-type",
+        help="Intervention type: manual_confirmation | manual_retry | manual_compensation",
+    ),
+    command: str = typer.Option(
+        ..., "--command",
+        help="Command or workflow step that required intervention",
+    ),
+    summary: str = typer.Option(
+        "", "--summary",
+        help="Short summary of the intervention context",
+    ),
+) -> None:
+    """Save one intervention-audit event to task directory."""
+    from harness.commands.artifact import run_save_intervention_audit
+
+    run_save_intervention_audit(task=task, event_type=event_type, command=command, summary=summary)
+
+
 @app.command()
 def update(
     check: bool = typer.Option(
