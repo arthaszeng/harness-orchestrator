@@ -93,7 +93,9 @@ def save_handoff(task_dir: Path, handoff: StageHandoff) -> Path:
             update={"created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")},
         )
     path = task_dir / _handoff_filename(handoff.source_phase)
-    path.write_text(handoff.model_dump_json(indent=2), encoding="utf-8")
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(handoff.model_dump_json(indent=2), encoding="utf-8")
+    tmp.replace(path)
     return path
 
 

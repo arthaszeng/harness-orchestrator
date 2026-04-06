@@ -78,13 +78,12 @@ class SessionState(BaseModel):
     stop_context: StopContext | None = None
 
     def save(self, agents_dir: Path) -> None:
-        """Persist to .harness-flow/state.json."""
+        """Persist to .harness-flow/state.json (atomic tmp+replace)."""
         agents_dir.mkdir(parents=True, exist_ok=True)
         state_file = agents_dir / "state.json"
-        state_file.write_text(
-            self.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
+        tmp = state_file.with_name(f".{state_file.name}.tmp")
+        tmp.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        tmp.replace(state_file)
 
     @classmethod
     def load(cls, agents_dir: Path) -> SessionState:
