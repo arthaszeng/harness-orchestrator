@@ -1,0 +1,19 @@
+## Framework progress line (mandatory)
+
+At **each numbered Step boundary** in this SKILL (when you start or finish a major Step), emit **exactly one line** using this machine-parsable format:
+
+`HARNESS_PROGRESS step=<current>/<total> phase=<slug> next=<one-line imperative>`
+
+Rules:
+
+- **One line only** for this progress line (no extra sentences on the same line).
+- `step` reflects your position through **this SKILL’s** numbered steps (e.g. `2/8`).
+- `phase` is a short slug matching this workflow: use `plan` | `build` | `eval` | `ship` as appropriate.
+- `next` is the **very next** action you will take, user-facing and imperative.
+- Emit **when entering** a Step (or when leaving the prior Step if clearer). Do not skip more than one numbered Step without emitting a line.
+
+Examples (illustrative):
+
+`HARNESS_PROGRESS step=1/6 phase=eval next=Gather task context and read plan.md`
+
+`HARNESS_PROGRESS step=2/8 phase=ship next=Rebase onto latest {{ trunk_branch }}`

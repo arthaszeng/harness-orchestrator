@@ -35,6 +35,13 @@ Each prompt must include:
   - if that context does not exist, keep the shared section's default single-round
     semantics and do NOT force loop assumptions
 
+**Task prompt composition (protocol vs facts)**
+
+- **Fixed protocol:** Subagent behavior MUST come **only** from the agent template section **"When reviewing plans (mode: plan-review)"** (or non-English equivalent). Do not paraphrase or rewrite role duties inside the Task body.
+- **Facts for this run:** Attach only what the table allows for that role — path pointers, short listings, `ci_command`, bounded excerpts. Prefer file paths over pasting entire documents when the role only needs to locate them.
+- **Forbidden (broadcasting):** Do not attach the **same** optional long-form bundle (e.g. full roadmap, full architecture appendix) to **all five** Task prompts. If only PO/PM need roadmap/stop-rule context, omit it for Architect/Engineer/QA unless the table says otherwise.
+- **Forbidden (wrong artifact):** Do not include **full git diff** or unrelated code dumps in plan-review Tasks — this mode is plan-only.
+
 **Degradation ladder** (if Task tool calls fail):
 - **5/5 respond:** Full synthesis as described below
 - **3-4/5 respond:** Proceed with available reviews, note missing perspectives
@@ -45,8 +52,9 @@ Each prompt must include:
 
 After all responses arrive:
 
-1. **Merge findings** from all 5 reviewers into a unified list
-2. **Filter out-of-scope findings** using the role→responsibility map:
+1. **Normalize and cluster findings** — Normalize wording (strip boilerplate); group items that share the **same root cause** into one cluster; record which roles contributed to each cluster (feeds `[HIGH CONFIDENCE]` without double-counting).
+2. **Merge findings** — Build one unified list from clusters (one canonical entry per cluster, preserve role lineage / tags).
+3. **Filter out-of-scope findings** using the role→responsibility map:
    | Role | Owns | Must NOT report |
    |------|------|----------------|
    | Architect | Design, modules, deps, security design | Code quality, tests, delivery, user value |
@@ -59,14 +67,14 @@ After all responses arrive:
    - **In-scope**: keep as-is
    - **Out-of-scope + CRITICAL**: re-tag as `[CROSS-ROLE]` and keep
    - **Out-of-scope + WARN/INFO**: mark `[OUT-OF-SCOPE]` and exclude from scoring
-3. **Cross-validate:** If 2+ roles flag the same issue → mark `[HIGH CONFIDENCE]`
-4. **Direction/governance synthesis:** Keep role-specific recommendations separate:
+4. **Cross-validate:** If 2+ roles flag the same issue (or the same cluster) → mark `[HIGH CONFIDENCE]`
+5. **Direction/governance synthesis:** Keep role-specific recommendations separate:
    - Product Owner → `Value recommendation`
    - Project Manager → `Delivery recommendation`
    - Do NOT collapse them into one generic direction field
-5. **Resolve conflicts:** If roles contradict each other, present both perspectives
+6. **Resolve conflicts:** If roles contradict each other, present both perspectives
    and mark as `[TASTE DECISION]` for the review gate
-6. **Compute aggregate score:**
+7. **Compute aggregate score:**
    ```
    Architecture:  [architect score]/10
    Product:       [product-owner score]/10
@@ -76,7 +84,7 @@ After all responses arrive:
    ─────────────────────────────────
    Weighted avg:  [avg]/10
    ```
-7. **Determine verdict:**
+8. **Determine verdict:**
    - All PASS and avg ≥ {{ pass_threshold }} → `PLAN_APPROVED`
    - Any CRITICAL finding → `PLAN_NEEDS_REVISION`
    - avg < {{ pass_threshold }} → `PLAN_NEEDS_REVISION`
