@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import typer
 
 from harness import __version__
@@ -97,7 +99,7 @@ def git_sync_trunk(
 @app.command(name="git-post-ship")
 def git_post_ship(
     task_key: str = typer.Option("", "--task-key", "-t", help="Task key (e.g. task-001 or PROJ-123)"),
-    pr: int | None = typer.Option(None, "--pr", help="Pull request number"),
+    pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
     branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
     wait_merge: bool = typer.Option(
         False,

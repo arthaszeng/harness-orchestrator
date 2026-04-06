@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -66,7 +67,7 @@ def run_git_sync_trunk(*, as_json: bool = False) -> None:
 def run_git_post_ship(
     *,
     task_key: str = "",
-    pr: int | None = None,
+    pr: Optional[int] = None,
     branch: str = "",
     wait_merge: bool = False,
     timeout_sec: int = 1800,
