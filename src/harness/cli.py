@@ -13,6 +13,29 @@ from harness.core.post_ship_pending import (
     is_auto_reconcile_eligible_subcommand,
 )
 
+def _log_debug_error(subcommand: str) -> None:
+    """Append a structured error entry to .harness-flow/debug.log.
+
+    Never raises — this is best-effort diagnostics that must not block
+    the user's command execution.
+    """
+    import traceback
+    from datetime import datetime, timezone
+
+    try:
+        log_dir = Path.cwd() / ".harness-flow"
+        if not log_dir.is_dir():
+            return
+        entry = (
+            f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] "
+            f"subcommand={subcommand} cwd={Path.cwd()}\n"
+            f"{traceback.format_exc()}\n"
+        )
+        (log_dir / "debug.log").open("a", encoding="utf-8").write(entry)
+    except Exception:
+        pass
+
+
 app = typer.Typer(
     name="harness",
     help="Cursor-native multi-agent development framework",
@@ -35,7 +58,6 @@ def main(
     ),
 ) -> None:
     """Cursor-native multi-agent development framework."""
-    # Best-effort post-ship fallback reconciliation for cross-session resilience.
     if not is_auto_reconcile_eligible_subcommand(ctx.invoked_subcommand):
         return
     if not has_pending_post_ship(Path.cwd()):
@@ -45,8 +67,7 @@ def main(
 
         run_git_post_ship_reconcile_background(max_items=20)
     except Exception:
-        # Never block user command execution on fallback reconciliation errors.
-        return
+        _log_debug_error(ctx.invoked_subcommand or "unknown")
 
 
 @app.command()

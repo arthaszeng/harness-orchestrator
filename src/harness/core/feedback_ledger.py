@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from harness.core.task_identity import TASK_ID_STORAGE_PATTERN
+
 LEDGER_FILENAME = "feedback-ledger.jsonl"
 
 
@@ -14,7 +16,7 @@ class FeedbackItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(min_length=1, max_length=120)
-    task_id: str = Field(pattern=r"^task-\d+$")
+    task_id: str = Field(pattern=TASK_ID_STORAGE_PATTERN)
     source_phase: str = Field(min_length=1, max_length=120)
     source_role: str = Field(min_length=1, max_length=120)
     severity: str = Field(min_length=1, max_length=30)

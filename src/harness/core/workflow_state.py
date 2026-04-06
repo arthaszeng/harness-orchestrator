@@ -235,6 +235,73 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
     return state
 
 
+_VALID_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
+    TaskState.IDLE: frozenset({
+        TaskState.PLANNING,
+        TaskState.BUILDING,       # hotfix fast-path
+        TaskState.BLOCKED,
+    }),
+    TaskState.PLANNING: frozenset({
+        TaskState.CONTRACTED,
+        TaskState.BUILDING,       # small tasks without formal contract
+        TaskState.BLOCKED,
+        TaskState.IDLE,           # cancellation
+    }),
+    TaskState.CONTRACTED: frozenset({
+        TaskState.BUILDING,
+        TaskState.BLOCKED,
+        TaskState.IDLE,           # cancellation
+    }),
+    TaskState.BUILDING: frozenset({
+        TaskState.EVALUATING,
+        TaskState.BLOCKED,
+        TaskState.SHIPPING,       # direct ship after build
+    }),
+    TaskState.EVALUATING: frozenset({
+        TaskState.BUILDING,       # fix loop
+        TaskState.SHIPPING,
+        TaskState.BLOCKED,
+        TaskState.DONE,
+    }),
+    TaskState.SHIPPING: frozenset({
+        TaskState.DONE,
+        TaskState.BLOCKED,
+        TaskState.EVALUATING,     # ship eval ITERATE fallback
+    }),
+    TaskState.DONE: frozenset({
+        TaskState.IDLE,           # new task
+        TaskState.PLANNING,       # follow-up iteration
+    }),
+    TaskState.BLOCKED: frozenset(TaskState),  # unblock to any state
+}
+
+
+def _validate_phase_transition(
+    old_phase: TaskState,
+    new_phase: TaskState,
+    *,
+    strict: bool = False,
+) -> None:
+    """Validate that a phase transition is allowed.
+
+    When *strict* is True, raises ``ValueError`` on illegal transitions.
+    Otherwise emits a warning.  Self-transitions (no-ops) are always allowed.
+    """
+    if old_phase == new_phase:
+        return
+    allowed = _VALID_TRANSITIONS.get(old_phase)
+    if allowed is not None and new_phase in allowed:
+        return
+    msg = (
+        f"Potentially illegal phase transition: {old_phase.value!r} → {new_phase.value!r}. "
+        f"Allowed targets from {old_phase.value!r}: "
+        f"{sorted(s.value for s in (allowed or set()))}"
+    )
+    if strict:
+        raise ValueError(msg)
+    warnings.warn(msg, stacklevel=3)
+
+
 def sync_task_state(
     task_dir: Path,
     *,
@@ -243,6 +310,7 @@ def sync_task_state(
     phase: TaskState | None = None,
     blocker: dict[str, str] | None = None,
     handoff_summary: str | None = None,
+    strict_transitions: bool = False,
 ) -> WorkflowState:
     """Load-merge-save task workflow state through a single entrypoint."""
     state_path = task_dir / WORKFLOW_STATE_FILENAME
@@ -275,6 +343,7 @@ def sync_task_state(
             setattr(state.gates, key, GateSnapshot.model_validate(update))
 
     if phase is not None:
+        _validate_phase_transition(state.phase, phase, strict=strict_transitions)
         state.phase = phase
 
     if blocker:

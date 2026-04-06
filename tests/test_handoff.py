@@ -223,3 +223,31 @@ class TestPhaseOrder:
             loaded = load_handoff(task_dir, phase)
             assert loaded is not None
             assert loaded.source_phase == phase
+
+
+class TestTaskIdStoragePattern:
+    """D2: task_id validation accepts all identity strategies."""
+
+    import pytest
+
+    @pytest.mark.parametrize("task_id", [
+        "task-001",
+        "task-999",
+        "PROJ-123",
+        "MY-TASK.v2",
+        "a1",
+    ])
+    def test_valid_task_ids_accepted(self, task_id: str):
+        h = _make_handoff(task_id=task_id)
+        assert h.task_id == task_id
+
+    @pytest.mark.parametrize("task_id", [
+        "",
+        "../hack",
+        "a" * 200,
+        "/etc/passwd",
+    ])
+    def test_invalid_task_ids_rejected(self, task_id: str):
+        import pytest as _pytest
+        with _pytest.raises(Exception):
+            _make_handoff(task_id=task_id)

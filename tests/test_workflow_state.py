@@ -5,9 +5,13 @@ from __future__ import annotations
 import warnings as _warnings
 from pathlib import Path
 
+import pytest
+
 from harness.core.state import TaskState
 from harness.core.workflow_state import (
     WORKFLOW_STATE_FILENAME,
+    _VALID_TRANSITIONS,
+    _validate_phase_transition,
     WorkflowState,
     artifact_pairs,
     iter_task_dirs,
@@ -383,3 +387,93 @@ def test_load_current_workflow_state_no_env_keeps_session_guard(tmp_path: Path):
     )
     assert task_dir is None
     assert state is None
+
+
+# ── D4: State transition validation ──────────────────────────────
+
+
+class TestPhaseTransitionValidation:
+    """D4: verify the transition table and validation behavior."""
+
+    @pytest.mark.parametrize("old,new", [
+        (TaskState.IDLE, TaskState.PLANNING),
+        (TaskState.IDLE, TaskState.BUILDING),
+        (TaskState.PLANNING, TaskState.CONTRACTED),
+        (TaskState.PLANNING, TaskState.BUILDING),
+        (TaskState.CONTRACTED, TaskState.BUILDING),
+        (TaskState.BUILDING, TaskState.EVALUATING),
+        (TaskState.BUILDING, TaskState.SHIPPING),
+        (TaskState.EVALUATING, TaskState.SHIPPING),
+        (TaskState.EVALUATING, TaskState.BUILDING),
+        (TaskState.SHIPPING, TaskState.DONE),
+        (TaskState.DONE, TaskState.IDLE),
+        (TaskState.DONE, TaskState.PLANNING),
+        (TaskState.BLOCKED, TaskState.IDLE),
+        (TaskState.BLOCKED, TaskState.BUILDING),
+        (TaskState.BLOCKED, TaskState.EVALUATING),
+    ])
+    def test_valid_transitions_no_warning(self, old, new):
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            _validate_phase_transition(old, new)
+        assert not caught
+
+    @pytest.mark.parametrize("old,new", [
+        (TaskState.IDLE, TaskState.SHIPPING),
+        (TaskState.IDLE, TaskState.DONE),
+        (TaskState.IDLE, TaskState.EVALUATING),
+        (TaskState.CONTRACTED, TaskState.SHIPPING),
+        (TaskState.DONE, TaskState.SHIPPING),
+    ])
+    def test_invalid_transitions_warn(self, old, new):
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            _validate_phase_transition(old, new)
+        assert any("illegal phase transition" in str(w.message).lower() for w in caught)
+
+    @pytest.mark.parametrize("old,new", [
+        (TaskState.IDLE, TaskState.SHIPPING),
+        (TaskState.DONE, TaskState.SHIPPING),
+    ])
+    def test_invalid_transitions_strict_raises(self, old, new):
+        with pytest.raises(ValueError, match="illegal phase transition"):
+            _validate_phase_transition(old, new, strict=True)
+
+    def test_self_transition_always_allowed(self):
+        for state in TaskState:
+            with _warnings.catch_warnings(record=True) as caught:
+                _warnings.simplefilter("always")
+                _validate_phase_transition(state, state)
+            assert not caught
+
+    def test_transition_table_covers_all_states(self):
+        for state in TaskState:
+            assert state in _VALID_TRANSITIONS, f"{state} missing from transition table"
+
+
+class TestSyncTaskStateWithTransitionValidation:
+    """D4: sync_task_state respects strict_transitions parameter."""
+
+    def test_valid_transition_succeeds(self, tmp_path: Path):
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        WorkflowState(task_id="task-001", phase=TaskState.IDLE).save(task_dir)
+
+        result = sync_task_state(task_dir, phase=TaskState.PLANNING)
+        assert result.phase == TaskState.PLANNING
+
+    def test_invalid_transition_warns_by_default(self, tmp_path: Path):
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        WorkflowState(task_id="task-001", phase=TaskState.IDLE).save(task_dir)
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            result = sync_task_state(task_dir, phase=TaskState.SHIPPING)
+        assert result.phase == TaskState.SHIPPING
+        assert any("illegal phase transition" in str(w.message).lower() for w in caught)
+
+    def test_invalid_transition_strict_raises(self, tmp_path: Path):
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
+        WorkflowState(task_id="task-001", phase=TaskState.IDLE).save(task_dir)
+
+        with pytest.raises(ValueError, match="illegal phase transition"):
+            sync_task_state(task_dir, phase=TaskState.SHIPPING, strict_transitions=True)
