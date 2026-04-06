@@ -1864,3 +1864,55 @@ def test_single_template_failure_does_not_abort(tmp_path: Path, monkeypatch):
     count = generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
     assert count >= 20, f"Expected at least 20 files, got {count}"
     assert call_count["n"] > 1
+
+
+class TestShipFastPathAndResume:
+    """Phase A1: ship SKILL contains fast-path and resume decision table."""
+
+    def test_zh_ship_contains_fast_path(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+        ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+        content = ship.read_text(encoding="utf-8")
+        assert "快速路径" in content
+        assert "handoff_summary" in content
+        assert "contracted" in content
+
+    def test_en_ship_contains_fast_path(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+        ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+        content = ship.read_text(encoding="utf-8")
+        assert "Fast Path" in content or "fast path" in content
+        assert "handoff_summary" in content
+        assert "contracted" in content
+
+    def test_zh_ship_contains_resume_table(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+        ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+        content = ship.read_text(encoding="utf-8")
+        assert "中断恢复决策表" in content
+        assert "Step 5" in content
+
+    def test_en_ship_contains_resume_table(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+        ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+        content = ship.read_text(encoding="utf-8")
+        assert "Resume Decision Table" in content
+        assert "Step 5" in content
+
+    def test_zh_plan_contains_continuity_guarantee(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+        plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+        content = plan.read_text(encoding="utf-8")
+        assert "衔接保障" in content
+
+    def test_en_plan_contains_continuity_guarantee(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+        plan = (tmp_path / ".cursor" / "skills" / "harness" / "harness-plan" / "SKILL.md")
+        content = plan.read_text(encoding="utf-8")
+        assert "Continuity guarantee" in content or "continuity guarantee" in content

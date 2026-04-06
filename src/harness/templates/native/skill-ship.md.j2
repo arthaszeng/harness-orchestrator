@@ -32,6 +32,30 @@ Run straight through and output the PR URL at the end.
 
 ## Step 1: Pre-flight
 
+### Fast Path (same-session continuity)
+
+Before running the full pre-flight, check whether it can be skipped — if the plan
+stage already completed in this session, most pre-flight work is redundant.
+
+1. Scan `.harness-flow/tasks/` for the latest `task-NNN` directory
+2. Read `TASK_DIR/workflow-state.json`
+3. **Enter fast path if ALL conditions are met**:
+   - `workflow-state.json` exists and is valid
+   - `phase` is `contracted`, `building`, `evaluating`, or `shipping` (past plan stage)
+   - `handoff_summary` is non-empty (prior stage wrote a handoff)
+   - Current branch starts with `{{ branch_prefix }}/` (already on a feature branch)
+
+4. **Fast path behavior**:
+   - ✅ Reuse existing `TASK_DIR` — do not re-scan or create
+   - ✅ Read `handoff_summary` as context — do not re-collect
+   - ✅ Skip branch check, config check (already verified in plan stage)
+   - ✅ Jump directly to Step 2 (Rebase)
+   - ❌ Do NOT skip `git fetch origin {{ trunk_branch }}` (rebase base must be fresh)
+
+5. **If fast path conditions are not met, run full pre-flight** (below)
+
+### Full Pre-flight
+
 1. Check the current branch. If on `{{ trunk_branch }}`, **abort**: "You're on the trunk branch. Ship from a feature branch."
 
 2. Run `git status`. Uncommitted changes are always included — no need to ask.
@@ -548,16 +572,33 @@ If `workflow-state.json` does not exist, skip.
 
 ---
 
-## State Persistence
+## State Persistence & Resume
 
 All state is persisted in `.harness-flow/tasks/task-NNN/`:
 - `plan.md` — the plan (if exists)
 - `build-rN.md` — build logs per round
 - `plan-eval-rN.md` — plan evaluations per round
 - `code-eval-rN.md` — code evaluations per round
-- `handoff-*.json` — structured stage handoffs (legacy; new flow uses `workflow-state.json` `handoff_summary` field)
+- `workflow-state.json` — authoritative task state (phase, gates, artifact refs)
 
-If interrupted, resume by checking which artifacts exist and which round number is latest.
+### Resume Decision Table
+
+If this workflow is interrupted and needs to resume, **use this table to determine
+where to continue** instead of starting from scratch:
+
+| Existing artifacts | workflow-state phase | Resume from | Notes |
+|-------------------|---------------------|-------------|-------|
+| `plan.md` only | `contracted` | Step 1 (use fast path) | Plan done, enter ship pre-flight |
+| `plan.md` + `build-rN.md` | `building` | Step 3 (Tests) | Build done, needs verification |
+| `plan.md` + `code-eval-rN.md` (verdict=ITERATE) | `evaluating` | Step 5 (Fix loop) | Eval found issues, continue fixing |
+| `plan.md` + `code-eval-rN.md` (verdict=PASS) | `evaluating` | Step 5.9 (Gate check) | Eval passed, verify gate |
+| Gate PASS + not pushed | `shipping` | Step 6 (Commit) | Needs commit and push |
+| Pushed + no PR | `shipping` | Step 8 (Create PR) | Code pushed, create PR |
+
+**When resuming, do NOT**:
+- Re-run eval that already passed (unless code changed after eval)
+- Re-create task directories that already exist
+- Re-run tests that already passed (unless code changed)
 
 ---
 
