@@ -10,7 +10,9 @@ import typer
 
 from harness.core.branch_lifecycle import BranchLifecycleManager
 from harness.core.post_ship import PostShipManager
+from harness.core.post_ship_pending import enqueue_pending_post_ship, reconcile_pending_post_ship
 from harness.core.post_ship_watcher import PostShipWatcher
+from harness.integrations.git_ops import GitOperationResult
 
 
 def run_git_preflight(*, as_json: bool = False) -> None:
@@ -70,7 +72,7 @@ def run_git_post_ship(
     pr: Optional[int] = None,
     branch: str = "",
     wait_merge: bool = False,
-    timeout_sec: int = 1800,
+    timeout_sec: int = 86400,
     poll_interval_sec: int = 15,
     as_json: bool = False,
 ) -> None:
@@ -103,6 +105,24 @@ def run_git_post_ship(
             timeout_sec=timeout_sec,
             poll_interval_sec=poll_interval_sec,
         )
+        if result.code == "PR_WAIT_TIMEOUT":
+            queued = enqueue_pending_post_ship(
+                Path.cwd(),
+                task_key=task_key,
+                pr_number=pr,
+                branch=branch or None,
+            )
+            status = "queued" if queued else "already_queued"
+            result = GitOperationResult(
+                ok=True,
+                code="PR_WATCH_DEFERRED",
+                message="merge watcher timed out; registered fallback reconciliation",
+                context={
+                    "task_key": task_key,
+                    "timeout_sec": str(timeout_sec),
+                    "fallback_status": status,
+                },
+            )
     else:
         result = manager.finalize_after_merge(
             task_key=task_key,
@@ -122,4 +142,29 @@ def run_git_post_ship(
         typer.echo(f"[{result.code}] {result.diagnostic}")
     if not result.ok:
         raise typer.Exit(code=1)
+
+
+def run_git_post_ship_reconcile(*, as_json: bool = False, max_items: int = 20) -> None:
+    if max_items < 1:
+        raise typer.BadParameter("max_items must be >= 1")
+    manager = PostShipManager.create(Path.cwd())
+    stats = reconcile_pending_post_ship(manager, max_items=max_items)
+    payload = {
+        "ok": True,
+        "code": "POST_SHIP_RECONCILED",
+        "message": "post-ship pending queue reconciled",
+        "context": {k: str(v) for k, v in stats.items()},
+    }
+    if as_json:
+        typer.echo(json.dumps(payload, ensure_ascii=False))
+    else:
+        typer.echo(f"[{payload['code']}] {payload['message']}")
+
+
+def run_git_post_ship_reconcile_background(*, max_items: int = 20) -> None:
+    """Best-effort background reconciliation; intentionally silent."""
+    if max_items < 1:
+        return
+    manager = PostShipManager.create(Path.cwd())
+    reconcile_pending_post_ship(manager, max_items=max_items)
 

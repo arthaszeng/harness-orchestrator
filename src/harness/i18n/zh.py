@@ -100,6 +100,8 @@ MESSAGES: dict[str, str] = {
     "update.skip_reinstall_up_to_date": "已是最新版本；如需重装请在目标仓库执行 `harness init --force`",
     "update.skip_reinstall_upgrade_ok": "升级完成；update 不会写入项目产物文件",
     "update.force_no_project_write": "--force 不再在当前目录重装产物；请在目标仓库执行 `harness init --force`",
+    "update.version_verify_retry": "检测到已安装版本（{installed}）未达到目标版本（{expected}），正在执行强制重装重试...",
+    "update.version_verify_failed": "重试后版本仍不匹配（期望 {expected}，实际 {installed}）",
     "update.easter_egg": "升级增益 +1，下一关：在目标项目里执行 `harness init --force`。",
 
     # ── progress / suggest_next_action ───────────────────────────

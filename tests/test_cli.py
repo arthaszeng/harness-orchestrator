@@ -64,6 +64,7 @@ class TestHelpOutput:
         assert "git-prepare-branch" in clean
         assert "git-sync-trunk" in clean
         assert "git-post-ship" in clean
+        assert "git-post-ship-reconcile" in clean
 
 
 class TestGateCommand:
@@ -270,6 +271,46 @@ class TestGitLifecycleCommands:
         assert payload["code"] == "POST_SHIP_DONE"
         assert "message" in payload
         assert "context" in payload
+
+    def test_git_post_ship_wait_merge_timeout_is_deferred(self, monkeypatch):
+        from harness.integrations.git_ops import GitOperationResult
+
+        class _Watcher:
+            def wait_and_finalize(self, **_kwargs):
+                return GitOperationResult(ok=False, code="PR_WAIT_TIMEOUT", message="timeout")
+
+        class _Manager:
+            def infer_task_key_from_branch(self, _branch=None):
+                return "task-009"
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
+        monkeypatch.setattr("harness.commands.git_lifecycle.enqueue_pending_post_ship", lambda *_a, **_k: True)
+
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-009", "--pr", "99", "--wait-merge", "--json"],
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["code"] == "PR_WATCH_DEFERRED"
+
+    def test_git_post_ship_reconcile_json_output(self, monkeypatch):
+        monkeypatch.setattr(
+            "harness.commands.git_lifecycle.reconcile_pending_post_ship",
+            lambda *_a, **_k: {"processed": 2, "merged": 1, "closed": 0, "retained": 1, "failed": 0},
+        )
+
+        class _Manager:
+            pass
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
+        result = runner.invoke(app, ["git-post-ship-reconcile", "--json", "--max-items", "20"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["code"] == "POST_SHIP_RECONCILED"
 
     def test_git_post_ship_requires_selector(self):
         result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])

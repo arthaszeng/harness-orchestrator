@@ -26,7 +26,7 @@ class PostShipWatcher:
         task_key: str,
         pr_number: int | None,
         branch: str | None = None,
-        timeout_sec: int = 1800,
+        timeout_sec: int = 86400,
         poll_interval_sec: int = 15,
     ) -> GitOperationResult:
         start = time.time()

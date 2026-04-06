@@ -11,6 +11,7 @@ import typer
 from harness.commands.update import (
     _get_latest_version,
     _migrate_config,
+    _pip_upgrade,
     run_update,
 )
 
@@ -198,3 +199,27 @@ class TestRunUpdate:
             with pytest.raises(typer.Exit) as exc_info:
                 run_update(check=False, force=False)
             assert exc_info.value.exit_code == 1
+
+
+class TestPipUpgradeVerification:
+    def test_retries_with_force_reinstall_when_version_not_updated(self):
+        pip_ok = MagicMock(returncode=0, stdout="", stderr="")
+        version_old = MagicMock(returncode=0, stdout="4.1.33\n", stderr="")
+        force_ok = MagicMock(returncode=0, stdout="", stderr="")
+        version_new = MagicMock(returncode=0, stdout="4.1.34\n", stderr="")
+        with patch(
+            "harness.commands.update.subprocess.run",
+            side_effect=[pip_ok, version_old, force_ok, version_new],
+        ):
+            assert _pip_upgrade("4.1.34") is True
+
+    def test_fails_when_version_still_mismatch_after_retry(self):
+        pip_ok = MagicMock(returncode=0, stdout="", stderr="")
+        version_old_1 = MagicMock(returncode=0, stdout="4.1.33\n", stderr="")
+        force_ok = MagicMock(returncode=0, stdout="", stderr="")
+        version_old_2 = MagicMock(returncode=0, stdout="4.1.33\n", stderr="")
+        with patch(
+            "harness.commands.update.subprocess.run",
+            side_effect=[pip_ok, version_old_1, force_ok, version_old_2],
+        ):
+            assert _pip_upgrade("4.1.34") is False
