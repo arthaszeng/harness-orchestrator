@@ -99,6 +99,8 @@ MESSAGES: dict[str, str] = {
     "update.skip_reinstall_up_to_date": "Already at latest; run `harness init --force` in target repo if needed",
     "update.skip_reinstall_upgrade_ok": "Upgrade done; update does not write project artifacts",
     "update.force_no_project_write": "--force no longer reinstalls artifacts here; run `harness init --force` in target repo",
+    "update.version_verify_retry": "Installed version ({installed}) did not reach target ({expected}); retrying with force reinstall...",
+    "update.version_verify_failed": "Installed version still mismatched after retry (expected {expected}, got {installed})",
     "update.easter_egg": "Upgrade buff acquired +1. Next quest: `harness init --force` in your target project.",
 
     # ── progress / suggest_next_action ───────────────────────────

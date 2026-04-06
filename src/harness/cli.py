@@ -23,12 +23,23 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", "-v", callback=version_callback, is_eager=True,
         help="Show version and exit",
     ),
 ) -> None:
     """Cursor-native multi-agent development framework."""
+    # Best-effort post-ship fallback reconciliation for cross-session resilience.
+    if ctx.invoked_subcommand in {"git-post-ship", "git-post-ship-reconcile"}:
+        return
+    try:
+        from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
+
+        run_git_post_ship_reconcile_background(max_items=20)
+    except Exception:
+        # Never block user command execution on fallback reconciliation errors.
+        return
 
 
 @app.command()
@@ -117,7 +128,7 @@ def git_post_ship(
         help="Wait for PR merge and auto-run post cleanup when merged",
     ),
     timeout_sec: int = typer.Option(
-        1800,
+        86400,
         "--timeout-sec",
         help="Timeout (seconds) when --wait-merge is enabled",
     ),
@@ -140,6 +151,17 @@ def git_post_ship(
         poll_interval_sec=poll_interval_sec,
         as_json=as_json,
     )
+
+
+@app.command(name="git-post-ship-reconcile")
+def git_post_ship_reconcile(
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
+    max_items: int = typer.Option(20, "--max-items", help="Maximum pending items to process this run"),
+) -> None:
+    """Reconcile persisted post-ship pending queue."""
+    from harness.commands.git_lifecycle import run_git_post_ship_reconcile
+
+    run_git_post_ship_reconcile(as_json=as_json, max_items=max_items)
 
 
 @app.command(name="save-eval")
