@@ -170,6 +170,9 @@ def save_ship_metrics(
     plan_total: int = 0,
     plan_done: int = 0,
     coverage_pct: int = 0,
+    e2e_total_time_sec: float = 0.0,
+    manual_interventions_per_task: float = 0.0,
+    first_pass_rate: float = 0.0,
 ) -> Path:
     """Write ``ship-metrics.json`` to *task_dir*.
 
@@ -187,6 +190,11 @@ def save_ship_metrics(
         "auto_fixed": auto_fixed,
         "test_count": test_count,
         "eval_rounds": eval_rounds,
+        "efficiency_baseline": {
+            "e2e_total_time_sec": round(float(e2e_total_time_sec), 2),
+            "manual_interventions_per_task": round(float(manual_interventions_per_task), 2),
+            "first_pass_rate": round(float(first_pass_rate), 4),
+        },
         "models_used": [
             "architect", "product-owner", "engineer", "qa", "project-manager",
         ],

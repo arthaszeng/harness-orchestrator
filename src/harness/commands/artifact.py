@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import sys
+import warnings
+from datetime import datetime
 from pathlib import Path
+import re
 
 import typer
 
@@ -198,3 +201,109 @@ def run_save_intervention_audit(
     if not ok:
         raise typer.BadParameter("failed to write intervention audit event")
     ui.info(f"✓ intervention-audit.jsonl updated for {task_dir.name}")
+
+
+def _parse_iso(ts: str) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts)
+    except Exception:
+        warnings.warn(f"invalid ISO timestamp in workflow state: {ts}", stacklevel=2)
+        return None
+
+
+def _infer_e2e_total_time_sec(task_dir: Path) -> float:
+    from harness.core.workflow_state import load_workflow_state
+
+    state = load_workflow_state(task_dir)
+    if state is None:
+        return 0.0
+    start = _parse_iso(state.gates.plan_review.updated_at)
+    end = _parse_iso(state.gates.ship_readiness.updated_at)
+    if start is None or end is None:
+        return 0.0
+    delta = (end - start).total_seconds()
+    return max(delta, 0.0)
+
+
+def _infer_manual_interventions_per_task(task_dir: Path) -> float:
+    from harness.core.intervention_audit import load_intervention_counts
+
+    counts = load_intervention_counts(task_dir)
+    total = float(sum(counts.values()))
+    return total
+
+
+def _infer_first_pass_rate(task_dir: Path) -> float:
+    code_eval_rounds: list[int] = []
+    for path in task_dir.glob("code-eval-r*.md"):
+        match = re.search(r"code-eval-r(\d+)\.md$", path.name)
+        if match:
+            code_eval_rounds.append(int(match.group(1)))
+    for path in task_dir.glob("evaluation-r*.md"):
+        match = re.search(r"evaluation-r(\d+)\.md$", path.name)
+        if match:
+            code_eval_rounds.append(int(match.group(1)))
+
+    if not code_eval_rounds:
+        return 0.0
+    # First-pass only when there is exactly one code-eval round and it is r1.
+    return 1.0 if sorted(set(code_eval_rounds)) == [1] else 0.0
+
+
+def run_save_ship_metrics(
+    *,
+    task: str,
+    branch: str = "",
+    pr_quality_score: float = 0.0,
+    test_count: int = 0,
+    eval_rounds: int = 1,
+    findings_critical: int = 0,
+    findings_informational: int = 0,
+    auto_fixed: int = 0,
+    plan_total: int = 0,
+    plan_done: int = 0,
+    coverage_pct: int = 0,
+    e2e_total_time_sec: float | None = None,
+    manual_interventions_per_task: float | None = None,
+    first_pass_rate: float | None = None,
+) -> None:
+    """Write ship-metrics.json with optional efficiency baseline fields."""
+    from harness.core.artifacts import save_ship_metrics
+
+    ui = get_ui()
+    task_dir = _resolve_task_dir(task)
+
+    if first_pass_rate is not None and not (0.0 <= first_pass_rate <= 1.0):
+        raise typer.BadParameter("first_pass_rate must be between 0 and 1")
+    if e2e_total_time_sec is not None and e2e_total_time_sec < 0:
+        raise typer.BadParameter("e2e_total_time_sec must be >= 0")
+    if manual_interventions_per_task is not None and manual_interventions_per_task < 0:
+        raise typer.BadParameter("manual_interventions_per_task must be >= 0")
+
+    inferred_e2e = _infer_e2e_total_time_sec(task_dir)
+    inferred_manual = _infer_manual_interventions_per_task(task_dir)
+    inferred_first_pass = _infer_first_pass_rate(task_dir)
+
+    path = save_ship_metrics(
+        task_dir,
+        branch=branch,
+        pr_quality_score=pr_quality_score,
+        test_count=test_count,
+        eval_rounds=eval_rounds,
+        findings_critical=findings_critical,
+        findings_informational=findings_informational,
+        auto_fixed=auto_fixed,
+        plan_total=plan_total,
+        plan_done=plan_done,
+        coverage_pct=coverage_pct,
+        e2e_total_time_sec=e2e_total_time_sec if e2e_total_time_sec is not None else inferred_e2e,
+        manual_interventions_per_task=(
+            manual_interventions_per_task
+            if manual_interventions_per_task is not None
+            else inferred_manual
+        ),
+        first_pass_rate=first_pass_rate if first_pass_rate is not None else inferred_first_pass,
+    )
+    ui.info(f"✓ {path.name} → {path}")

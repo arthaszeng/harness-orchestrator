@@ -240,6 +240,63 @@ def save_build_log(
     run_save_build_log(task=task, body=body)
 
 
+@app.command(name="save-ship-metrics")
+def save_ship_metrics(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    branch: str = typer.Option("", "--branch", help="Feature branch name"),
+    pr_quality_score: float = typer.Option(0.0, "--pr-quality-score", help="PR quality score (0-10)"),
+    test_count: int = typer.Option(0, "--test-count", help="Total test cases"),
+    eval_rounds: int = typer.Option(1, "--eval-rounds", help="Number of eval rounds"),
+    findings_critical: int = typer.Option(0, "--findings-critical", help="Critical findings count"),
+    findings_informational: int = typer.Option(0, "--findings-informational", help="Informational findings count"),
+    auto_fixed: int = typer.Option(0, "--auto-fixed", help="Auto-fixed findings count"),
+    plan_total: int = typer.Option(0, "--plan-total", help="Plan deliverables total"),
+    plan_done: int = typer.Option(0, "--plan-done", help="Plan deliverables completed"),
+    coverage_pct: int = typer.Option(0, "--coverage-pct", help="Estimated coverage percentage"),
+    e2e_total_time_sec: float = typer.Option(
+        -1.0,
+        "--e2e-total-time-sec",
+        help="End-to-end runtime in seconds (auto-infer when negative)",
+    ),
+    manual_interventions_per_task: float = typer.Option(
+        -1.0,
+        "--manual-interventions-per-task",
+        help="Manual interventions per task (auto-infer when negative)",
+    ),
+    first_pass_rate: float = typer.Option(
+        -1.0,
+        "--first-pass-rate",
+        help="First-pass rate between 0 and 1 (auto-infer when negative)",
+    ),
+) -> None:
+    """Save ship-metrics.json to task directory (programmatic artifact write)."""
+    from harness.commands.artifact import run_save_ship_metrics
+
+    run_save_ship_metrics(
+        task=task,
+        branch=branch,
+        pr_quality_score=pr_quality_score,
+        test_count=test_count,
+        eval_rounds=eval_rounds,
+        findings_critical=findings_critical,
+        findings_informational=findings_informational,
+        auto_fixed=auto_fixed,
+        plan_total=plan_total,
+        plan_done=plan_done,
+        coverage_pct=coverage_pct,
+        e2e_total_time_sec=None if e2e_total_time_sec < 0 else e2e_total_time_sec,
+        manual_interventions_per_task=(
+            None
+            if manual_interventions_per_task < 0
+            else manual_interventions_per_task
+        ),
+        first_pass_rate=None if first_pass_rate < 0 else first_pass_rate,
+    )
+
+
 @app.command(name="save-feedback-ledger")
 def save_feedback_ledger(
     task: str = typer.Option(
