@@ -123,3 +123,28 @@ def test_load_feedback_ledger_non_utf8_reports_file_error(tmp_path: Path):
     assert result.items == []
     assert result.errors
     assert result.errors[0].startswith("file:")
+
+
+class TestFeedbackItemTaskIdPattern:
+    """D2: FeedbackItem.task_id accepts Jira-style and other valid formats."""
+
+    import pytest
+
+    @pytest.mark.parametrize("task_id", [
+        "task-001",
+        "PROJ-42",
+        "my-task.v2",
+    ])
+    def test_valid_task_ids(self, task_id: str):
+        item = _item(task_id=task_id)
+        assert item.task_id == task_id
+
+    @pytest.mark.parametrize("task_id", [
+        "",
+        "../hack",
+        "a" * 200,
+    ])
+    def test_invalid_task_ids(self, task_id: str):
+        import pytest as _pytest
+        with _pytest.raises(Exception):
+            _item(task_id=task_id)

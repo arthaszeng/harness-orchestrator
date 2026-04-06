@@ -26,6 +26,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from harness.core.task_identity import TASK_ID_STORAGE_PATTERN
+
 HANDOFF_SCHEMA_VERSION = 1
 
 HandoffPhase = Literal["plan", "build", "eval", "ship"]
@@ -69,7 +71,7 @@ class StageHandoff(BaseModel):
     schema_version: int = HANDOFF_SCHEMA_VERSION
     source_phase: HandoffPhase
     target_phase: HandoffPhase
-    task_id: str = Field(..., pattern=r"^task-\d+$")
+    task_id: str = Field(..., pattern=TASK_ID_STORAGE_PATTERN)
     summary: str = Field(default="", max_length=2000)
     decisions: list[Decision] = Field(default_factory=list)
     risks: list[Risk] = Field(default_factory=list)

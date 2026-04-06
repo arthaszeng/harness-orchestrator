@@ -17,6 +17,15 @@ _JIRA_PATTERN = r"[A-Z][A-Z0-9]+-\d+"
 _SAFE_CUSTOM_MAX_LEN = 128
 _SAFE_KEY_MAX_LEN = 96
 
+TASK_ID_STORAGE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$"
+"""Storage-layer validation pattern for task IDs persisted in JSON artifacts.
+
+This is intentionally broader than any single identity strategy — it defines
+the character set that task directories and JSON fields can safely hold.
+Runtime identity validation (numeric vs Jira vs custom) is handled by
+``TaskIdentityResolver.is_valid_task_key()``.
+"""
+
 
 def _build_pattern(strategy: TaskIdStrategy, custom_pattern: str = "") -> str:
     if strategy == "numeric":
