@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import jinja2
@@ -264,6 +265,7 @@ def run_init(
     ci_command: str = "",
     non_interactive: bool = False,
     force: bool = False,
+    auto_commit: bool = False,
 ) -> None:
     """Run the initialization wizard, or reinit with --force."""
     from harness import __version__
@@ -275,6 +277,8 @@ def run_init(
     ui = get_ui()
     console = ui.console
     ui.banner("init", __version__)
+
+    git_clean_before = _git_is_clean(project_root)
 
     if force and config_exists:
         _run_reinit(project_root)
@@ -376,7 +380,86 @@ def run_init(
     console.print()
     console.print(f"  [cyber.yellow]▸[/] [cyber.cyan]{t('init.guide_edit_vision')}[/]")
     console.print(f"    [cyber.magenta]{t('init.guide_use_vision')}[/]")
+    console.print(f"  [cyber.yellow]▸[/] [cyber.cyan]{t('init.next_step_commit_hint')}[/]")
+    console.print(f"    [cyber.dim]{t('init.next_step_commit_cmd')}[/]")
     console.print(f"  [cyber.yellow]✨[/] {t('init.easter_egg')}")
+
+    if auto_commit:
+        _auto_commit_init_artifacts(project_root, git_clean_before=git_clean_before)
+
+
+def _git_is_clean(project_root: Path) -> bool:
+    try:
+        completed = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=str(project_root),
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if completed.returncode != 0:
+        return False
+    return completed.stdout.strip() == ""
+
+
+def _auto_commit_init_artifacts(project_root: Path, *, git_clean_before: bool) -> None:
+    ui = get_ui()
+    if not git_clean_before:
+        ui.warn(t("init.auto_commit_skipped_dirty"))
+        return
+
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=str(project_root),
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        ui.warn(t("init.auto_commit_failed", error=str(exc)))
+        return
+
+    if status.returncode != 0:
+        ui.warn(t("init.auto_commit_failed", error=status.stderr.strip() or "git status failed"))
+        return
+    if status.stdout.strip() == "":
+        ui.info(t("init.auto_commit_nothing_to_commit"))
+        return
+
+    add_targets: list[str] = []
+    for candidate in (".gitignore", ".harness-flow", ".cursor"):
+        if (project_root / candidate).exists():
+            add_targets.append(candidate)
+    if not add_targets:
+        ui.info(t("init.auto_commit_nothing_to_commit"))
+        return
+
+    add = subprocess.run(
+        ["git", "add", *add_targets],
+        capture_output=True,
+        text=True,
+        cwd=str(project_root),
+        timeout=20,
+    )
+    if add.returncode != 0:
+        ui.warn(t("init.auto_commit_failed", error=add.stderr.strip() or "git add failed"))
+        return
+
+    commit = subprocess.run(
+        ["git", "commit", "-m", "chore(init): bootstrap harness artifacts"],
+        capture_output=True,
+        text=True,
+        cwd=str(project_root),
+        timeout=20,
+    )
+    if commit.returncode != 0:
+        ui.warn(t("init.auto_commit_failed", error=commit.stderr.strip() or "git commit failed"))
+        return
+
+    ui.info(t("init.auto_commit_done"))
 
 
 def _update_gitignore(project_root: Path) -> None:

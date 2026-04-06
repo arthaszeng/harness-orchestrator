@@ -126,7 +126,14 @@ class PostShipManager:
             pr_head_ref=merged.context.get("head_ref", ""),
         )
         if not task_branch:
-            if self._has_ambiguous_task_branches(task_key):
+            ambiguity = self._has_ambiguous_task_branches(task_key)
+            if ambiguity is None:
+                return GitOperationResult(
+                    ok=False,
+                    code="TASK_BRANCH_DISCOVERY_FAILED",
+                    message=f"failed to inspect task branches for '{task_key}'",
+                )
+            if ambiguity:
                 return GitOperationResult(
                     ok=False,
                     code="TASK_BRANCH_RESOLUTION_FAILED",
@@ -309,6 +316,10 @@ class PostShipManager:
             if candidate:
                 branches.append(candidate)
         if not branches:
+            if pr_head_ref:
+                inferred = self.infer_task_key_from_branch(pr_head_ref)
+                if inferred == task_key:
+                    return pr_head_ref
             return None
 
         exact = f"{self.branch_prefix}/{task_key}"
@@ -316,13 +327,9 @@ class PostShipManager:
             return exact
         if len(branches) == 1:
             return branches[0]
-        if not branches and pr_head_ref:
-            inferred = self.infer_task_key_from_branch(pr_head_ref)
-            if inferred == task_key:
-                return pr_head_ref
         return None
 
-    def _has_ambiguous_task_branches(self, task_key: str) -> bool:
+    def _has_ambiguous_task_branches(self, task_key: str) -> bool | None:
         pattern = f"{self.branch_prefix}/{task_key}*"
         listed = run_git_result(
             ["branch", "--list", pattern],
@@ -331,7 +338,7 @@ class PostShipManager:
             message=f"failed to list branches by pattern '{pattern}'",
         )
         if not listed.ok:
-            return False
+            return None
         branches = [line.strip().lstrip("*").strip() for line in listed.stdout.splitlines() if line.strip()]
         return len(branches) > 1
 

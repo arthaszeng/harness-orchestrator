@@ -42,10 +42,20 @@ def init(
         False, "--force", "-f",
         help="Skip wizard and regenerate artifacts from existing config",
     ),
+    auto_commit: bool = typer.Option(
+        False, "--auto-commit",
+        help="Auto-commit init artifacts when git working tree was clean before init",
+    ),
 ) -> None:
     """Initialize harness in the current project (interactive wizard)."""
     from harness.commands.init import run_init
-    run_init(name=name, ci_command=ci_command, non_interactive=non_interactive, force=force)
+    run_init(
+        name=name,
+        ci_command=ci_command,
+        non_interactive=non_interactive,
+        force=force,
+        auto_commit=auto_commit,
+    )
 
 
 @app.command()

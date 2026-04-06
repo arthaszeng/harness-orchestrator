@@ -67,6 +67,12 @@ MESSAGES: dict[str, str] = {
     "init.guide_ship": "Direct ship: test → eval → fix → commit → push → PR",
     "init.guide_edit_vision": "Edit .harness-flow/vision.md to set your project vision,",
     "init.guide_use_vision": "then use /harness-vision in Cursor.",
+    "init.next_step_commit_hint": "Commit init artifacts before running /harness-* workflows (preflight may stop on dirty tree).",
+    "init.next_step_commit_cmd": "git add .gitignore .harness-flow .cursor && git commit -m \"chore: bootstrap harness artifacts\"",
+    "init.auto_commit_done": "Auto-committed init artifacts (chore(init): bootstrap harness artifacts).",
+    "init.auto_commit_nothing_to_commit": "No init artifacts to commit.",
+    "init.auto_commit_skipped_dirty": "Skipped auto-commit because working tree was not clean before init.",
+    "init.auto_commit_failed": "Failed to auto-commit init artifacts: {error}",
     "init.easter_egg": "Artifact forge online. You can summon your next task with /harness-plan.",
     "init.gitignore_comment": "# harness — do not track runtime state",
 

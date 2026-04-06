@@ -319,6 +319,7 @@ class TestRunInitNonInteractive:
         logs = capsys.readouterr()
         rendered = f"{logs.out}\n{logs.err}"
         assert "/harness-plan" in rendered
+        assert "git add .gitignore .harness-flow .cursor" in rendered
 
     def test_loads_business_oriented_zh_vision_template(self):
         tmpl = _load_template("vision.zh.md.j2")
@@ -337,6 +338,13 @@ class TestRunInitNonInteractive:
         gi = tmp_path / ".gitignore"
         assert gi.exists()
         assert ".harness-flow/state.json" in gi.read_text(encoding="utf-8")
+
+    @patch("harness.native.skill_gen.generate_native_artifacts")
+    def test_auto_commit_flag_invokes_helper(self, _mock_gen, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        with patch("harness.commands.init._auto_commit_init_artifacts") as auto_commit:
+            run_init(non_interactive=True, auto_commit=True)
+        auto_commit.assert_called_once()
 
 
 class TestRunInitReinit:
