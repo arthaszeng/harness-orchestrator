@@ -101,3 +101,47 @@ class TestWorkflowNext:
         result = runner.invoke(app, ["workflow", "next"])
         assert result.exit_code == 0
         assert "phase=unknown" in result.output
+
+    @pytest.mark.parametrize(
+        ("phase", "expected_skill"),
+        [
+            (TaskState.IDLE, "/harness-plan"),
+            (TaskState.PLANNING, "/harness-plan"),
+            (TaskState.SHIPPING, "/harness-ship"),
+            (TaskState.DONE, "/harness-plan"),
+            (TaskState.BLOCKED, "/harness-plan"),
+        ],
+    )
+    def test_remaining_phases_map_to_expected_skill(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        phase: TaskState,
+        expected_skill: str,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        task = tmp_path / ".harness-flow" / "tasks" / "task-042"
+        _write_state(task, phase=phase)
+        result = runner.invoke(app, ["workflow", "next"])
+        assert result.exit_code == 0
+        assert "task=task-042" in result.output
+        assert f"phase={phase.value}" in result.output
+        assert f"skill={expected_skill}" in result.output
+
+    def test_harness_task_id_env_matches_gate_resolution(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        for name, phase in (
+            ("task-001", TaskState.CONTRACTED),
+            ("task-002", TaskState.BUILDING),
+        ):
+            t = tmp_path / ".harness-flow" / "tasks" / name
+            _write_state(t, phase=phase)
+        monkeypatch.setenv("HARNESS_TASK_ID", "task-001")
+        result = runner.invoke(app, ["workflow", "next"])
+        assert result.exit_code == 0
+        assert "task=task-001" in result.output
+        assert "phase=contracted" in result.output
+        assert "skill=/harness-build" in result.output
