@@ -203,16 +203,36 @@ Project settings live in `.harness-flow/config.toml`:
 
 ## CLI reference
 
+### Core
 
-| Command                                                                     | Description                                                              |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `harness init [--name] [--ci] [-y] [--force]`                               | Initialize project (interactive wizard); `--force` regenerates artifacts |
-| `harness git-preflight [--json]`                                            | Structured preflight checks (clean tree, branch/worktree context)        |
-| `harness git-post-ship-reconcile [--max-items] [--json]`                    | Manually reconcile persisted post-ship pending queue                     |
-| `harness save-intervention-audit --task --event-type --command [--summary]` | Append one manual-intervention audit event                               |
-| `harness status`                                                            | Show current task progress                                               |
-| `harness update [--check] [--force]`                                        | Self-update + config migration check (no project artifact writes)        |
-| `harness --version`                                                         | Show version                                                             |
+| Command                                        | Description                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `harness init [--name] [--ci] [-y] [--force]`  | Initialize project (interactive wizard); `--force` regenerates artifacts |
+| `harness status`                               | Show current task progress                                               |
+| `harness gate [--task]`                        | Check ship-readiness gates for the current task                          |
+| `harness update [--check] [--force]`           | Self-update + config migration check                                     |
+| `harness --version`                            | Show version                                                             |
+
+### Git lifecycle
+
+| Command                                                                          | Description                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `harness git-preflight [--json]`                                                 | Structured preflight checks (clean tree, branch, worktree) |
+| `harness git-prepare-branch --task-key <key> [--short-desc] [--json]`            | Create or resume task branch on top of trunk            |
+| `harness git-sync-trunk [--json]`                                                | Sync current feature branch with configured trunk       |
+| `harness git-post-ship [--task-key] [--pr] [--branch] [--wait-merge] [--json]`   | Run post-ship cleanup after PR merge                    |
+| `harness git-post-ship-watch [--task-key] [--pr] [--branch] [--json]`            | Start detached post-ship watcher and return immediately  |
+| `harness git-post-ship-reconcile [--max-items] [--json]`                         | Reconcile persisted post-ship pending queue              |
+
+### Artifact persistence
+
+| Command                                                                     | Description                                   |
+| --------------------------------------------------------------------------- | --------------------------------------------- |
+| `harness save-eval --task <id> [--kind] [--verdict] [--score] [--body]`     | Save evaluation results (plan or code)         |
+| `harness save-build-log --task <id> [--body]`                               | Save build log to task directory               |
+| `harness save-ship-metrics --task <id> [--branch] [--pr-quality-score] ...` | Save ship-metrics.json to task directory        |
+| `harness save-feedback-ledger --task <id> [--body]`                         | Save feedback-ledger.jsonl to task directory    |
+| `harness save-intervention-audit --task <id> --event-type --command [--summary]` | Append one manual-intervention audit event |
 
 
 ---
