@@ -120,15 +120,22 @@ class PostShipManager:
         if not clean.ok:
             return clean
 
-        task_branch = self._resolve_task_branch(task_key=task_key, branch=branch)
+        task_branch = self._resolve_task_branch(
+            task_key=task_key,
+            branch=branch,
+            pr_head_ref=merged.context.get("head_ref", ""),
+        )
         if not task_branch:
-            return GitOperationResult(
-                ok=False,
-                code="TASK_BRANCH_RESOLUTION_FAILED",
-                message=f"unable to uniquely resolve local branch for task '{task_key}'",
-            )
+            if self._has_ambiguous_task_branches(task_key):
+                return GitOperationResult(
+                    ok=False,
+                    code="TASK_BRANCH_RESOLUTION_FAILED",
+                    message=f"unable to uniquely resolve local branch for task '{task_key}'",
+                )
+            # Branch may already be deleted by `gh pr merge --delete-branch`.
+            task_branch = ""
 
-        if task_branch == self.trunk_branch:
+        if task_branch and task_branch == self.trunk_branch:
             return GitOperationResult(
                 ok=False,
                 code="PROTECTED_BRANCH",
@@ -155,11 +162,40 @@ class PostShipManager:
             return pull
 
         active = current_branch(self.project_root)
-        if active == task_branch:
+        if task_branch and active == task_branch:
             return GitOperationResult(
                 ok=False,
                 code="BRANCH_IN_USE",
                 message=f"refusing to delete currently checked out branch '{task_branch}'",
+            )
+
+        if not task_branch:
+            return GitOperationResult(
+                ok=True,
+                code="POST_SHIP_DONE",
+                message="post-ship cleanup completed (no local task branch to delete)",
+                context={
+                    "task_key": task_key,
+                    "task_branch": "",
+                    "trunk": self.trunk_branch,
+                    "pr": merged.context.get("pr", ""),
+                    "url": merged.context.get("url", ""),
+                },
+            )
+
+        branch_exists = self._local_branch_exists(task_branch)
+        if branch_exists is False:
+            return GitOperationResult(
+                ok=True,
+                code="POST_SHIP_DONE",
+                message=f"post-ship cleanup completed (branch '{task_branch}' already deleted)",
+                context={
+                    "task_key": task_key,
+                    "task_branch": task_branch,
+                    "trunk": self.trunk_branch,
+                    "pr": merged.context.get("pr", ""),
+                    "url": merged.context.get("url", ""),
+                },
             )
 
         delete = run_git_result(
@@ -169,6 +205,20 @@ class PostShipManager:
             message=f"failed to delete local branch '{task_branch}'",
         )
         if not delete.ok:
+            branch_exists_after = self._local_branch_exists(task_branch)
+            if branch_exists_after is False:
+                return GitOperationResult(
+                    ok=True,
+                    code="POST_SHIP_DONE",
+                    message=f"post-ship cleanup completed (branch '{task_branch}' already deleted)",
+                    context={
+                        "task_key": task_key,
+                        "task_branch": task_branch,
+                        "trunk": self.trunk_branch,
+                        "pr": merged.context.get("pr", ""),
+                        "url": merged.context.get("url", ""),
+                    },
+                )
             return delete
 
         return GitOperationResult(
@@ -234,7 +284,7 @@ class PostShipManager:
 
         return GitOperationResult(ok=True, code="OK", stdout=completed.stdout)
 
-    def _resolve_task_branch(self, *, task_key: str, branch: str | None) -> str | None:
+    def _resolve_task_branch(self, *, task_key: str, branch: str | None, pr_head_ref: str | None = None) -> str | None:
         if branch and branch.strip():
             return branch.strip()
 
@@ -266,4 +316,32 @@ class PostShipManager:
             return exact
         if len(branches) == 1:
             return branches[0]
+        if not branches and pr_head_ref:
+            inferred = self.infer_task_key_from_branch(pr_head_ref)
+            if inferred == task_key:
+                return pr_head_ref
         return None
+
+    def _has_ambiguous_task_branches(self, task_key: str) -> bool:
+        pattern = f"{self.branch_prefix}/{task_key}*"
+        listed = run_git_result(
+            ["branch", "--list", pattern],
+            self.project_root,
+            code_on_error="TASK_BRANCH_DISCOVERY_FAILED",
+            message=f"failed to list branches by pattern '{pattern}'",
+        )
+        if not listed.ok:
+            return False
+        branches = [line.strip().lstrip("*").strip() for line in listed.stdout.splitlines() if line.strip()]
+        return len(branches) > 1
+
+    def _local_branch_exists(self, branch: str) -> bool | None:
+        listed = run_git_result(
+            ["branch", "--list", branch],
+            self.project_root,
+            code_on_error="BRANCH_LIST_FAILED",
+            message=f"failed to inspect branch '{branch}'",
+        )
+        if not listed.ok:
+            return None
+        return bool(listed.stdout.strip())

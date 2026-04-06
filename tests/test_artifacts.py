@@ -230,6 +230,45 @@ class TestCLISaveEval:
         assert eval_file.exists()
         assert "PASS" in eval_file.read_text()
 
+    def test_save_eval_with_literal_escaped_newlines_normalizes_body(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".harness-flow" / "tasks" / "task-010").mkdir(parents=True)
+
+        result = runner.invoke(
+            app,
+            [
+                "save-eval",
+                "--kind", "code",
+                "--task", "task-010",
+                "--verdict", "PASS",
+                "--score", "8.0",
+                "--body", "# Eval\\n\\n## Verdict: PASS\\n",
+            ],
+        )
+        assert result.exit_code == 0
+        eval_file = tmp_path / ".harness-flow" / "tasks" / "task-010" / "code-eval-r1.md"
+        text = eval_file.read_text()
+        assert "# Eval\n\n## Verdict: PASS\n" == text
+
+    def test_save_eval_with_real_newlines_keeps_existing_text(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".harness-flow" / "tasks" / "task-011").mkdir(parents=True)
+        body = "# Eval\n\nLiteral sequence: \\n should stay as-is.\n\n## Verdict: PASS\n"
+        result = runner.invoke(
+            app,
+            [
+                "save-eval",
+                "--kind", "code",
+                "--task", "task-011",
+                "--verdict", "PASS",
+                "--score", "8.0",
+                "--body", body,
+            ],
+        )
+        assert result.exit_code == 0
+        eval_file = tmp_path / ".harness-flow" / "tasks" / "task-011" / "code-eval-r1.md"
+        assert eval_file.read_text() == body
+
     def test_save_eval_without_body_generates_template(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         (tmp_path / ".harness-flow" / "tasks" / "task-002").mkdir(parents=True)

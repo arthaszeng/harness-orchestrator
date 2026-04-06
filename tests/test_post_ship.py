@@ -110,6 +110,8 @@ def test_finalize_after_merge_happy_path(tmp_path: Path, monkeypatch):
 
     def _run_git(args, *_args, **_kwargs):
         calls.append(args)
+        if args[:2] == ["branch", "--list"]:
+            return GitOperationResult(ok=True, code="OK", stdout="  agent/task-006-post-ship-cleanup\n")
         return GitOperationResult(ok=True, code="OK", message="ok")
 
     monkeypatch.setattr("harness.core.post_ship.run_git_result", _run_git)
@@ -120,6 +122,7 @@ def test_finalize_after_merge_happy_path(tmp_path: Path, monkeypatch):
     assert calls == [
         ["checkout", "main"],
         ["pull", "--ff-only", "origin", "main"],
+        ["branch", "--list", "agent/task-006-post-ship-cleanup"],
         ["branch", "-d", "agent/task-006-post-ship-cleanup"],
     ]
 
@@ -168,3 +171,68 @@ def test_finalize_after_merge_rejects_ambiguous_branch_resolution(tmp_path: Path
     result = manager.finalize_after_merge(task_key="task-006", pr_number=64)
     assert result.ok is False
     assert result.code == "TASK_BRANCH_RESOLUTION_FAILED"
+
+
+def test_finalize_after_merge_skips_when_no_local_branch(tmp_path: Path, monkeypatch):
+    manager = _manager(tmp_path)
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager.check_pr_state",
+        lambda self, **kwargs: GitOperationResult(ok=True, code="PR_MERGED", message="merged", context={"pr": "64"}),
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.ensure_clean_result",
+        lambda _cwd: GitOperationResult(ok=True, code="OK", message="clean"),
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.current_branch",
+        lambda _cwd: "main",
+    )
+
+    def _run_git(args, *_a, **_k):
+        if args[:2] == ["branch", "--list"]:
+            return GitOperationResult(ok=True, code="OK", stdout="")
+        return GitOperationResult(ok=True, code="OK", message="ok")
+
+    monkeypatch.setattr("harness.core.post_ship.run_git_result", _run_git)
+    result = manager.finalize_after_merge(task_key="task-006", pr_number=64)
+    assert result.ok is True
+    assert result.code == "POST_SHIP_DONE"
+    assert "no local task branch" in result.message
+
+
+def test_finalize_after_merge_delete_failure_but_branch_gone_is_idempotent(tmp_path: Path, monkeypatch):
+    manager = _manager(tmp_path)
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager.check_pr_state",
+        lambda self, **kwargs: GitOperationResult(ok=True, code="PR_MERGED", message="merged", context={"pr": "64"}),
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.ensure_clean_result",
+        lambda _cwd: GitOperationResult(ok=True, code="OK", message="clean"),
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.current_branch",
+        lambda _cwd: "main",
+    )
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager._resolve_task_branch",
+        lambda self, **kwargs: "agent/task-006-post-ship-cleanup",
+    )
+
+    state = {"delete_attempted": False}
+
+    def _run_git(args, *_a, **_k):
+        if args[:2] == ["branch", "--list"]:
+            if args[2] == "agent/task-006-post-ship-cleanup":
+                return GitOperationResult(ok=True, code="OK", stdout="" if state["delete_attempted"] else "  agent/task-006-post-ship-cleanup\n")
+            return GitOperationResult(ok=True, code="OK", stdout="")
+        if args[:2] == ["branch", "-d"]:
+            state["delete_attempted"] = True
+            return GitOperationResult(ok=False, code="BRANCH_DELETE_FAILED", message="failed", stderr="error")
+        return GitOperationResult(ok=True, code="OK", message="ok")
+
+    monkeypatch.setattr("harness.core.post_ship.run_git_result", _run_git)
+    result = manager.finalize_after_merge(task_key="task-006", pr_number=64)
+    assert result.ok is True
+    assert result.code == "POST_SHIP_DONE"
+    assert "already deleted" in result.message

@@ -13,6 +13,23 @@ from harness.core.task_identity import TaskIdentityResolver
 from harness.core.ui import get_ui
 
 
+def _normalize_literal_escapes(text: str) -> str:
+    """Normalize common shell-passed literal escapes when body is single-line.
+
+    Users sometimes pass `--body "# Eval\\n\\n## Verdict: PASS\\n"` expecting
+    real newlines. Keep true multi-line input untouched, and only normalize
+    escaped newlines/tabs when the payload has no real line breaks.
+    """
+    if "\n" in text or "\r" in text:
+        return text
+    if "\\n" not in text and "\\r" not in text and "\\t" not in text:
+        return text
+
+    normalized = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+    normalized = normalized.replace("\\t", "\t")
+    return normalized
+
+
 def _resolve_task_dir(task: str) -> Path:
     """Resolve task ID to a task directory path, creating if needed.
 
@@ -52,6 +69,7 @@ def run_save_eval(
     round_num = next_eval_round(task_dir)
 
     if body:
+        body = _normalize_literal_escapes(body)
         path = save_evaluation(
             task_dir,
             kind=kind,
