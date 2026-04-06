@@ -23,6 +23,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint="No task directory under .harness-flow/tasks",
         )
+        _recovery_echo("workflow_next.recovery.no_tasks_dir")
         return
 
     tid = task_dir.name
@@ -34,6 +35,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint="Missing workflow-state.json; run /harness-plan or create task state",
         )
+        _recovery_echo("workflow_next.recovery.missing_state")
         return
 
     try:
@@ -45,6 +47,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint="Invalid workflow-state.json; fix JSON or re-run plan",
         )
+        _recovery_echo("workflow_next.recovery.corrupt")
         return
 
     if not isinstance(raw, dict):
@@ -54,6 +57,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint="workflow-state.json must be a JSON object",
         )
+        _recovery_echo("workflow_next.recovery.corrupt")
         return
 
     phase_val = raw.get("phase")
@@ -64,6 +68,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint="workflow-state phase missing or not a string",
         )
+        _recovery_echo("workflow_next.recovery.unknown_phase")
         return
 
     try:
@@ -75,6 +80,7 @@ def run_workflow_next(*, task: str | None = None) -> None:
             skill="/harness-plan",
             hint=f"Unknown phase value: {phase_val!r}",
         )
+        _recovery_echo("workflow_next.recovery.unknown_phase")
         return
 
     skill, hint = _suggest(phase)
@@ -86,6 +92,14 @@ def _emit(*, task: str, phase: str, skill: str, hint: str) -> None:
     typer.echo(
         f'HARNESS_NEXT task={task} phase={phase} skill={skill} hint="{safe_hint}"',
     )
+
+
+def _recovery_echo(i18n_key: str) -> None:
+    from harness.i18n import t
+
+    msg = t(i18n_key)
+    if msg != i18n_key:
+        typer.echo(msg, err=True)
 
 
 def _suggest(phase: TaskState) -> tuple[str, str]:

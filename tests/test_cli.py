@@ -347,6 +347,61 @@ class TestGitLifecycleCommands:
         assert '"ok": true' in result.output
         assert '"code": "OK"' in result.output
 
+    def test_git_preflight_dirty_prints_recovery_on_stderr(self, monkeypatch, tmp_path: Path):
+        from harness.integrations.git_ops import GitOperationResult
+
+        class _Manager:
+            def preflight_repo_state(self):
+                return GitOperationResult(
+                    ok=False,
+                    code="DIRTY_WORKTREE",
+                    message="working tree has uncommitted changes",
+                )
+
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".harness-flow"
+        agents.mkdir()
+        (agents / "config.toml").write_text('[project]\nname="x"\n', encoding="utf-8")
+        monkeypatch.setattr(
+            "harness.commands.git_lifecycle.BranchLifecycleManager.create",
+            lambda *_args, **_kwargs: _Manager(),
+        )
+        result = runner.invoke(app, ["git-preflight"])
+        assert result.exit_code == 1
+        assert "What happened" in result.stderr
+
+    def test_gate_no_task_prints_recovery(self, monkeypatch, tmp_path: Path):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".harness-flow").mkdir()
+        (tmp_path / ".harness-flow" / "config.toml").write_text('[project]\nname="x"\n', encoding="utf-8")
+        result = runner.invoke(app, ["gate"])
+        assert result.exit_code == 1
+        combined = f"{result.stdout}{result.stderr}"
+        assert "What happened" in combined
+
+    def test_gate_blocked_prints_recovery(self, monkeypatch, tmp_path: Path):
+        from harness.core.gates import CheckItem, CheckStatus, GateVerdict
+
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".harness-flow"
+        agents.mkdir()
+        (agents / "config.toml").write_text('[project]\nname="x"\n', encoding="utf-8")
+        task = agents / "tasks" / "task-001"
+        task.mkdir(parents=True)
+        verdict = GateVerdict(
+            passed=False,
+            checks=[
+                CheckItem(name="plan_exists", status=CheckStatus.BLOCKED, reason="missing plan"),
+            ],
+            summary="blocked",
+        )
+        monkeypatch.setattr("harness.commands.gate.check_ship_readiness", lambda *_a, **_k: verdict)
+        monkeypatch.setattr("harness.commands.gate.write_gate_snapshot", lambda *_a, **_k: None)
+        result = runner.invoke(app, ["gate"])
+        assert result.exit_code == 1
+        combined = f"{result.stdout}{result.stderr}"
+        assert "What happened" in combined
+
     def test_git_prepare_branch_failure_returns_exit_1(self, monkeypatch):
         from harness.integrations.git_ops import GitOperationResult
 

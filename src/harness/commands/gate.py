@@ -34,6 +34,7 @@ def run_gate(*, task: Optional[str] = None) -> None:
         suffix = f" for '{task}'" if task else ""
         ui.error(t("gate.no_task", suffix=suffix))
         ui.info(t("gate.no_task_hint"))
+        ui.info(t("gate.recovery.no_task"))
         raise typer.Exit(code=1)
 
     try:
@@ -97,4 +98,5 @@ def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
     else:
         console.print(f"[cyber.red]{t('gate.blocked', summary=verdict.summary)}[/]")
         console.print(f"[cyber.dim]{t('gate.blocked_hint')}[/]")
+        console.print(f"[cyber.dim]{t('gate.recovery.blocked')}[/]")
     console.print()

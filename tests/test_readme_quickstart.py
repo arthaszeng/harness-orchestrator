@@ -12,6 +12,14 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
+def test_zh_readme_quickstart_has_core_keywords():
+    zh = Path(__file__).resolve().parents[1] / "README.zh-CN.md"
+    content = zh.read_text(encoding="utf-8")
+    assert "10 分钟" in content
+    assert "git-preflight" in content
+    assert "/harness-plan" in content
+
+
 def test_readme_happy_path_commands_exist_in_cli():
     readme = Path(__file__).resolve().parents[1] / "README.md"
     content = readme.read_text(encoding="utf-8")

@@ -24,6 +24,9 @@ from harness.integrations.git_ops import GitOperationResult
 
 
 def run_git_preflight(*, as_json: bool = False) -> None:
+    from harness.core.config import HarnessConfig
+    from harness.i18n import set_lang, t
+
     manager = BranchLifecycleManager.create(Path.cwd())
     result = manager.preflight_repo_state()
     payload = {
@@ -37,6 +40,16 @@ def run_git_preflight(*, as_json: bool = False) -> None:
     else:
         typer.echo(f"[{result.code}] {result.diagnostic}")
     if not result.ok:
+        try:
+            cfg = HarnessConfig.load(Path.cwd())
+            set_lang(cfg.project.lang)
+        except Exception:
+            set_lang("en")
+        key = f"git_preflight.recovery.{result.code}"
+        msg = t(key)
+        if msg == key:
+            msg = t("git_preflight.recovery.generic")
+        typer.echo(msg, err=True)
         raise typer.Exit(code=1)
 
 

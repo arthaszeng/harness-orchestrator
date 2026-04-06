@@ -289,6 +289,15 @@ class TestUpdateGitignore:
 
 class TestRunInitNonInteractive:
     @patch("harness.native.skill_gen.generate_native_artifacts")
+    def test_non_interactive_uses_scanner_when_no_ci_flag(self, _mock_gen, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_x.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+        run_init(non_interactive=True)
+        body = (tmp_path / ".harness-flow" / "config.toml").read_text(encoding="utf-8")
+        assert "python -m pytest" in body
+
+    @patch("harness.native.skill_gen.generate_native_artifacts")
     def test_creates_agents_layout_and_config(self, mock_gen, monkeypatch, tmp_path, capsys):
         monkeypatch.chdir(tmp_path)
         run_init(

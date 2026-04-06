@@ -62,6 +62,7 @@ MESSAGES: dict[str, str] = {
     "init.guide_brainstorm": "Vision-driven loop: brainstorm → roadmap/backlog → active plan → repeated ship",
     "init.guide_vision": "From vision: vision → plan → ship",
     "init.guide_plan": "Plan a task, then ship (recommended for defined tasks)",
+    "init.guide_default_starter": "recommended first step",
     "init.guide_build": "Implement according to plan",
     "init.guide_eval": "5-role parallel code review",
     "init.guide_ship": "Direct ship: test → eval → fix → commit → push → PR",
@@ -140,6 +141,30 @@ MESSAGES: dict[str, str] = {
     "gate.check.eval_fresh": "Review freshness",
     "gate.check.workflow_state_gate": "Task status sync",
     "gate.check_fallback": "Check ({id})",
+    "gate.recovery.no_task": "What happened: gate could not resolve a task directory. Suggestion: run from project root with .harness-flow/tasks/task-NNN/, or pass --task.",
+    "gate.recovery.blocked": "What happened: one or more ship-readiness checks failed. Suggestion: fix failing items (tests, eval artifacts, or workflow state), then run `harness gate` again.",
+
+    # ── workflow next recovery (stderr) ──────────────────────────
+    "workflow_next.recovery.no_tasks_dir": "What happened: no task folder under .harness-flow/tasks. Suggestion: run `harness init` if needed, then `/harness-plan` in Cursor.",
+    "workflow_next.recovery.missing_state": "What happened: workflow-state.json is missing for this task. Suggestion: run `/harness-plan` to create or refresh task state.",
+    "workflow_next.recovery.corrupt": "What happened: workflow-state.json is not valid JSON or shape. Suggestion: repair the file or re-run `/harness-plan`.",
+    "workflow_next.recovery.unknown_phase": "What happened: workflow-state.json has an unknown phase. Suggestion: set phase to a valid value or re-run `/harness-plan`.",
+
+    # ── git preflight recovery (stderr) ──────────────────────────
+    "git_preflight.recovery.DIRTY_WORKTREE": "What happened: git working tree has uncommitted changes. Suggestion: commit, stash, or discard changes, then retry.",
+    "git_preflight.recovery.DETACHED_HEAD": "What happened: repository is in detached HEAD. Suggestion: `git checkout main` (or your trunk branch), then retry.",
+    "git_preflight.recovery.generic": "What happened: preflight failed. Suggestion: read the message above, fix the underlying git state, then run `harness git-preflight` again.",
+
+    # ── HARNESS_PROGRESS next= (status --progress-line) ───────────
+    "progress_line.next.idle": "Run /harness-plan in Cursor to start or resume the task workflow",
+    "progress_line.next.planning": "Continue /harness-plan until the plan is contracted",
+    "progress_line.next.contracted": "Run /harness-build to implement, then /harness-ship",
+    "progress_line.next.building": "Finish implementation and run /harness-ship when ready",
+    "progress_line.next.evaluating": "Complete eval in /harness-ship or fix findings and re-run",
+    "progress_line.next.shipping": "Continue /harness-ship until tests, eval, gate, and PR are done",
+    "progress_line.next.done": "Run /harness-plan when you are ready for the next task",
+    "progress_line.next.blocked": "Resolve the blocker, then continue with /harness-plan or /harness-ship",
+    "progress_line.next.fallback": "Continue the harness workflow in Cursor",
 
     # ── status command ───────────────────────────────────────────
     "status.next_title": "Next step",

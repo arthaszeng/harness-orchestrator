@@ -63,6 +63,7 @@ MESSAGES: dict[str, str] = {
     "init.guide_brainstorm": "愿景驱动循环: 头脑风暴 → roadmap/backlog → active plan → 持续交付",
     "init.guide_vision": "从愿景开始: 愿景 → 规划 → 交付",
     "init.guide_plan": "规划任务后交付（明确任务推荐使用）",
+    "init.guide_default_starter": "推荐首选",
     "init.guide_build": "按计划实现代码",
     "init.guide_eval": "5 角色并行代码评审",
     "init.guide_ship": "直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
@@ -141,6 +142,27 @@ MESSAGES: dict[str, str] = {
     "gate.check.eval_fresh": "评审是否仍有效",
     "gate.check.workflow_state_gate": "任务状态同步",
     "gate.check_fallback": "检查项（{id}）",
+    "gate.recovery.no_task": "说明：未能解析任务目录。建议：在项目根目录运行，确保存在 .harness-flow/tasks/task-NNN/，或使用 --task 指定。",
+    "gate.recovery.blocked": "说明：有一项或多项发布就绪检查未通过。建议：修复测试、评审产物或 workflow 状态后，再次运行 `harness gate`。",
+
+    "workflow_next.recovery.no_tasks_dir": "说明：.harness-flow/tasks 下没有任务目录。建议：如需请先 `harness init`，然后在 Cursor 中执行 `/harness-plan`。",
+    "workflow_next.recovery.missing_state": "说明：该任务缺少 workflow-state.json。建议：在 Cursor 中运行 `/harness-plan` 以创建或刷新任务状态。",
+    "workflow_next.recovery.corrupt": "说明：workflow-state.json 不是合法 JSON 或结构不对。建议：手工修复后重试，或重新执行 `/harness-plan`。",
+    "workflow_next.recovery.unknown_phase": "说明：workflow-state.json 中的 phase 无法识别。建议：改为合法 phase 或重新执行 `/harness-plan`。",
+
+    "git_preflight.recovery.DIRTY_WORKTREE": "说明：工作区有未提交变更。建议：提交、stash 或丢弃变更后重试。",
+    "git_preflight.recovery.DETACHED_HEAD": "说明：当前处于 detached HEAD。建议：先 `git checkout main`（或你的主干分支）再重试。",
+    "git_preflight.recovery.generic": "说明：预检未通过。建议：根据上方提示处理 git 状态后，再次运行 `harness git-preflight`。",
+
+    "progress_line.next.idle": "在 Cursor 中运行 /harness-plan 以开始或继续任务流程",
+    "progress_line.next.planning": "继续 /harness-plan 直至计划合约就绪",
+    "progress_line.next.contracted": "运行 /harness-build 实现计划，然后 /harness-ship",
+    "progress_line.next.building": "完成实现并在就绪时运行 /harness-ship",
+    "progress_line.next.evaluating": "在 /harness-ship 中完成评审，或修复后重跑",
+    "progress_line.next.shipping": "继续 /harness-ship 直至测试、评审、门禁与 PR 完成",
+    "progress_line.next.done": "需要下一任务时在 Cursor 中运行 /harness-plan",
+    "progress_line.next.blocked": "解除阻塞后，继续 /harness-plan 或 /harness-ship",
+    "progress_line.next.fallback": "在 Cursor 中继续 harness 工作流",
 
     # ── status command ───────────────────────────────────────────
     "status.next_title": "下一步",

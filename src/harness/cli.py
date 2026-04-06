@@ -137,10 +137,15 @@ def status(
         "--verbose",
         help="Show technical details (phase, gates, artifact paths, agent runs)",
     ),
+    progress_line: bool = typer.Option(
+        False,
+        "--progress-line",
+        help="Emit one machine-readable HARNESS_PROGRESS line (or nothing) and exit",
+    ),
 ) -> None:
     """Show current progress and status"""
     from harness.commands.status import run_status
-    run_status(verbose=verbose)
+    run_status(verbose=verbose, progress_line=progress_line)
 
 
 @app.command(name="git-preflight")

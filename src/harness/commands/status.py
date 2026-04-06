@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import typer
 from rich.panel import Panel
 from rich.table import Table
 
@@ -18,17 +19,39 @@ from harness.core.progress import (
 from harness.core.state import SessionState
 from harness.core.ui import get_ui
 from harness.core.worktree import detect_worktree, extract_task_id_from_branch
+from harness.core.workflow_progress_line import format_harness_progress_line
 from harness.core.workflow_state import (
     WorkflowState,
     artifact_pairs,
     gate_pairs,
     load_current_workflow_state,
 )
-from harness.i18n import t
+from harness.i18n import set_lang, t
 
 log = logging.getLogger("harness.commands.status")
 
 _DEFAULT_PASS_THRESHOLD = WorkflowConfig().pass_threshold
+
+
+def _emit_progress_line_only() -> None:
+    """Stdout: one HARNESS_PROGRESS line when workflow-state is valid; else silent."""
+    from harness.core.config import HarnessConfig
+
+    agents_dir = Path.cwd() / ".harness-flow"
+    try:
+        cfg = HarnessConfig.load(Path.cwd())
+        set_lang(cfg.project.lang)
+    except Exception:
+        set_lang("en")
+
+    state = SessionState.load(agents_dir)
+    _, workflow_state = load_current_workflow_state(
+        agents_dir,
+        session_task_id=state.current_task.id if state.current_task else None,
+    )
+    if workflow_state is None:
+        return
+    typer.echo(format_harness_progress_line(phase=workflow_state.phase))
 
 
 def _load_pass_threshold() -> float:
@@ -41,12 +64,18 @@ def _load_pass_threshold() -> float:
         return _DEFAULT_PASS_THRESHOLD
 
 
-def run_status(*, verbose: bool = False) -> None:
+def run_status(*, verbose: bool = False, progress_line: bool = False) -> None:
     """Load state.json and render a Rich panel.
 
     Default view leads with task-language "next step"; technical rows (phase,
     gates, artifact paths, agent registry) require ``verbose=True``.
+    With ``progress_line=True``, print at most one ``HARNESS_PROGRESS`` line
+    (or nothing) and return — no Rich dashboard.
     """
+    if progress_line:
+        _emit_progress_line_only()
+        return
+
     from harness import __version__
 
     ui = get_ui()

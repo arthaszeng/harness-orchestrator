@@ -32,6 +32,7 @@ class TestWorkflowNext:
         assert "HARNESS_NEXT" in result.output
         assert "task=none" in result.output
         assert "skill=/harness-plan" in result.output
+        assert "What happened" in result.stderr
 
     def test_missing_workflow_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner):
         monkeypatch.chdir(tmp_path)
@@ -42,6 +43,7 @@ class TestWorkflowNext:
         assert "task=task-001" in result.output
         assert "phase=unknown" in result.output
         assert "skill=/harness-plan" in result.output
+        assert "What happened" in result.stderr
 
     def test_corrupt_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner):
         monkeypatch.chdir(tmp_path)
@@ -52,6 +54,7 @@ class TestWorkflowNext:
         assert result.exit_code == 0
         assert "phase=corrupt" in result.output
         assert "skill=/harness-plan" in result.output
+        assert "What happened" in result.stderr
 
     def test_phase_contracted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner):
         monkeypatch.chdir(tmp_path)
@@ -101,6 +104,7 @@ class TestWorkflowNext:
         result = runner.invoke(app, ["workflow", "next"])
         assert result.exit_code == 0
         assert "phase=unknown" in result.output
+        assert "What happened" in result.stderr
 
     @pytest.mark.parametrize(
         ("phase", "expected_skill"),

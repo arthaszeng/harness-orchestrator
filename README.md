@@ -35,6 +35,14 @@ Then open Cursor in the project and run:
 
 When it finishes, you should have: a task directory, evaluation artifacts, and a branch state ready for ship/PR (subject to your remote/auth setup).
 
+**Prerequisites:** clean git working tree before `harness git-preflight`, Cursor installed, and this repo initialized in the project as above.
+
+### Progress vs next-step hints
+
+- **`HARNESS_NEXT`** — `harness workflow next` prints one machine line for agents/scripts (task id, phase, suggested skill).
+- **`HARNESS_PROGRESS`** — Cursor skills may emit a one-line boundary marker; `harness status --progress-line` prints a similar line when `.harness-flow/tasks/.../workflow-state.json` is valid (same `step/total` is a coarse workflow map, not per-skill step counts).
+- **`harness status`** — default Rich view for humans (“what to do next” in task language).
+
 ### 1. Install
 
 ```bash

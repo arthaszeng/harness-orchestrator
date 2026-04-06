@@ -99,6 +99,14 @@ def _step_trunk_branch(project_root: Path) -> str:
 
 # ── Step 3: CI gate ───────────────────────────────────────────────
 
+def _default_ci_for_non_interactive(project_root: Path) -> str:
+    """First scanner suggestion, or empty string (matches interactive skip)."""
+    scan = scan_project(project_root)
+    if scan.suggested_commands:
+        return scan.suggested_commands[0][0]
+    return ""
+
+
 def _step_ci_command(
     project_root: Path,
     *,
@@ -300,7 +308,7 @@ def run_init(
         proj_name = name or project_root.name
         description = ""
         trunk_branch = "main"
-        ci = ci_command or "make test"
+        ci = ci_command if ci_command else _default_ci_for_non_interactive(project_root)
         memverse_enabled, memverse_domain = False, ""
         evaluator_model = "inherit"
     else:
@@ -371,7 +379,10 @@ def run_init(
     console.print("  [cyber.dim]─────────────────────────────────────────────────────[/]")
     console.print(f"  [cyber.magenta]/harness-brainstorm[/]  [cyber.dim]{t('init.guide_brainstorm')}[/]")
     console.print(f"  [cyber.magenta]/harness-vision[/]      [cyber.dim]{t('init.guide_vision')}[/]")
-    console.print(f"  [cyber.magenta]/harness-plan[/]        [cyber.dim]{t('init.guide_plan')}[/]")
+    console.print(
+        f"  [bold magenta]/harness-plan[/]        [cyber.dim]{t('init.guide_plan')}[/]"
+        f"  [cyber.dim]({t('init.guide_default_starter')})[/]",
+    )
     console.print(f"  [cyber.magenta]/harness-build[/]       [cyber.dim]{t('init.guide_build')}[/]")
     console.print(f"  [cyber.magenta]/harness-eval[/]        [cyber.dim]{t('init.guide_eval')}[/]")
     console.print(f"  [cyber.magenta]/harness-ship[/]        [cyber.dim]{t('init.guide_ship')}[/]")
