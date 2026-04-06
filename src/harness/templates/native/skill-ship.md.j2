@@ -452,6 +452,23 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 
 ---
 
+## Step 8.25: Auto Trigger Post-Ship Watcher
+
+Immediately after PR creation/update, auto-start post-ship watcher (no manual post command):
+
+1. Resolve `TASK_KEY` from current branch or task directory.
+2. Resolve `PR_NUMBER` from the created/updated PR URL.
+3. Start watcher with merge wait mode:
+   ```bash
+   harness git-post-ship --task-key TASK_KEY --pr PR_NUMBER --wait-merge --json
+   ```
+4. Behavior contract:
+   - If PR is merged during wait window: auto-run trunk sync + local branch cleanup.
+   - If timeout occurs: record blocker/retry hints in task artifacts (do not require user to remember internals).
+   - If PR closes unmerged: stop cleanup and report structured code.
+
+---
+
 ## Step 8.5: Doc-Release (auto-invoke)
 
 After the PR is created/updated, run the `/harness-doc-release` workflow:

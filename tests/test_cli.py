@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -62,6 +63,7 @@ class TestHelpOutput:
         assert "git-preflight" in clean
         assert "git-prepare-branch" in clean
         assert "git-sync-trunk" in clean
+        assert "git-post-ship" in clean
 
 
 class TestGateCommand:
@@ -246,3 +248,57 @@ class TestGitLifecycleCommands:
         result = runner.invoke(app, ["git-sync-trunk", "--json"])
         assert result.exit_code == 0
         assert '"code": "OK"' in result.output
+
+    def test_git_post_ship_wait_merge_json_output(self, monkeypatch):
+        from harness.integrations.git_ops import GitOperationResult
+
+        class _Watcher:
+            def wait_and_finalize(self, **_kwargs):
+                return GitOperationResult(ok=True, code="POST_SHIP_DONE", message="done")
+
+        class _Manager:
+            def infer_task_key_from_branch(self, _branch=None):
+                return "task-006"
+
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
+        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
+
+        result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--wait-merge", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["code"] == "POST_SHIP_DONE"
+        assert "message" in payload
+        assert "context" in payload
+
+    def test_git_post_ship_requires_selector(self):
+        result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])
+        assert result.exit_code != 0
+
+    def test_git_post_ship_rejects_invalid_timeout(self):
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--timeout-sec", "0"],
+        )
+        assert result.exit_code != 0
+
+    def test_git_post_ship_rejects_invalid_poll_interval(self):
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--poll-interval-sec", "0"],
+        )
+        assert result.exit_code != 0
+
+    def test_git_post_ship_rejects_non_positive_pr(self):
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-006", "--pr", "0"],
+        )
+        assert result.exit_code != 0
+
+    def test_git_post_ship_rejects_task_key_branch_mismatch(self):
+        result = runner.invoke(
+            app,
+            ["git-post-ship", "--task-key", "task-007", "--branch", "agent/task-006-demo"],
+        )
+        assert result.exit_code != 0

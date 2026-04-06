@@ -36,15 +36,18 @@ For module-level behavior, read the code and docstrings. For day-to-day usage, s
 
 Built with **Typer**. Core commands:
 
-| Command   | Purpose |
-|-----------|---------|
-| `init`    | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
-| `gate`    | Check ship-readiness gates for the current task (hard + soft checks). |
-| `status`  | Load session state and render a Rich dashboard. |
-| `git-preflight` | Structured git preflight checks with deterministic result codes. |
-| `git-prepare-branch` | Create/resume task branch on top of configured trunk. |
-| `git-sync-trunk` | Sync the current feature branch against configured trunk. |
-| `update`  | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes. |
+
+| Command              | Purpose                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `init`               | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts.                         |
+| `gate`               | Check ship-readiness gates for the current task (hard + soft checks).                                            |
+| `status`             | Load session state and render a Rich dashboard.                                                                  |
+| `git-preflight`      | Structured git preflight checks with deterministic result codes.                                                 |
+| `git-prepare-branch` | Create/resume task branch on top of configured trunk.                                                            |
+| `git-sync-trunk`     | Sync the current feature branch against configured trunk.                                                        |
+| `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup (with wait-merge watcher mode). |
+| `update`             | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes.                            |
+
 
 ---
 
@@ -131,6 +134,13 @@ Structured git lifecycle orchestration used by workflow entry points:
 preflight checks, trunk sync, task-branch prepare/resume, and feature rebase.
 Returns structured result codes/messages for deterministic agent handling.
 
+### `post_ship.py` / `post_ship_watcher.py`
+
+Post-ship lifecycle orchestration. `post_ship.py` handles PR state lookup via `gh`,
+merged-only safety checks, trunk update, and local task-branch cleanup with guardrails
+(never delete trunk/current branch). `post_ship_watcher.py` polls PR state and triggers
+automatic finalization when merge is detected, returning stable timeout/closed codes.
+
 ### `handoff.py`
 
 Structured stage handoff contract. Each pipeline stage (plan → build → eval → ship)
@@ -180,7 +190,7 @@ Structured **JSONL** event logging for observability of harness-adjacent activit
 
 - Loads **Jinja2** templates from `src/harness/templates/native/`.
 - Builds a **layered template context** via `_build_layered_context()` from `HarnessConfig`.
-  Context is organized into three layers:
+Context is organized into three layers:
   - **Layer 0 (Base)** — project-wide scalars (CI command, trunk branch, project lang, memverse config, etc.)
   - **Layer 1 (Role)** — principles (planner/builder), per-role model hints, evaluator model
   - **Layer 2 (Stage)** — pipeline gates, hooks, thresholds
@@ -188,7 +198,7 @@ Structured **JSONL** event logging for observability of harness-adjacent activit
   most rules get Layer 0+2 (no role principles), while `harness-trust-boundary` gets all three
   layers because it references evaluator model info. Mapping is defined in `_ARTIFACT_LAYERS`.
 - **Selective rule activation**: `NativeModeConfig.rule_activation` controls per-rule generation:
-  `"always"` (default), `"phase_match"` (adds marker comment), `"disabled"` (skips file).
+`"always"` (default), `"phase_match"` (adds marker comment), `"disabled"` (skips file).
 - **`generate_native_artifacts()`** writes:
   - **10 skills** under `.cursor/skills/harness/<skill-name>/SKILL.md`
   - **5 agents** under `.cursor/agents/*.md` (with `<!-- context: layers ... -->` metadata)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import typer
 
 from harness import __version__
@@ -92,6 +94,42 @@ def git_sync_trunk(
     """Sync current feature branch with configured trunk."""
     from harness.commands.git_lifecycle import run_git_sync_trunk
     run_git_sync_trunk(as_json=as_json)
+
+
+@app.command(name="git-post-ship")
+def git_post_ship(
+    task_key: str = typer.Option("", "--task-key", "-t", help="Task key (e.g. task-001 or PROJ-123)"),
+    pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
+    branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
+    wait_merge: bool = typer.Option(
+        False,
+        "--wait-merge",
+        help="Wait for PR merge and auto-run post cleanup when merged",
+    ),
+    timeout_sec: int = typer.Option(
+        1800,
+        "--timeout-sec",
+        help="Timeout (seconds) when --wait-merge is enabled",
+    ),
+    poll_interval_sec: int = typer.Option(
+        15,
+        "--poll-interval-sec",
+        help="Polling interval (seconds) when --wait-merge is enabled",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
+) -> None:
+    """Run post-ship cleanup after PR merge."""
+    from harness.commands.git_lifecycle import run_git_post_ship
+
+    run_git_post_ship(
+        task_key=task_key,
+        pr=pr,
+        branch=branch,
+        wait_merge=wait_merge,
+        timeout_sec=timeout_sec,
+        poll_interval_sec=poll_interval_sec,
+        as_json=as_json,
+    )
 
 
 @app.command(name="save-eval")
