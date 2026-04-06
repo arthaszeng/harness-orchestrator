@@ -68,6 +68,12 @@ MESSAGES: dict[str, str] = {
     "init.guide_ship": "直接交付: 测试 → 评审 → 修复 → 提交 → 推送 → PR",
     "init.guide_edit_vision": "编辑 .harness-flow/vision.md 设定项目愿景，",
     "init.guide_use_vision": "然后在 Cursor 中使用 /harness-vision。",
+    "init.next_step_commit_hint": "先提交初始化产物，再运行 /harness-* workflow（否则 preflight 可能因脏工作区中止）",
+    "init.next_step_commit_cmd": "git add .gitignore .harness-flow .cursor && git commit -m \"chore: bootstrap harness artifacts\"",
+    "init.auto_commit_done": "已自动提交初始化产物（chore(init): bootstrap harness artifacts）",
+    "init.auto_commit_nothing_to_commit": "没有新增初始化产物可提交。",
+    "init.auto_commit_skipped_dirty": "检测到 init 前工作区非干净状态，跳过自动提交以避免混入历史变更。",
+    "init.auto_commit_failed": "自动提交初始化产物失败：{error}",
     "init.easter_egg": "产物锻造台已上线，下一步可直接召唤 /harness-plan。",
     "init.gitignore_comment": "# harness — 不跟踪运行时状态",
 
