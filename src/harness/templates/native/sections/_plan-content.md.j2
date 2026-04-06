@@ -32,6 +32,12 @@ If `workflow-state.json` does not exist, skip — handoff is optional.
 Review gate passed. Invoke `/harness-ship` to execute the full
 build → eval → ship → PR pipeline.
 
+**Continuity guarantee**: the plan stage has already updated `workflow-state.json`
+with `phase: contracted` and a `handoff_summary`. Ship detects these signals and
+enters its **fast path** — skipping pre-flight checks already done during plan
+(branch check, config check, task directory scan), jumping straight to rebase
+and tests. No manual context passing needed.
+
 Ship will dispatch the same 5 roles (architect, product-owner, engineer,
 qa, project-manager) in `code-eval` mode for the evaluation phase.
 

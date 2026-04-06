@@ -30,6 +30,11 @@
 Review gate 已通过。调用 `/harness-ship` 执行完整的
 build → eval → ship → PR 管线。
 
+**衔接保障**：plan 阶段已将 `workflow-state.json` 的 `phase` 更新为 `contracted`
+并写入了 `handoff_summary`。Ship 检测到这些信号后会进入**快速路径**——
+跳过已在 plan 中完成的预检（分支检查、config 检查、任务目录扫描），
+直接从 rebase 和测试开始。无需手动传递上下文。
+
 Ship 会派遣同样的 5 个角色（architect、product-owner、engineer、
 qa、project-manager）以 `code-eval` 模式进行评审阶段。
 
