@@ -90,8 +90,11 @@ def run_git(
 _run_git = run_git
 
 
-def current_branch(cwd: Path) -> str:
+def current_branch(cwd: Path) -> str | None:
+    """Return current branch name, ``""`` for detached HEAD, ``None`` on git failure."""
     result = _run_git(["branch", "--show-current"], cwd)
+    if result.returncode != 0:
+        return None
     return result.stdout.strip()
 
 

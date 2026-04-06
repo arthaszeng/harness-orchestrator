@@ -187,3 +187,22 @@ class TestSafeCleanup:
         """safe_cleanup should never raise, even with an invalid target."""
         repo = _init_repo(tmp_path)
         safe_cleanup("nonexistent-branch", repo)
+
+
+class TestCurrentBranchReturnType:
+    """D2: current_branch returns None on git failure, '' on detached HEAD."""
+
+    def test_normal_branch_returns_name(self, tmp_path: Path):
+        repo = _init_repo(tmp_path)
+        assert current_branch(repo) == "main"
+
+    def test_not_a_repo_returns_none(self, tmp_path: Path):
+        result = current_branch(tmp_path)
+        assert result is None
+
+    def test_detached_head_returns_empty_string(self, tmp_path: Path):
+        repo = _init_repo(tmp_path)
+        commit_hash = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+        _git(["checkout", commit_hash], repo)
+        result = current_branch(repo)
+        assert result == ""

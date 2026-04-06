@@ -1,9 +1,13 @@
 """config.py 单元测试"""
 
+import warnings as _warnings
 from pathlib import Path
+
+import pytest
 
 from harness.core.config import (
     HarnessConfig,
+    HarnessConfigError,
     ModelsConfig,
     RoleModelConfig,
     _deep_merge,
@@ -103,3 +107,56 @@ def test_models_empty():
     assert models.default == ""
     assert models.role_overrides == {}
     assert models.role_configs == {}
+
+
+class TestHarnessConfigError:
+    """D1: config loading wraps TOML and I/O errors."""
+
+    def test_corrupt_toml_raises_config_error(self, tmp_path: Path):
+        agents_dir = tmp_path / ".harness-flow"
+        agents_dir.mkdir()
+        (agents_dir / "config.toml").write_text("{invalid toml!!", encoding="utf-8")
+
+        with pytest.raises(HarnessConfigError, match="Invalid TOML"):
+            HarnessConfig.load(tmp_path)
+
+    def test_config_error_includes_file_path(self, tmp_path: Path):
+        agents_dir = tmp_path / ".harness-flow"
+        agents_dir.mkdir()
+        (agents_dir / "config.toml").write_text("[[broken", encoding="utf-8")
+
+        with pytest.raises(HarnessConfigError) as exc_info:
+            HarnessConfig.load(tmp_path)
+        assert "config.toml" in str(exc_info.value)
+
+    def test_non_utf8_config_raises_config_error(self, tmp_path: Path):
+        agents_dir = tmp_path / ".harness-flow"
+        agents_dir.mkdir()
+        (agents_dir / "config.toml").write_bytes(b"\xff\xfe[project]\nname = 'x'\n")
+
+        with pytest.raises(HarnessConfigError, match="Cannot read"):
+            HarnessConfig.load(tmp_path)
+
+    def test_global_config_corrupt_warns_and_continues(self, tmp_path: Path, monkeypatch):
+        agents_dir = tmp_path / ".harness-flow"
+        agents_dir.mkdir()
+        (agents_dir / "config.toml").write_text(
+            '[project]\nname = "proj"\n', encoding="utf-8",
+        )
+
+        fake_home = tmp_path / "fakehome"
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        global_dir = fake_home / ".harness"
+        global_dir.mkdir(parents=True)
+        (global_dir / "config.toml").write_text("{broken!", encoding="utf-8")
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            cfg = HarnessConfig.load(tmp_path)
+
+        assert cfg.project.name == "proj"
+        assert any("corrupt global config" in str(w.message).lower() for w in caught)
+
+    def test_missing_config_uses_defaults(self, tmp_path: Path):
+        cfg = HarnessConfig.load(tmp_path)
+        assert cfg.workflow.max_iterations == 3

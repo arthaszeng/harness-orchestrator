@@ -19,6 +19,14 @@ from harness.core.model_selection import validate_model_name
 from harness.core.roles import NATIVE_REVIEW_ROLES
 
 
+class HarnessConfigError(Exception):
+    """Raised when config loading fails due to file I/O or TOML syntax errors.
+
+    Pydantic ``ValidationError`` is NOT wrapped — it already provides
+    structured field-level diagnostics.
+    """
+
+
 class ProjectConfig(BaseModel):
     name: str = ""
     description: str = ""
@@ -180,13 +188,28 @@ class HarnessConfig(BaseModel):
 
         data: dict[str, Any] = {}
         if config_path.exists():
-            data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            try:
+                data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError) as exc:
+                raise HarnessConfigError(
+                    f"Cannot read {config_path}: {type(exc).__name__}: {exc}"
+                ) from exc
+            except Exception as exc:
+                raise HarnessConfigError(
+                    f"Invalid TOML in {config_path}: {exc}"
+                ) from exc
 
-        # Global config fallback
         global_path = Path.home() / ".harness" / "config.toml"
         if global_path.exists():
-            global_data = tomllib.loads(global_path.read_text(encoding="utf-8"))
-            # Project config takes priority over global
+            try:
+                global_data = tomllib.loads(global_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                warnings.warn(
+                    f"Ignoring corrupt global config at {global_path} "
+                    f"({type(exc).__name__}: {exc})",
+                    stacklevel=2,
+                )
+                global_data = {}
             data = _deep_merge(global_data, data)
 
         # Environment variable overrides (highest priority)

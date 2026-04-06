@@ -98,3 +98,41 @@ def test_reconcile_pending_closed_unmerged_removed_without_finalize(tmp_path: Pa
     assert stats["processed"] == 1
     assert stats["closed"] == 1
     assert manager.finalize_calls == 0
+
+
+class TestLoadPendingCorruptLines:
+    """D4: corrupt JSONL lines emit warnings instead of silent discard."""
+
+    def test_corrupt_line_warns(self, tmp_path: Path):
+        import warnings as _warnings
+        from harness.core.post_ship_pending import _load_pending
+
+        path = tmp_path / "pending.jsonl"
+        path.write_text(
+            '{"task_key": "task-001", "pr_number": 1}\n'
+            '{not valid json}\n'
+            '{"task_key": "task-002", "pr_number": 2}\n',
+            encoding="utf-8",
+        )
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            rows = _load_pending(path)
+
+        assert len(rows) == 2
+        assert any("corrupt jsonl" in str(w.message).lower() for w in caught)
+        assert any("line 2" in str(w.message) for w in caught)
+
+    def test_all_corrupt_returns_empty_with_warnings(self, tmp_path: Path):
+        import warnings as _warnings
+        from harness.core.post_ship_pending import _load_pending
+
+        path = tmp_path / "pending.jsonl"
+        path.write_text("{bad1}\n{bad2}\n", encoding="utf-8")
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            rows = _load_pending(path)
+
+        assert rows == []
+        assert len(caught) == 2

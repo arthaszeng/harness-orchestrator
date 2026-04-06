@@ -1842,3 +1842,25 @@ def test_zh_dispatch_sections_contain_response_language(tmp_path: Path):
 
     eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
     assert "response_language: zh" in eval_content, "ZH eval missing response_language"
+
+
+def test_single_template_failure_does_not_abort(tmp_path: Path, monkeypatch):
+    """D3: per-template error recovery continues generating remaining files."""
+    cfg = _make_cfg(tmp_path)
+
+    import harness.native.skill_gen as sg
+
+    real_render = sg._render_template
+
+    call_count = {"n": 0}
+
+    def _failing_render(tmpl_dir, tmpl_name, context):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise sg.jinja2.TemplateError("simulated failure")
+        return real_render(tmpl_dir, tmpl_name, context)
+
+    monkeypatch.setattr(sg, "_render_template", _failing_render)
+    count = generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    assert count >= 20, f"Expected at least 20 files, got {count}"
+    assert call_count["n"] > 1

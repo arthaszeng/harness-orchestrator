@@ -51,12 +51,17 @@ def _load_pending(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
         try:
             raw = json.loads(line)
         except json.JSONDecodeError:
+            import warnings
+            warnings.warn(
+                f"Corrupt JSONL at {path} line {idx}: {line[:200]!r}",
+                stacklevel=2,
+            )
             continue
         if not isinstance(raw, dict):
             continue

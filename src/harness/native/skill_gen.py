@@ -349,6 +349,22 @@ def generate_native_artifacts(
     count = 0
 
     typer.echo(t("native.generating"))
+    skipped: list[str] = []
+
+    def _try_render_and_write(
+        tmpl_name: str, artifact_name: str, out_path: Path, ctx: dict[str, str],
+    ) -> bool:
+        try:
+            content = _render_template(tmpl_dir, tmpl_name, ctx)
+            out_path.write_text(content, encoding="utf-8")
+            return True
+        except (jinja2.TemplateError, OSError) as exc:
+            typer.echo(
+                f"  [error] skipping {artifact_name}: {type(exc).__name__}: {exc}",
+                err=True,
+            )
+            skipped.append(artifact_name)
+            return False
 
     # Skills → .cursor/skills/harness/<name>/SKILL.md
     skills_base = project_root / ".cursor" / "skills" / "harness"
@@ -357,10 +373,9 @@ def generate_native_artifacts(
         skill_dir.mkdir(parents=True, exist_ok=True)
         out_path = skill_dir / "SKILL.md"
         ctx = _filter_context(full_ctx, "skill", skill_name)
-        content = _render_template(tmpl_dir, tmpl_name, ctx)
-        out_path.write_text(content, encoding="utf-8")
-        typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
-        count += 1
+        if _try_render_and_write(tmpl_name, skill_name, out_path, ctx):
+            typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
+            count += 1
 
     # Agents → .cursor/agents/<name>.md
     agents_dir = project_root / ".cursor" / "agents"
@@ -371,10 +386,9 @@ def generate_native_artifacts(
         ctx["context_layers"] = ",".join(
             str(i) for i in sorted(_ARTIFACT_LAYERS.get(("agent", agent_name), {0, 1}))
         )
-        content = _render_template(tmpl_dir, tmpl_name, ctx)
-        out_path.write_text(content, encoding="utf-8")
-        typer.echo(t("native.generated_agent", path=_rel(project_root, out_path)))
-        count += 1
+        if _try_render_and_write(tmpl_name, agent_name, out_path, ctx):
+            typer.echo(t("native.generated_agent", path=_rel(project_root, out_path)))
+            count += 1
 
     # Rules → .cursor/rules/<name>.mdc
     rules_dir = project_root / ".cursor" / "rules"
@@ -385,12 +399,13 @@ def generate_native_artifacts(
             continue
         out_path = rules_dir / f"{rule_name}.mdc"
         ctx = _filter_context(full_ctx, "rule", rule_name)
-        content = _render_template(tmpl_dir, tmpl_name, ctx)
-        if activation == "phase_match":
-            content = f"<!-- rule-activation: phase_match -->\n{content}"
-        out_path.write_text(content, encoding="utf-8")
-        typer.echo(t("native.generated_rule", path=_rel(project_root, out_path)))
-        count += 1
+        if _try_render_and_write(tmpl_name, rule_name, out_path, ctx):
+            content = out_path.read_text(encoding="utf-8")
+            if activation == "phase_match":
+                content = f"<!-- rule-activation: phase_match -->\n{content}"
+                out_path.write_text(content, encoding="utf-8")
+            typer.echo(t("native.generated_rule", path=_rel(project_root, out_path)))
+            count += 1
 
     # Resources → .cursor/skills/harness/harness-eval/<path>
     eval_resource_dir = skills_base / "harness-eval"
@@ -409,6 +424,12 @@ def generate_native_artifacts(
     # Worktrees config → .cursor/worktrees.json
     count += _generate_worktrees_json(project_root, force=force)
 
+    if skipped:
+        typer.echo(
+            f"  [warn] {count} files generated, {len(skipped)} skipped due to errors: "
+            f"{', '.join(skipped)}",
+            err=True,
+        )
     typer.echo(t("native.done", count=count))
     return count
 
