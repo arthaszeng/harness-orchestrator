@@ -368,7 +368,7 @@ class TestGitLifecycleCommands:
         )
         result = runner.invoke(app, ["git-preflight"])
         assert result.exit_code == 1
-        assert "What happened" in result.stderr
+        assert "What happened" in result.output
 
     def test_gate_no_task_prints_recovery(self, monkeypatch, tmp_path: Path):
         monkeypatch.chdir(tmp_path)
@@ -376,8 +376,7 @@ class TestGitLifecycleCommands:
         (tmp_path / ".harness-flow" / "config.toml").write_text('[project]\nname="x"\n', encoding="utf-8")
         result = runner.invoke(app, ["gate"])
         assert result.exit_code == 1
-        combined = f"{result.stdout}{result.stderr}"
-        assert "What happened" in combined
+        assert "What happened" in result.output
 
     def test_gate_blocked_prints_recovery(self, monkeypatch, tmp_path: Path):
         from harness.core.gates import CheckItem, CheckStatus, GateVerdict
@@ -399,8 +398,7 @@ class TestGitLifecycleCommands:
         monkeypatch.setattr("harness.commands.gate.write_gate_snapshot", lambda *_a, **_k: None)
         result = runner.invoke(app, ["gate"])
         assert result.exit_code == 1
-        combined = f"{result.stdout}{result.stderr}"
-        assert "What happened" in combined
+        assert "What happened" in result.output
 
     def test_git_prepare_branch_failure_returns_exit_1(self, monkeypatch):
         from harness.integrations.git_ops import GitOperationResult
