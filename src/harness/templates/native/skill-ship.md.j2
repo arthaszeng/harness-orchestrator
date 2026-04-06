@@ -489,6 +489,12 @@ If no documentation issues are found: skip silently.
 
 Write ship metrics to `.harness-flow/tasks/task-NNN/ship-metrics.json` for retrospective consumption:
 
+Prefer the structured command (supports auto-inferred efficiency baseline fields):
+
+```bash
+harness save-ship-metrics --task TASK_ID --branch "$(git rev-parse --abbrev-ref HEAD)" --pr-quality-score 8.5 --test-count 285 --eval-rounds 1 --findings-critical 0 --findings-informational 2 --auto-fixed 1 --plan-total 5 --plan-done 5 --coverage-pct 85
+```
+
 ```json
 {
   "timestamp": "ISO-8601",

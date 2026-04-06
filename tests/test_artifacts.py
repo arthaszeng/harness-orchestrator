@@ -159,12 +159,18 @@ class TestSaveShipMetrics:
             plan_total=5,
             plan_done=4,
             coverage_pct=85,
+            e2e_total_time_sec=321.5,
+            manual_interventions_per_task=2.0,
+            first_pass_rate=0.75,
         )
         data = json.loads(path.read_text())
         assert data["coverage_pct"] == 85
         assert data["plan_total"] == 5
         assert data["plan_done"] == 4
         assert data["eval_rounds"] == 2
+        assert data["efficiency_baseline"]["e2e_total_time_sec"] == 321.5
+        assert data["efficiency_baseline"]["manual_interventions_per_task"] == 2.0
+        assert data["efficiency_baseline"]["first_pass_rate"] == 0.75
 
     def test_updates_workflow_state_ref(self, tmp_path: Path):
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-009"
@@ -190,6 +196,90 @@ class TestSaveEvaluationRawBody:
         save_evaluation(tmp_path, round_num=1, verdict="ITERATE")
         path = save_evaluation(tmp_path, raw_body="round 2 content", verdict="PASS")
         assert path.name == "code-eval-r2.md"
+
+
+class TestCLISaveShipMetrics:
+    def test_save_ship_metrics_with_manual_values(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-050"
+        _seed_workflow_state(task_dir, "task-050")
+
+        result = runner.invoke(
+            app,
+            [
+                "save-ship-metrics",
+                "--task",
+                "task-050",
+                "--branch",
+                "agent/task-050-demo",
+                "--test-count",
+                "612",
+                "--coverage-pct",
+                "88",
+                "--e2e-total-time-sec",
+                "123.4",
+                "--manual-interventions-per-task",
+                "1",
+                "--first-pass-rate",
+                "1",
+            ],
+        )
+        assert result.exit_code == 0
+        metrics = json.loads((task_dir / "ship-metrics.json").read_text(encoding="utf-8"))
+        assert metrics["branch"] == "agent/task-050-demo"
+        assert metrics["coverage_pct"] == 88
+        assert metrics["efficiency_baseline"]["e2e_total_time_sec"] == 123.4
+        assert metrics["efficiency_baseline"]["manual_interventions_per_task"] == 1.0
+        assert metrics["efficiency_baseline"]["first_pass_rate"] == 1.0
+
+    def test_save_ship_metrics_auto_infers_baseline(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-051"
+        _seed_workflow_state(task_dir, "task-051")
+        (task_dir / "code-eval-r1.md").write_text("# Eval\n\n## Verdict: PASS\n", encoding="utf-8")
+        (task_dir / "intervention-audit.jsonl").write_text(
+            '{"event_type":"manual_retry"}\n{"event_type":"manual_confirmation"}\n',
+            encoding="utf-8",
+        )
+        raw_state = json.loads((task_dir / "workflow-state.json").read_text(encoding="utf-8"))
+        raw_state["gates"] = {
+            "plan_review": {"status": "pass", "reason": "", "updated_at": "2026-04-06T10:00:00+00:00"},
+            "evaluation": {"status": "pass", "reason": "", "updated_at": "2026-04-06T10:10:00+00:00"},
+            "ship_readiness": {"status": "pass", "reason": "", "updated_at": "2026-04-06T10:15:00+00:00"},
+        }
+        (task_dir / "workflow-state.json").write_text(json.dumps(raw_state), encoding="utf-8")
+
+        result = runner.invoke(app, ["save-ship-metrics", "--task", "task-051"])
+        assert result.exit_code == 0
+        metrics = json.loads((task_dir / "ship-metrics.json").read_text(encoding="utf-8"))
+        baseline = metrics["efficiency_baseline"]
+        assert baseline["e2e_total_time_sec"] == 900.0
+        assert baseline["manual_interventions_per_task"] == 2.0
+        assert baseline["first_pass_rate"] == 1.0
+
+    def test_save_ship_metrics_infer_first_pass_from_code_eval_only(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-052"
+        _seed_workflow_state(task_dir, "task-052")
+        # plan-eval does not count as code first-pass
+        (task_dir / "plan-eval-r1.md").write_text("# Plan Eval\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["save-ship-metrics", "--task", "task-052"])
+        assert result.exit_code == 0
+        metrics = json.loads((task_dir / "ship-metrics.json").read_text(encoding="utf-8"))
+        assert metrics["efficiency_baseline"]["first_pass_rate"] == 0.0
+
+    def test_save_ship_metrics_rejects_invalid_first_pass_rate(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-053"
+        _seed_workflow_state(task_dir, "task-053")
+
+        result = runner.invoke(
+            app,
+            ["save-ship-metrics", "--task", "task-053", "--first-pass-rate", "1.2"],
+        )
+        assert result.exit_code != 0
+
 
 
 class TestCLIPathTraversal:

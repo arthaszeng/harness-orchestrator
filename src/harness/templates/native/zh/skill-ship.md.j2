@@ -484,6 +484,12 @@ PR 创建/更新后，运行 `/harness-doc-release` 工作流：
 
 将 ship 指标写入 `.harness-flow/tasks/task-NNN/ship-metrics.json` 供回顾消费：
 
+优先使用结构化命令写入（支持自动推断效率基线指标）：
+
+```bash
+harness save-ship-metrics --task TASK_ID --branch "$(git rev-parse --abbrev-ref HEAD)" --pr-quality-score 8.5 --test-count 285 --eval-rounds 1 --findings-critical 0 --findings-informational 2 --auto-fixed 1 --plan-total 5 --plan-done 5 --coverage-pct 85
+```
+
 ```json
 {
   "timestamp": "ISO-8601",
