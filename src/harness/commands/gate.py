@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,8 @@ from pydantic import ValidationError
 from harness.core.gates import CheckStatus, GateVerdict, check_ship_readiness, write_gate_snapshot
 from harness.core.ui import get_ui
 from harness.core.workflow_state import resolve_task_dir
+
+log = logging.getLogger("harness.commands.gate")
 
 
 def run_gate(*, task: Optional[str] = None) -> None:
@@ -61,6 +64,7 @@ def _gate_check_label(check_name: str) -> str:
     key = f"gate.check.{check_name}"
     label = t(key)
     if label == key:
+        log.debug("missing i18n for gate check label: %s", check_name)
         return t("gate.check_fallback", id=check_name)
     return label
 

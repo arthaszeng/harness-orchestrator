@@ -88,6 +88,8 @@ class TestGateCommand:
         clean = _ANSI_RE.sub("", result.output)
         assert result.exit_code == 0
         assert "ready to ship" in clean.lower()
+        assert "plan document" in clean.lower()
+        assert "plan_exists" not in clean
 
     def test_gate_blocked_missing_eval(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -101,6 +103,8 @@ class TestGateCommand:
         assert result.exit_code == 1
         clean = _ANSI_RE.sub("", result.output)
         assert "not ready" in clean.lower()
+        assert "code review record" in clean.lower()
+        assert "eval_exists" not in clean
 
     def test_gate_no_task_dir(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)

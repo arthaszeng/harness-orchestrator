@@ -525,6 +525,28 @@ class TestEvalVerdict:
 
 
 # ---------------------------------------------------------------------------
+# Gate CLI: human-readable check labels (B2)
+# ---------------------------------------------------------------------------
+
+
+class TestGateCliCheckLabels:
+    def test_gate_check_label_maps_plan_exists_en(self):
+        from harness.commands.gate import _gate_check_label
+        from harness.i18n import set_lang
+
+        set_lang("en")
+        assert _gate_check_label("plan_exists") == "Plan document"
+
+    def test_gate_check_label_unknown_id_uses_fallback_en(self):
+        from harness.commands.gate import _gate_check_label
+        from harness.i18n import set_lang
+
+        set_lang("en")
+        label = _gate_check_label("no_such_check_xyz")
+        assert "no_such_check_xyz" in label
+
+
+# ---------------------------------------------------------------------------
 # D5: task_id pattern enforcement
 # ---------------------------------------------------------------------------
 

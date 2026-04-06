@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from harness.core.progress import (
     get_recent_blocked,
     get_recent_completed,
     is_resumable,
     suggest_next_action,
     update_progress,
+    workflow_phase_user_label,
 )
 from harness.core.state import (
     CompletedTask,
@@ -155,6 +158,14 @@ class TestSuggestNextAction:
         action = suggest_next_action(state, workflow_state)
         assert "evaluating" not in action.lower()
         assert "代码评审" in action
+
+    @pytest.mark.parametrize("phase", list(TaskState))
+    def test_workflow_phase_user_label_en_not_raw_enum_string(self, phase):
+        from harness.i18n import set_lang
+
+        set_lang("en")
+        label = workflow_phase_user_label(phase)
+        assert label != phase.value
 
 
 # ---------------------------------------------------------------------------
