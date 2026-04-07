@@ -64,14 +64,12 @@ description: "计划和代码评审阶段的架构审查者。评估架构可行
 - "technical debt"
 - "dependency choices"
 - "security patterns"
-- project recent window: domain `{{ project_name or memverse_domain }}`, limit 20
-- role learning window: domain `{{ project_name or memverse_domain }}-architect-learning`, limit 15
+- 使用多域 OR 查询：`domains: "{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning"`，limit 20
 
 在你的发现中引用相关记忆。
 
-如果 findings 包含 `[LEARNING]` 条目，best-effort 调用 `add_memories`
-写入 `{{ project_name or memverse_domain }}-architect-learning`（non-blocking；
-Memverse 不可用时不应导致评审失败）。
+**不要调用 `add_memories`** — 学习捕获由父协调器统一处理。
+你在输出契约中的 `[LEARNING]` 条目会被父代理收集并持久化。
 
 {% endif %}
 ## 输出契约
@@ -85,6 +83,8 @@ Findings:
 - [CRITICAL] description → suggested fix
 - [WARN] description → suggested fix
 - [INFO] description
+
+Learnings（mandatory — 至少一条，或显式写 "No learnings extracted"）:
 - [LEARNING] role-specific long-lived, cross-project/language insight
 
 Verdict: PASS | ISSUES_FOUND

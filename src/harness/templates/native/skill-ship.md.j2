@@ -90,7 +90,12 @@ stage already completed in this session, most pre-flight work is redundant.
 
 {% if memverse_enabled == "true" %}
 6. **Prior Learnings**: If Memverse MCP is available, search for learnings relevant to the
-   changed files/modules. Display any prior pitfalls or patterns that apply to this diff.
+   changed files/modules. Use multi-domain OR query (aligned with eval Step 0.7).
+   Include the project domain plus all five role-learning domains:
+   ```
+   search_memory(query=<key topics from diff>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning,{{ project_name or memverse_domain }}-engineer-learning,{{ project_name or memverse_domain }}-qa-learning,{{ project_name or memverse_domain }}-product-learning,{{ project_name or memverse_domain }}-project-manager-learning", limit=20)
+   ```
+   Display any prior pitfalls or patterns that apply to this diff.
 
 {% endif %}
 {% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} **Eval Readiness Reminder**: This workflow WILL run a mandatory eval at Step 3.8.
@@ -278,6 +283,62 @@ All CRITICAL findings must be resolved before proceeding.
 
 **Review Gate (advisory):** Evaluation is advisory — ITERATE verdict is logged but does not block.
 CRITICAL findings are flagged but shipping continues.
+{% endif %}
+
+---
+
+## Step 3.9: Capture Learnings
+
+{% if memverse_enabled == "true" %}
+After the evaluation synthesis is complete, capture non-obvious insights as learnings
+(aligned with eval Step 2 — same logic, same metadata schema):
+
+1. Review all findings with confidence >= 7
+2. Parse merged findings for `[LEARNING]` items from each role's output.
+   Keep only entries that are:
+   - long-lived
+   - cross-project / cross-language reusable
+   - strongly role-relevant
+3. **Domain registration guard** (once per session, before the first write):
+   Call `manage_domain` for each role domain that will receive writes.
+   `manage_domain` is idempotent — registering an already-existing domain is a no-op,
+   so **skip `list_domains`** and just register directly:
+   ```
+   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
+   ```
+   Fire all 5 calls **in parallel**. If this session already registered domains
+   (e.g. eval ran before ship), skip entirely.
+4. **Dedup guard** (prevents double-write when eval ran before ship in the same session):
+   For each qualifying `[LEARNING]` item, before writing, call:
+   ```
+   search_memory(query=<learning key or short text>, domains="{{ project_name or memverse_domain }}-<role>-learning", limit=5)
+   ```
+   If a result with substantially the same insight already exists → **skip** (log as `skipped-dedup`).
+   Only write if no near-duplicate is found.
+5. For each non-duplicate `[LEARNING]` item, the **parent orchestrator** (you) calls `add_memories`
+   with structured metadata (JSON string). Sub-agents do NOT call `add_memories` themselves.
+   **Text must include a `[domain]` prefix** to reinforce Memverse domain inference:
+   ```
+   add_memories(
+     text="[{{ project_name or memverse_domain }}-<role>-learning] <learning insight text>",
+     domain="{{ project_name or memverse_domain }}-<role>-learning",
+     metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
+   )
+   ```
+   **Note**: metadata is write-only — `search_memory` cannot filter by metadata fields.
+   For precise metadata filtering, use `list_memories` + client-side parsing.
+   Treat writes as non-blocking fire-and-forget: do not block gate on write outcome.
+   **Parallel writes**: when multiple learnings are ready, dispatch all `add_memories` calls
+   concurrently (do not serialize).
+6. Log counters: `LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`.
+
+If Memverse MCP is not available: skip silently.
+{% else %}
+Skip — Memverse not enabled.
 {% endif %}
 
 ---

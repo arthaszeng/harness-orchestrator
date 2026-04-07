@@ -46,17 +46,30 @@ Prompt for (or extract from context):
 - **confidence**: 1-10 (how certain is this learning?)
 - **files**: related files (optional)
 
-Store via Memverse `add_memories` with structured format:
+Before writing, ensure the target domain is registered (`manage_domain` is idempotent):
 ```
-[{type}] {key}: {insight} (confidence: {confidence}/10, files: {files}, branch: {branch}, commit: {commit})
+manage_domain(name="{{ memverse_domain }}", display="{{ memverse_domain }}", aliases="{{ memverse_domain }}", keywords="{{ memverse_domain }} learning")
 ```
 
-Domain: "{{ memverse_domain }}"
+Store via Memverse `add_memories` with structured metadata (JSON string).
+**Text must include a `[domain]` prefix** to reinforce Memverse domain inference:
+```
+add_memories(
+  text="[{{ memverse_domain }}] {insight}",
+  domain="{{ memverse_domain }}",
+  metadata="{\"type\": \"{type}\", \"key\": \"{key}\", \"confidence\": {confidence}, \"source\": \"user-stated\", \"files\": [\"{files}\"], \"branch\": \"{branch}\", \"commit\": \"{commit}\"}"
+)
+```
+
+**Note**: metadata is write-only — `search_memory` cannot filter by metadata fields.
+For precise metadata filtering, use `list_memories` + client-side parsing.
 
 ### `/harness-learn prune` — Check Staleness
 Review existing learnings for staleness.
 
-1. Fetch all learnings for this project via `search_memory`
+1. Fetch all learnings for this project via `list_memories(domain="{{ memverse_domain }}", limit=100)`
+   (use `list_memories` for complete enumeration — `search_memory` may miss items with low semantic similarity).
+   If `has_more` is true, repeat with `offset` to paginate until all items are fetched.
 2. For each learning that references specific files:
    - Check if the file still exists
    - If deleted: flag as potentially stale
@@ -74,7 +87,10 @@ LEARNING HEALTH CHECK
 ═══════════════════════════════════════
 ```
 
-5. For stale/contradicting learnings: suggest deletions via Memverse `delete_memories`
+5. For stale/contradicting learnings:
+   - If contradiction can be resolved by updating: use `update_memory(memory_id, new_content)` to merge/correct
+     (note: `update_memory` replaces only the searchable `text`; to change metadata, delete and re-add)
+   - If truly obsolete: suggest deletion via `delete_memories`
 
 ### `/harness-learn export` — Export as Markdown
 Export all learnings grouped by type.
@@ -123,15 +139,29 @@ LEARNING STATISTICS
 
 ## Memory Schema
 
-Each learning stored in Memverse follows this structure:
-- **type**: pattern / pitfall / preference / architecture / tool
-- **key**: short kebab-case identifier
-- **insight**: the learning content (1-3 sentences)
-- **confidence**: 1-10
-- **source**: observed / user-stated / inferred / cross-model
-- **files**: list of related file paths (optional)
-- **branch**: git branch where learned (optional)
-- **commit**: commit hash where learned (optional)
+Each learning is stored via `add_memories` with two parts:
+
+**`text` parameter** (the searchable content):
+The learning insight in plain text (1-3 sentences). This is what `search_memory` matches against.
+
+**`metadata` parameter** (JSON string, write-only — not searchable):
+```json
+{
+  "type": "pattern | pitfall | preference | architecture | tool",
+  "key": "short-kebab-case-id",
+  "confidence": 9,
+  "source": "observed | user-stated | inferred | cross-model",
+  "role": "architect | engineer | qa | product-owner | project-manager",
+  "task": "task-NNN",
+  "files": ["src/api.py"],
+  "branch": "agent/task-041-...",
+  "commit": "abc1234"
+}
+```
+
+**Important**: `search_memory` cannot filter by metadata fields (Memverse constraint).
+To filter by `type`, `confidence`, etc., use `list_memories` for full enumeration and
+parse metadata client-side. The `metadata` field is returned by `list_memories` results.
 
 ---
 
@@ -142,7 +172,8 @@ Each learning stored in Memverse follows this structure:
 At the start of `/harness-eval` and `/harness-ship` workflows:
 
 1. Extract key topics from the diff (file names, module names, patterns used)
-2. Call Memverse `search_memory` with these topics and domain "{{ memverse_domain }}"
+2. Call Memverse `search_memory` using multi-domain OR query (aligned with eval/ship):
+   `search_memory(query=<topics>, domains="{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-learning,{{ memverse_domain }}-project-manager-learning", limit=20)`
 3. If relevant learnings are found, display:
 
 ```
@@ -157,13 +188,28 @@ PRIOR LEARNINGS (relevant to this diff):
 
 At the end of `/harness-eval` and `/harness-ship` workflows:
 
-1. Review all findings from the evaluation
-2. For any non-obvious finding (confidence >= 7) that reveals a pattern or pitfall:
-   - Auto-capture as a learning via Memverse `add_memories`
+1. **Domain registration guard** (once per session):
+   Call `manage_domain` for each role domain that will receive writes (idempotent, skip `list_domains`):
+   ```
+   manage_domain(name="{{ memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ memverse_domain }} architect", keywords="architecture learning patterns")
+   manage_domain(name="{{ memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ memverse_domain }} engineer", keywords="engineering learning patterns")
+   manage_domain(name="{{ memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ memverse_domain }} qa", keywords="testing qa learning patterns")
+   manage_domain(name="{{ memverse_domain }}-product-learning", display="Product Learning", aliases="{{ memverse_domain }} product", keywords="product learning patterns")
+   manage_domain(name="{{ memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ memverse_domain }} pm", keywords="project management learning patterns")
+   ```
+   Fire all 5 in parallel. Skip if already done in this session.
+2. Review all findings from the evaluation
+3. For any non-obvious finding (confidence >= 7) that reveals a pattern or pitfall:
+   - **Dedup guard**: before writing, `search_memory` with the learning key in the target
+     role-learning domain; skip if a near-duplicate already exists (log as `skipped-dedup`)
+   - The **parent orchestrator** auto-captures as a learning via Memverse `add_memories` with metadata
+   - **Text must include a `[domain]` prefix** (e.g. `[{{ memverse_domain }}-qa-learning] insight text`)
+   - Sub-agents do NOT call `add_memories` — they output `[LEARNING]` items in their Output Contract
    - Type: pattern (if good practice) or pitfall (if common mistake)
    - Source: "observed"
    - Confidence: same as the finding's confidence
-3. Log: "Captured N new learnings from this review"
+   - **Parallel writes**: dispatch all `add_memories` calls concurrently
+4. Log: "Captured N new learnings, M skipped-dedup, K domain-registered from this review"
 
 ---
 
@@ -172,7 +218,8 @@ At the end of `/harness-eval` and `/harness-ship` workflows:
 - **Always use Memverse MCP** as the storage backend — do not create local files for learnings
 - **Domain isolation** — always scope to "{{ memverse_domain }}" domain
 - **Deduplication** — before adding, search for existing learnings with similar keys
-- **Confidence decay** — learnings that are contradicted by new evidence should be updated, not just added alongside
+- **Confidence decay** — learnings that are contradicted by new evidence should be updated
+  via `update_memory(memory_id, new_content)`, not just added alongside as duplicates
 - **Privacy** — never store secrets, credentials, or PII as learnings
 
 {% else %}

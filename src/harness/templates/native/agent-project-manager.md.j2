@@ -98,14 +98,12 @@ If Memverse MCP is available, call `search_memory` with:
 - "estimation accuracy"
 - "scope creep"
 - "delivery patterns"
-- project recent window: domain `{{ project_name or memverse_domain }}`, limit 20
-- role learning window: domain `{{ project_name or memverse_domain }}-project-manager-learning`, limit 15
+- Use multi-domain OR query: `domains: "{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-project-manager-learning"`, limit 20
 
 Reference relevant memories in your findings.
 
-If findings contain `[LEARNING]` entries, call `add_memories` best-effort to
-`{{ project_name or memverse_domain }}-project-manager-learning` (non-blocking intent;
-do not fail review if Memverse is unavailable).
+**Do not call `add_memories`** — learning capture is handled by the parent orchestrator.
+Your `[LEARNING]` entries in the Output Contract will be collected and persisted by the parent.
 
 {% endif %}
 ## Output Contract
@@ -119,6 +117,8 @@ Findings:
 - [CRITICAL] description → suggested fix
 - [WARN] description → suggested fix
 - [INFO] description
+
+Learnings (mandatory — at least one, or explicit "No learnings extracted"):
 - [LEARNING] role-specific long-lived, cross-project/language insight
 
 Delivery recommendation: continue | reprioritize | pause/pivot | n/a
