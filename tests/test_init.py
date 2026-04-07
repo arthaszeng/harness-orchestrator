@@ -9,6 +9,7 @@ import pytest
 import typer
 
 from harness.commands.init import (
+    _GITIGNORE_RULES,
     _load_template,
     _prompt_choice,
     _step_ci_command,
@@ -265,9 +266,9 @@ class TestUpdateGitignore:
         gi = tmp_path / ".gitignore"
         assert gi.exists()
         text = gi.read_text(encoding="utf-8")
-        assert ".harness-flow/state.json" in text
-        assert ".harness-flow/.stop" in text
-        assert "# harness — do not track runtime state" in text
+        for rule in _GITIGNORE_RULES:
+            assert rule in text
+        assert "# harness-flow — local tooling artifacts" in text
 
     def test_appends_to_existing_gitignore(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -276,15 +277,36 @@ class TestUpdateGitignore:
         _update_gitignore(tmp_path)
         text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
         assert "node_modules/" in text
-        assert ".harness-flow/state.json" in text
+        for rule in _GITIGNORE_RULES:
+            assert rule in text
 
-    def test_skips_when_marker_present(self, tmp_path, monkeypatch):
+    def test_skips_when_all_rules_present(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         set_lang("en")
-        original = "foo\n.harness-flow/state.json\nbar\n"
+        original = "foo\n" + "\n".join(_GITIGNORE_RULES) + "\nbar\n"
         (tmp_path / ".gitignore").write_text(original, encoding="utf-8")
         _update_gitignore(tmp_path)
         assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == original
+
+    def test_incremental_append_adds_missing_rules(self, tmp_path, monkeypatch):
+        """Old .gitignore with only some rules gets remaining rules added."""
+        monkeypatch.chdir(tmp_path)
+        set_lang("en")
+        old_content = "# harness-flow — local tooling artifacts (not version-controlled)\n.harness-flow/\n"
+        (tmp_path / ".gitignore").write_text(old_content, encoding="utf-8")
+        _update_gitignore(tmp_path)
+        text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        for rule in _GITIGNORE_RULES:
+            assert rule in text
+
+    def test_idempotent_on_repeated_calls(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        set_lang("en")
+        _update_gitignore(tmp_path)
+        first = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        _update_gitignore(tmp_path)
+        second = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert first == second
 
 
 class TestRunInitNonInteractive:
@@ -328,7 +350,7 @@ class TestRunInitNonInteractive:
         logs = capsys.readouterr()
         rendered = f"{logs.out}\n{logs.err}"
         assert "/harness-plan" in rendered
-        assert "git add .gitignore .harness-flow .cursor" in rendered
+        assert "git add .gitignore && git commit" in rendered
 
     def test_loads_business_oriented_zh_vision_template(self):
         tmpl = _load_template("vision.zh.md.j2")
@@ -346,7 +368,9 @@ class TestRunInitNonInteractive:
         run_init(non_interactive=True)
         gi = tmp_path / ".gitignore"
         assert gi.exists()
-        assert ".harness-flow/state.json" in gi.read_text(encoding="utf-8")
+        text = gi.read_text(encoding="utf-8")
+        for rule in _GITIGNORE_RULES:
+            assert rule in text
 
     @patch("harness.native.skill_gen.generate_native_artifacts")
     def test_auto_commit_flag_invokes_helper(self, _mock_gen, monkeypatch, tmp_path):
@@ -377,6 +401,25 @@ class TestRunInitReinit:
         logs = capsys.readouterr()
         rendered = f"{logs.out}\n{logs.err}"
         assert "/harness-plan" in rendered
+
+    @patch("harness.native.skill_gen.generate_native_artifacts", return_value=10)
+    def test_reinit_updates_gitignore(self, _mock_gen, monkeypatch, tmp_path):
+        """harness init --force should also update .gitignore with all rules."""
+        monkeypatch.chdir(tmp_path)
+        agents = tmp_path / ".harness-flow"
+        agents.mkdir(parents=True)
+        (agents / "config.toml").write_text(
+            '[project]\nname = "x"\nlang = "en"\n'
+            '[ci]\ncommand = "make test"\n'
+            '[workflow]\ntrunk_branch = "main"\n',
+            encoding="utf-8",
+        )
+        run_init(force=True)
+        gi = tmp_path / ".gitignore"
+        assert gi.exists()
+        text = gi.read_text(encoding="utf-8")
+        for rule in _GITIGNORE_RULES:
+            assert rule in text
 
     @patch("harness.native.skill_gen.generate_native_artifacts", return_value=10)
     def test_reinit_uses_config_lang(self, mock_gen, monkeypatch, tmp_path):
