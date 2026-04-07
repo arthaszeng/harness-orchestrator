@@ -286,13 +286,22 @@ def test_preflight_returns_branch_task_key_for_agent_branch(tmp_path: Path, monk
     )
     monkeypatch.setattr("harness.core.branch_lifecycle.current_branch", lambda _cwd: "agent/task-036-worktree-bug-bash")
     monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
+    extract_calls: list[dict] = []
+
+    def _spy_extract(branch, **kwargs):
+        extract_calls.append({"branch": branch, "kwargs": kwargs})
+        return "task-036"
+
     monkeypatch.setattr(
         "harness.core.branch_lifecycle.extract_task_key_from_branch",
-        lambda branch, **_kw: "task-036",
+        _spy_extract,
     )
     result = manager.preflight_repo_state()
     assert result.ok is True
     assert result.context["branch_task_key"] == "task-036"
+    assert len(extract_calls) == 1
+    assert extract_calls[0]["branch"] == "agent/task-036-worktree-bug-bash"
+    assert extract_calls[0]["kwargs"].get("cwd") == tmp_path
 
 
 def test_preflight_returns_empty_task_key_for_non_agent_branch(tmp_path: Path, monkeypatch):
