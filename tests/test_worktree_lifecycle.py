@@ -4,17 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from harness.core.worktree_lifecycle import (
-    REGISTRY_FILENAME,
     REGISTRY_VERSION,
-    WorktreeCreateResult,
-    WorktreeEntry,
     WorktreeLifecycleManager,
-    WorktreeRemoveResult,
 )
 from harness.integrations.git_ops import GitOperationResult
 
@@ -50,7 +46,7 @@ class TestCreateWorktree:
         ) as mock_git:
             mock_git.return_value = _ok_result()
 
-            with patch.object(mgr, "_copy_artifacts") as mock_copy:
+            with patch.object(mgr, "_copy_artifacts"):
                 result = mgr.create_worktree("task-034", short_desc="new feature")
 
         assert result.ok

@@ -13,14 +13,14 @@ import os
 import re
 import shutil
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 from harness.core.config import HarnessConfig
 from harness.core.task_identity import TaskIdentityResolver
-from harness.integrations.git_ops import GitOperationResult, run_git_result
+from harness.integrations.git_ops import run_git_result
 
 log = logging.getLogger(__name__)
 
