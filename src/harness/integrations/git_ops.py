@@ -35,10 +35,11 @@ def run_git_result(
     timeout: int = 30,
     code_on_error: str = "GIT_COMMAND_FAILED",
     message: str = "",
+    env: dict[str, str] | None = None,
 ) -> GitOperationResult:
     """Run git command and return structured result."""
     try:
-        completed = run_git(args, cwd, timeout=timeout)
+        completed = run_git(args, cwd, timeout=timeout, env=env)
     except subprocess.TimeoutExpired as exc:
         return GitOperationResult(
             ok=False,
@@ -75,7 +76,7 @@ def run_git_result(
 
 
 def run_git(
-    args: list[str], cwd: Path, *, timeout: int = 30,
+    args: list[str], cwd: Path, *, timeout: int = 30, env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a git command and return the completed process."""
     return subprocess.run(
@@ -84,6 +85,7 @@ def run_git(
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
 
 

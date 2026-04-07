@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from harness.core.branch_lifecycle import BranchLifecycleManager
 from harness.integrations.git_ops import GitOperationResult, current_branch, ensure_clean_result, run_git_result
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -196,6 +199,7 @@ class PostShipManager:
             )
 
         if not task_branch:
+            self._cleanup_worktree(task_key)
             return GitOperationResult(
                 ok=True,
                 code="POST_SHIP_DONE",
@@ -247,6 +251,8 @@ class PostShipManager:
                 )
             return delete
 
+        self._cleanup_worktree(task_key)
+
         return GitOperationResult(
             ok=True,
             code="POST_SHIP_DONE",
@@ -259,6 +265,39 @@ class PostShipManager:
                 "url": merged.context.get("url", ""),
             },
         )
+
+    def _cleanup_worktree(self, task_key: str) -> None:
+        """Best-effort worktree registry and directory cleanup after merge."""
+        try:
+            from harness.core.worktree_lifecycle import WorktreeLifecycleManager
+
+            common_dir = run_git_result(
+                ["rev-parse", "--git-common-dir"],
+                self.project_root,
+                timeout=10,
+            )
+            if common_dir.ok and common_dir.stdout:
+                root = Path(common_dir.stdout.strip()).resolve()
+                if root.name == ".git":
+                    root = root.parent
+            else:
+                root = self.project_root
+
+            mgr = WorktreeLifecycleManager(project_root=root)
+            entries = mgr.list_worktrees()
+            match = [e for e in entries if e.task_key == task_key]
+            if not match:
+                return
+
+            for entry in match:
+                identifier = entry.task_key or entry.branch
+                result = mgr.remove_worktree(identifier, prune_branch=False, force=True)
+                if result.ok:
+                    _log.info("post-ship: removed worktree for %s", task_key)
+                else:
+                    _log.warning("post-ship: worktree cleanup failed for %s: %s", task_key, result.message)
+        except Exception:
+            _log.warning("post-ship: worktree cleanup skipped (error)", exc_info=True)
 
     def _load_pr_payload(self, *, pr_number: int | None, branch: str | None) -> GitOperationResult:
         if pr_number is None and not (branch and branch.strip()):

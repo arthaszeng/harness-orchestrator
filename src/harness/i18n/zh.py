@@ -177,4 +177,6 @@ MESSAGES: dict[str, str] = {
     "status.stats_reconcile_on": "后台同步：开启（有待处理的交付后工作）",
     "status.stats_reconcile_off": "后台同步：关闭",
 
+    "init.worktree_blocked": "当前处于 git worktree 中。在此执行 init 会导致配置与主仓库分叉。请使用 'harness init --force' 重新生成产物，或回到主仓库执行 init。",
+
 }

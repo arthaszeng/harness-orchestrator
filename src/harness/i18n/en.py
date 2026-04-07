@@ -179,4 +179,6 @@ MESSAGES: dict[str, str] = {
     "status.stats_reconcile_on": "Background sync: on (pending post-ship work)",
     "status.stats_reconcile_off": "Background sync: off",
 
+    "init.worktree_blocked": "You are inside a git worktree. Running 'init' here would fork config from the main repo. Use 'harness init --force' to regenerate artifacts, or run 'init' from the main repository.",
+
 }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +17,30 @@ from harness.integrations.git_ops import (
     ensure_clean_result,
     run_git_result,
 )
+
+_log = logging.getLogger(__name__)
+
+_AUTO_RESOLVE_PATTERNS = (
+    "poetry.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Pipfile.lock",
+    ".cursor/",
+)
+
+
+def _is_auto_resolvable(filepath: str) -> bool:
+    """Return True if a conflicted file can be safely auto-resolved (take trunk version)."""
+    for pattern in _AUTO_RESOLVE_PATTERNS:
+        if pattern.endswith("/"):
+            if filepath.startswith(pattern) or ("/" + pattern) in ("/" + filepath):
+                return True
+        else:
+            basename = filepath.rsplit("/", 1)[-1] if "/" in filepath else filepath
+            if basename == pattern:
+                return True
+    return False
 
 
 def _sanitize_short_desc(value: str) -> str:
@@ -158,22 +184,147 @@ class BranchLifecycleManager:
         if rebase.ok:
             return GitOperationResult(ok=True, code="OK", message="feature branch is synced with trunk")
 
-        abort = run_git_result(
+        auto_resolved: list[str] = []
+        manual_conflicts: list[str] = []
+
+        for iteration in range(50):
+            conflict_files = self._get_conflict_files()
+            if conflict_files is None:
+                self._abort_rebase()
+                return GitOperationResult(
+                    ok=False,
+                    code="REBASE_CONFLICT",
+                    message="unable to enumerate conflict files",
+                    context={
+                        "auto_resolved_files": ",".join(auto_resolved),
+                        "manual_conflict_files": "",
+                    },
+                )
+            if not conflict_files:
+                break
+
+            resolvable = []
+            unresolvable = []
+            for f in conflict_files:
+                if _is_auto_resolvable(f):
+                    resolvable.append(f)
+                else:
+                    unresolvable.append(f)
+
+            if unresolvable:
+                manual_conflicts.extend(unresolvable)
+                self._abort_rebase()
+                return GitOperationResult(
+                    ok=False,
+                    code="REBASE_CONFLICT",
+                    message=f"rebase conflict in {len(unresolvable)} file(s) requiring manual resolution",
+                    stderr=rebase.stderr,
+                    context={
+                        "auto_resolved_files": ",".join(auto_resolved),
+                        "manual_conflict_files": ",".join(manual_conflicts),
+                    },
+                )
+
+            for f in resolvable:
+                co = run_git_result(["checkout", "--ours", f], self.project_root, timeout=10)
+                if not co.ok:
+                    self._abort_rebase()
+                    return GitOperationResult(
+                        ok=False,
+                        code="REBASE_CONFLICT",
+                        message=f"failed to checkout --ours for {f}",
+                        stderr=co.stderr,
+                        context={
+                            "auto_resolved_files": ",".join(auto_resolved),
+                            "manual_conflict_files": ",".join(manual_conflicts),
+                        },
+                    )
+                add = run_git_result(["add", f], self.project_root, timeout=10)
+                if not add.ok:
+                    self._abort_rebase()
+                    return GitOperationResult(
+                        ok=False,
+                        code="REBASE_CONFLICT",
+                        message=f"failed to stage auto-resolved file {f}",
+                        stderr=add.stderr,
+                        context={
+                            "auto_resolved_files": ",".join(auto_resolved),
+                            "manual_conflict_files": ",".join(manual_conflicts),
+                        },
+                    )
+                auto_resolved.append(f)
+
+            cont = run_git_result(
+                ["rebase", "--continue"],
+                self.project_root,
+                timeout=120,
+                code_on_error="REBASE_CONTINUE_FAILED",
+                message="rebase --continue failed",
+                env={**os.environ, "GIT_EDITOR": "true"},
+            )
+            if cont.ok:
+                _log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
+                return GitOperationResult(
+                    ok=True,
+                    code="REBASE_AUTO_RESOLVED",
+                    message=f"rebase completed with {len(auto_resolved)} auto-resolved file(s)",
+                    context={"auto_resolved_files": ",".join(auto_resolved)},
+                )
+
+            status = run_git_result(["status", "--porcelain"], self.project_root, timeout=10)
+            _conflict_prefixes = ("UU", "AA", "DU", "UD", "AU", "UA", "DD")
+            has_new_conflicts = any(
+                any(line.startswith(p) for p in _conflict_prefixes)
+                for line in (status.stdout or "").splitlines()
+            )
+            if not has_new_conflicts:
+                self._abort_rebase()
+                return GitOperationResult(
+                    ok=False,
+                    code="REBASE_CONTINUE_FAILED",
+                    message="rebase --continue failed for non-conflict reason",
+                    stderr=cont.stderr,
+                    context={"auto_resolved_files": ",".join(auto_resolved)},
+                )
+
+        else:
+            self._abort_rebase()
+            return GitOperationResult(
+                ok=False,
+                code="REBASE_CONFLICT",
+                message="rebase auto-resolve exceeded iteration limit",
+                context={
+                    "auto_resolved_files": ",".join(auto_resolved),
+                    "manual_conflict_files": ",".join(manual_conflicts),
+                },
+            )
+
+        _log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
+        return GitOperationResult(
+            ok=True,
+            code="REBASE_AUTO_RESOLVED",
+            message=f"rebase completed with {len(auto_resolved)} auto-resolved file(s)",
+            context={"auto_resolved_files": ",".join(auto_resolved)},
+        )
+
+    def _get_conflict_files(self) -> list[str] | None:
+        """Return conflicted file list, or None if the command fails."""
+        result = run_git_result(
+            ["diff", "--name-only", "--diff-filter=U"],
+            self.project_root,
+            timeout=10,
+        )
+        if not result.ok:
+            return None
+        return [f.strip() for f in result.stdout.splitlines() if f.strip()]
+
+    def _abort_rebase(self) -> None:
+        result = run_git_result(
             ["rebase", "--abort"],
             self.project_root,
             code_on_error="REBASE_ABORT_FAILED",
-            message="failed to abort rebase after error",
+            message="failed to abort rebase",
         )
-        if not abort.ok:
-            return GitOperationResult(
-                ok=False,
-                code="REBASE_ABORT_FAILED",
-                message="rebase failed and abort failed",
-                stderr=(abort.stderr or rebase.stderr),
-                context={
-                    "rebase_code": rebase.code,
-                    "abort_code": abort.code,
-                },
-            )
-        return rebase
+        if not result.ok:
+            _log.error("rebase --abort failed: %s", result.message)
 
