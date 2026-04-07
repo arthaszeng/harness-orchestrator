@@ -249,7 +249,7 @@ class TestDetectWorktreeEdgeCases:
         invariant: no unhandled exception.
         """
         import subprocess
-        from harness.core.worktree import WorktreeInfo, detect_worktree
+        from harness.core.worktree import detect_worktree
 
         def mock_run(args, cwd, *, timeout=30):
             return subprocess.CompletedProcess(args, 0, stdout="!@#$%^&*()\n")
