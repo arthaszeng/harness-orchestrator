@@ -98,6 +98,8 @@ flowchart LR
 | **QA** | 测试策略、边界值、回归风险 | 测试覆盖、边界场景、CI 健康度 |
 | **项目经理** | 任务分解、并行度、scope | scope 漂移、计划完成度、交付风险 |
 
+每个角色可通过配置中的 `[native.role_models]` 使用不同模型。无效配置自动回退到 IDE 默认模型。
+
 </details>
 
 ---
@@ -199,7 +201,9 @@ harness init
 | `workflow.auto_merge` | true | 通过后自动合并分支 |
 | `native.evaluator_model` | "inherit" | 评审角色默认模型 |
 | `native.review_gate` | "eng" | 评审门禁（`eng` = 硬门禁，`advisory` = 仅记录） |
-| `native.role_models.*` | `{}` | 每角色模型覆盖 |
+| `native.plan_review_gate` | "auto" | 计划审阅门控（`human` / `ai` / `auto`） |
+| `native.role_models.*` | `{}` | 每角色模型覆盖；无效时回退到 IDE 默认 |
+| `workflow.branch_prefix` | "agent" | 任务分支前缀 |
 
 </details>
 
@@ -214,6 +218,9 @@ harness init
 | `harness update [--check] [--force]` | 自更新 + 配置迁移 |
 | `harness git-preflight [--json]` | 预检（工作树、分支、worktree） |
 | `harness save-eval --task <id> [--kind] [--verdict] ...` | 保存评审结果 |
+| `harness save-build-log --task <id> [--body]` | 保存构建日志 |
+| `harness git-prepare-branch --task-key <key>` | 创建或恢复任务分支 |
+| `harness git-sync-trunk [--json]` | 同步 feature 分支与主干 |
 
 </details>
 

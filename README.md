@@ -98,6 +98,8 @@ flowchart LR
 | **QA**              | Test strategy, boundary values, regression risk   | Test coverage, edge cases, CI health         |
 | **Project Manager** | Task decomposition, parallelism, scope            | Scope drift, plan completion, delivery risk  |
 
+Each role can use a different model via `[native.role_models]` in config. Invalid pins fall back to IDE default.
+
 </details>
 
 ---
@@ -197,7 +199,9 @@ Project settings live in `.harness-flow/config.toml`:
 | `workflow.auto_merge`             | true      | Auto-merge branch after pass                                      |
 | `native.evaluator_model`          | "inherit" | Default model for review roles; falls back to IDE default         |
 | `native.review_gate`              | "eng"     | Review gate strictness (`eng` = hard gate, `advisory` = log only) |
-| `native.role_models.*`            | `{}`      | Per-role model overrides                                          |
+| `native.plan_review_gate`         | "auto"    | Plan review gate (`human` / `ai` / `auto`)                       |
+| `native.role_models.*`            | `{}`      | Per-role model overrides; falls back to IDE default               |
+| `workflow.branch_prefix`          | "agent"   | Task branch prefix                                                |
 
 </details>
 
@@ -212,6 +216,9 @@ Project settings live in `.harness-flow/config.toml`:
 | `harness update [--check] [--force]`                       | Self-update + config migration                       |
 | `harness git-preflight [--json]`                           | Preflight checks (clean tree, branch, worktree)      |
 | `harness save-eval --task <id> [--kind] [--verdict] ...`   | Save evaluation results                              |
+| `harness save-build-log --task <id> [--body]`              | Save build log                                       |
+| `harness git-prepare-branch --task-key <key>`              | Create or resume task branch                         |
+| `harness git-sync-trunk [--json]`                          | Sync feature branch with trunk                       |
 
 </details>
 
