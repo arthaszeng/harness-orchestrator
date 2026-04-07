@@ -254,6 +254,7 @@ def _run_reinit(project_root: Path) -> None:
         padding=(0, 1),
     ))
     count = generate_native_artifacts(project_root, lang=lang, cfg=cfg, force=True)
+    _update_gitignore(project_root)
     console.print()
     console.print(Panel(
         f"  [cyber.green]✓[/] {t('init.reinit_done', count=count)}\n"
@@ -446,27 +447,21 @@ def _auto_commit_init_artifacts(project_root: Path, *, git_clean_before: bool) -
         ui.info(t("init.auto_commit_nothing_to_commit"))
         return
 
-    add_targets: list[str] = []
-    for candidate in (".gitignore", ".harness-flow", ".cursor"):
-        if (project_root / candidate).exists():
-            add_targets.append(candidate)
-    if not add_targets:
+    gitignore_path = project_root / ".gitignore"
+    if not gitignore_path.exists():
         ui.info(t("init.auto_commit_nothing_to_commit"))
         return
 
-    add = subprocess.run(
-        ["git", "add", *add_targets],
-        capture_output=True,
-        text=True,
-        cwd=str(project_root),
-        timeout=20,
+    add_gi = subprocess.run(
+        ["git", "add", ".gitignore"],
+        capture_output=True, text=True, cwd=str(project_root), timeout=20,
     )
-    if add.returncode != 0:
-        ui.warn(t("init.auto_commit_failed", error=add.stderr.strip() or "git add failed"))
+    if add_gi.returncode != 0:
+        ui.warn(t("init.auto_commit_failed", error=add_gi.stderr.strip() or "git add .gitignore failed"))
         return
 
     commit = subprocess.run(
-        ["git", "commit", "-m", "chore(init): bootstrap harness artifacts"],
+        ["git", "commit", "-m", "chore(init): gitignore harness artifacts"],
         capture_output=True,
         text=True,
         cwd=str(project_root),
@@ -479,19 +474,39 @@ def _auto_commit_init_artifacts(project_root: Path, *, git_clean_before: bool) -
     ui.info(t("init.auto_commit_done"))
 
 
+_GITIGNORE_RULES: list[str] = [
+    ".harness-flow/",
+    ".cursor/skills/harness/",
+    ".cursor/agents/harness-*.md",
+    ".cursor/rules/harness-*.mdc",
+    ".cursor/worktrees.json",
+]
+
+
 def _update_gitignore(project_root: Path) -> None:
     gitignore = project_root / ".gitignore"
-    marker = ".harness-flow/state.json"
     comment = t("init.gitignore_comment")
+
     if gitignore.exists():
         content = gitignore.read_text(encoding="utf-8")
-        if marker not in content:
-            with gitignore.open("a", encoding="utf-8") as f:
-                f.write(f"\n{comment}\n")
-                f.write(".harness-flow/state.json\n")
-                f.write(".harness-flow/.stop\n")
     else:
-        gitignore.write_text(
-            f"{comment}\n.harness-flow/state.json\n.harness-flow/.stop\n",
-            encoding="utf-8",
-        )
+        content = ""
+
+    missing = [r for r in _GITIGNORE_RULES if r not in content]
+    if not missing:
+        return
+
+    has_comment = comment in content
+    lines: list[str] = []
+    if not has_comment:
+        lines.append(f"\n{comment}")
+    for rule in missing:
+        lines.append(rule)
+
+    if content and not content.endswith("\n"):
+        lines[0] = "\n" + lines[0]
+
+    gitignore.write_text(
+        content + "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
