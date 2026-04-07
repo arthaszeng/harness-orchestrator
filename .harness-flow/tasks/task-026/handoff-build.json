@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "source_phase": "build",
+  "target_phase": "eval",
+  "task_id": "task-026",
+  "summary": "Vision 审计 + GAP-1 补齐完成。在 score_calibration.py 增量添加 ScoreBand/classify_score；gates.py 新增 parse_eval_aggregate_score 与 GateVerdict 扩展；commands/gate.py 渲染 advisory 区间文案；i18n en/zh 新增 score_band 键。22 项新测试全通过，全量 758 测试通过。",
+  "decisions": [
+    "正则支持 bold 数字格式",
+    "eval_content 提到外层变量避免 scope 问题"
+  ],
+  "risks": [],
+  "open_items": [],
+  "artifacts_produced": [
+    ".harness-flow/tasks/task-026/build-r1.md",
+    ".harness-flow/tasks/task-026/handoff-build.json"
+  ],
+  "scope_changes": [],
+  "context_footprint": {
+    "explored_paths": [
+      "src/harness/core/score_calibration.py",
+      "src/harness/core/gates.py",
+      "src/harness/commands/gate.py",
+      "src/harness/i18n/en.py",
+      "src/harness/i18n/zh.py",
+      "tests/"
+    ],
+    "primary_read_files": [
+      "src/harness/core/score_calibration.py",
+      "src/harness/core/gates.py",
+      "src/harness/commands/gate.py",
+      "src/harness/i18n/en.py",
+      "src/harness/i18n/zh.py"
+    ],
+    "primary_touched_files": [
+      "src/harness/core/score_calibration.py",
+      "src/harness/core/gates.py",
+      "src/harness/commands/gate.py",
+      "src/harness/i18n/en.py",
+      "src/harness/i18n/zh.py",
+      "tests/test_score_calibration.py"
+    ]
+  }
+}

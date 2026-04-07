@@ -17,6 +17,7 @@ from harness.core.workflow_state import (
     GateStatus,
     load_workflow_state,
 )
+from harness.core.score_calibration import ScoreBand, classify_score
 from harness.integrations.git_ops import get_head_commit_epoch
 
 
@@ -53,6 +54,8 @@ class GateVerdict:
     passed: bool
     checks: list[CheckItem] = field(default_factory=list)
     summary: str = ""
+    aggregate_score: float | None = None
+    score_band: "ScoreBand | None" = None
 
     @property
     def hard_blocked(self) -> list[CheckItem]:
@@ -62,6 +65,32 @@ class GateVerdict:
     def warnings(self) -> list[CheckItem]:
         return [c for c in self.checks if c.status == CheckStatus.WARNING]
 
+
+def parse_eval_aggregate_score(content: str) -> float | None:
+    """Extract the aggregate review score from eval markdown content.
+
+    Supports formats: ``Weighted avg: X.X/10``, ``Weighted Average: X.X/10``,
+    ``**Average** | **X.X/10**``.  Returns None when no match is found or the
+    parsed value is not finite.
+    """
+    import math as _math
+
+    m = _AGGREGATE_SCORE_RE.search(content)
+    if not m:
+        return None
+    try:
+        val = float(m.group(1))
+    except (ValueError, TypeError):
+        return None
+    if not _math.isfinite(val):
+        return None
+    return val
+
+
+_AGGREGATE_SCORE_RE = re.compile(
+    r"(?:Weighted\s+avg|Weighted\s+Average|\*\*Average\*\*)\s*[:|]\s*\**(\d+(?:\.\d+)?)\**\s*/\s*10",
+    re.IGNORECASE,
+)
 
 _CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
 _LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
@@ -139,11 +168,13 @@ def check_ship_readiness(
         ))
 
     verdict_value: str | None = None
+    eval_content: str = ""
     if latest_eval and latest_eval.exists():
         try:
-            content = latest_eval.read_text(encoding="utf-8")
+            eval_content = latest_eval.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
-            content = ""
+            eval_content = ""
+        content = eval_content
         m = _VERDICT_LINE_RE.search(content)
         if m:
             parsed = EvalVerdict.parse(m.group(1))
@@ -249,7 +280,16 @@ def check_ship_readiness(
         reasons = "; ".join(c.reason for c in blocked if c.reason)
         summary = f"blocked: {reasons}"
 
-    return GateVerdict(passed=passed, checks=checks, summary=summary)
+    agg_score = parse_eval_aggregate_score(eval_content) if eval_content else None
+    band = classify_score(agg_score) if agg_score is not None else None
+
+    return GateVerdict(
+        passed=passed,
+        checks=checks,
+        summary=summary,
+        aggregate_score=agg_score,
+        score_band=band,
+    )
 
 
 def write_gate_snapshot(task_dir: Path, verdict: GateVerdict) -> bool:

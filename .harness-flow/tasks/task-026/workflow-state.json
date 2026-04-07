@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "task_id": "task-026",
+  "branch": "",
+  "phase": "building",
+  "iteration": 0,
+  "active_plan": {
+    "id": "",
+    "title": ""
+  },
+  "artifacts": {
+    "plan": "",
+    "build_log": ".harness-flow/tasks/task-026/build-r1.md",
+    "evaluation": "",
+    "plan_evaluation": ".harness-flow/tasks/task-026/plan-eval-r1.md",
+    "code_evaluation": "",
+    "feedback_ledger": "",
+    "ship_metrics": "",
+    "handoff": ""
+  },
+  "gates": {
+    "plan_review": {
+      "status": "pass",
+      "reason": "plan-eval-r1.md saved with verdict PASS",
+      "updated_at": "2026-04-07T01:51:23+00:00"
+    },
+    "evaluation": {
+      "status": "unknown",
+      "reason": "",
+      "updated_at": ""
+    },
+    "ship_readiness": {
+      "status": "unknown",
+      "reason": "",
+      "updated_at": ""
+    }
+  },
+  "blocker": {
+    "kind": "",
+    "reason": ""
+  },
+  "handoff_summary": "",
+  "updated_at": "2026-04-07T01:55:23+00:00"
+}

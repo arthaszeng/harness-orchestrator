@@ -7,9 +7,47 @@ templates/workflows can reference when calibrating score behavior.
 
 from __future__ import annotations
 
+import math
 import re
 import statistics
+from enum import Enum
 from typing import Iterable
+
+SHIP_THRESHOLD: float = 8.0
+ITERATE_THRESHOLD: float = 6.0
+
+
+class ScoreBand(str, Enum):
+    """Advisory score band — maps aggregate review score to decision guidance.
+
+    Not a hard gate; coexists with EvalVerdict (PASS/ITERATE) as supplementary
+    signal for human decision-makers.
+    """
+
+    SHIP = "ship"
+    ITERATE = "iterate"
+    REDO = "redo"
+
+
+def classify_score(score: float) -> ScoreBand | None:
+    """Classify a review aggregate score into an advisory band.
+
+    Intervals (half-open): [8.0, 10.0] → SHIP, [6.0, 8.0) → ITERATE, [0.0, 6.0) → REDO.
+    Returns None for non-finite inputs (NaN, inf, -inf).
+    Finite values are clamped to [0, 10] before classification.
+    """
+    try:
+        val = float(score)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(val):
+        return None
+    val = max(0.0, min(10.0, val))
+    if val >= SHIP_THRESHOLD:
+        return ScoreBand.SHIP
+    if val >= ITERATE_THRESHOLD:
+        return ScoreBand.ITERATE
+    return ScoreBand.REDO
 
 _TAG_RE = re.compile(r"\[[A-Z0-9_\- ]+\]")
 _SPACE_RE = re.compile(r"\s+")

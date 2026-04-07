@@ -165,6 +165,11 @@ MESSAGES: dict[str, str] = {
     "progress_line.next.blocked": "解除阻塞后，继续 /harness-plan 或 /harness-ship",
     "progress_line.next.fallback": "在 Cursor 中继续 harness 工作流",
 
+    # ── score band (advisory) ────────────────────────────────────
+    "score_band.ship": "评分 {score}/10 — 可发布质量",
+    "score_band.iterate": "评分 {score}/10 — 建议迭代后再发布",
+    "score_band.redo": "评分 {score}/10 — 建议重新规划或大幅返工",
+
     # ── status command ───────────────────────────────────────────
     "status.next_title": "下一步",
     "status.current_task": "当前任务",

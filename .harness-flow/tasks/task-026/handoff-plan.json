@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "source_phase": "plan",
+  "target_phase": "build",
+  "task_id": "task-026",
+  "summary": "Vision 对齐审计 + GAP-1 补齐。审计矩阵确认 Roadmap A(3 phases) 和 B(4 phases) 全部 DONE。M3 里程碑部分达成：缺分数区间分类。本任务在 score_calibration.py 增量添加 ScoreBand/classify_score，在 gates.py 增加 parse_eval_aggregate_score，在 commands/gate.py 渲染 advisory 区间文案，i18n 新增 score_band 键，参数化测试 + CLI 窄集成测试。",
+  "decisions": [
+    "只补 GAP-1，GAP-2~5 deferred",
+    "区间 [8,10] SHIP / [6,8) ITERATE / [0,6) REDO — TASTE DECISION",
+    "分层 core 解析 → core 分类 → commands 渲染",
+    "ScoreBand 为 advisory 语义，不是第二套硬门禁",
+    "首版硬编码阈值常量，config 留后续"
+  ],
+  "risks": [
+    "区间阈值是品味决策，需基于实际分布调整 — 首版硬编码 + 注释扩展点",
+    "eval 产物综合分格式可能漂移 — 多格式匹配 + 静默降级"
+  ],
+  "open_items": [],
+  "artifacts_produced": [
+    ".harness-flow/tasks/task-026/plan.md",
+    ".harness-flow/tasks/task-026/plan-eval-r1.md"
+  ],
+  "scope_changes": [],
+  "context_footprint": {
+    "explored_paths": [
+      ".harness-flow/vision.md",
+      ".harness-flow/tasks/",
+      "src/harness/core/score_calibration.py",
+      "src/harness/core/gates.py",
+      "src/harness/commands/gate.py",
+      "src/harness/commands/status.py",
+      "src/harness/commands/init.py",
+      "src/harness/core/handoff.py",
+      "src/harness/core/workflow_progress_line.py",
+      "src/harness/core/feedback_ledger.py",
+      "src/harness/i18n/en.py",
+      "src/harness/i18n/zh.py",
+      "README.md",
+      "README.zh-CN.md",
+      ".cursor/skills/harness/",
+      "src/harness/templates/native/sections/_workflow-progress-envelope.md.j2",
+      "tests/"
+    ],
+    "primary_read_files": [
+      ".harness-flow/vision.md",
+      "src/harness/core/score_calibration.py",
+      "src/harness/core/gates.py",
+      "README.md",
+      "README.zh-CN.md"
+    ],
+    "primary_touched_files": []
+  }
+}

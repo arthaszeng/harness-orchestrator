@@ -99,4 +99,10 @@ def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
         console.print(f"[cyber.red]{t('gate.blocked', summary=verdict.summary)}[/]")
         console.print(f"[cyber.dim]{t('gate.blocked_hint')}[/]")
         console.print(f"[cyber.dim]{t('gate.recovery.blocked')}[/]")
+
+    if verdict.score_band is not None and verdict.aggregate_score is not None:
+        band_key = f"score_band.{verdict.score_band.value}"
+        band_text = t(band_key, score=f"{verdict.aggregate_score:.1f}")
+        console.print(f"\n  {band_text}")
+
     console.print()

@@ -167,6 +167,11 @@ MESSAGES: dict[str, str] = {
     "progress_line.next.blocked": "Resolve the blocker, then continue with /harness-plan or /harness-ship",
     "progress_line.next.fallback": "Continue the harness workflow in Cursor",
 
+    # ── score band (advisory) ────────────────────────────────────
+    "score_band.ship": "Score {score}/10 — shippable quality",
+    "score_band.iterate": "Score {score}/10 — needs iteration before shipping",
+    "score_band.redo": "Score {score}/10 — consider re-planning or major rework",
+
     # ── status command ───────────────────────────────────────────
     "status.next_title": "Next step",
     "status.current_task": "Current task",
