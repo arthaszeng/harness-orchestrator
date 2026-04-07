@@ -8,27 +8,100 @@
 [![PyPI](https://img.shields.io/pypi/v/harness-flow)](https://pypi.org/project/harness-flow/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+## 你的 AI 工程团队
+
+Harness 在 Cursor 内为你组建了一支**完整的工程团队** — 每个角色同时评审你的计划和代码：
+
+```mermaid
+classDiagram
+    class 架构师 {
+        +评审设计
+        +检查依赖
+        +评估安全
+    }
+    class 产品负责人 {
+        +评审愿景
+        +验证需求
+        +检查用户价值
+    }
+    class 工程师 {
+        +评审代码
+        +检查模式
+        +评估性能
+    }
+    class QA {
+        +编写测试
+        +运行CI
+        +检查边界
+    }
+    class 项目经理 {
+        +跟踪范围
+        +管理交付
+        +评估风险
+    }
+
+    style 架构师 fill:#222,stroke:#222,color:#fff
+    style 产品负责人 fill:#222,stroke:#222,color:#fff
+    style 工程师 fill:#222,stroke:#222,color:#fff
+    style QA fill:#222,stroke:#222,color:#fff
+    style 项目经理 fill:#222,stroke:#222,color:#fff
+```
+
+> **不是模拟** — 这些角色作为并行 AI 子代理运行，各自拥有独立系统提示，独立评分。被 2+ 角色发现的问题标注为高置信度。
+
+---
+
+## 快速开始
+
+### 0. 约 10 分钟上手
+
+**第一步** — 安装：
+
+```bash
+pip install harness-flow
+```
+
+**第二步** — 在项目中初始化：
+
+```bash
+cd <YOUR_PROJECT_PATH>
+harness init
+```
+
+**第三步** — 打开 Cursor，输入需求：
+
+```
+/harness-plan add input validation to the user registration endpoint
+```
+
+```
+/harness-plan resolve JIRA-XXXX
+```
+
+```
+/harness-plan implement SSO integration for the auth module
+```
+
+就这样 — 计划、构建、5 角色评审、PR，一句话搞定。
+
+<!-- TODO: 添加 demo 录屏（GIF 或视频），展示从需求到 PR 的完整流程 -->
+
+---
+
 ## 工作原理
 
 ```mermaid
-flowchart TB
+flowchart LR
   Req["需求"] --> Plan["计划"]
-  Plan --> PlanReview["5 角色计划评审"]
+  Plan --> PlanReview["5 角色\n计划评审"]
   PlanReview --> Build["构建 + CI"]
-  Build --> CodeReview["5 角色代码评审"]
+  Build --> CodeReview["5 角色\n代码评审"]
   CodeReview --> Ship["发布 → PR"]
 
-  subgraph reviewers [" "]
-    direction LR
-    A["架构师"]
-    PO["产品负责人"]
-    Eng["工程师"]
-    Q["QA"]
-    PM["项目经理"]
-  end
+  PlanReview -.->|"同一组 5 角色"| Reviewers
+  CodeReview -.->|"同一组 5 角色"| Reviewers
 
-  PlanReview -.-> reviewers
-  CodeReview -.-> reviewers
+  Reviewers["架构师 · 产品负责人 · 工程师 · QA · 项目经理"]
 
   style Req fill:#fff,stroke:#222,stroke-width:2px,color:#000
   style Plan fill:#fff,stroke:#222,stroke-width:2px,color:#000
@@ -36,12 +109,7 @@ flowchart TB
   style Build fill:#fff,stroke:#222,stroke-width:2px,color:#000
   style CodeReview fill:#222,stroke:#222,stroke-width:2px,color:#fff
   style Ship fill:#fff,stroke:#222,stroke-width:2px,color:#000
-  style A fill:#fff,stroke:#222,stroke-width:1px,color:#000
-  style PO fill:#fff,stroke:#222,stroke-width:1px,color:#000
-  style Eng fill:#fff,stroke:#222,stroke-width:1px,color:#000
-  style Q fill:#fff,stroke:#222,stroke-width:1px,color:#000
-  style PM fill:#fff,stroke:#222,stroke-width:1px,color:#000
-  style reviewers fill:none,stroke:#222,stroke-width:1px,stroke-dasharray: 5 5
+  style Reviewers fill:#222,stroke:#222,stroke-width:2px,color:#fff
 ```
 
 **计划评审**和**代码评审**都会派遣同样的 5 个并行评审者。被 2+ 角色发现的问题标注为高置信度。
@@ -64,67 +132,6 @@ flowchart TB
 每个角色可通过配置中的 `[native.role_models]` 使用不同模型。无效配置自动回退到 IDE 默认模型。
 
 </details>
-
----
-
-## 快速开始
-
-### 0. 约 10 分钟上手
-
-**第一步** — 安装：
-
-```bash
-pip install harness-flow
-```
-
-**第二步** — 在项目中初始化：
-
-```bash
-cd <你的项目路径>
-harness init
-```
-
-**第三步** — 打开 Cursor，输入需求：
-
-```
-/harness-plan add input validation to the user registration endpoint
-```
-或
-```
-/harness-plan 帮我完成这张卡：JIRA-XXXX
-```
-或
-```
-/harness-plan 帮我完成SSO的相关接口
-```
-
-就这样 — 计划、构建、5 角色评审、PR，一句话搞定。
-
-<!-- TODO: 添加 demo 录屏（GIF 或视频），展示从需求到 PR 的完整流程 -->
-
----
-
-## 安装与升级
-
-```mermaid
-flowchart LR
-  S1["安装\npip install harness-flow"]
-  S2["初始化\nharness init"]
-  S3["升级\nharness update"]
-  S1 --> S2 --> S3
-
-  style S1 fill:#fff,stroke:#222,stroke-width:2px,color:#000
-  style S2 fill:#fff,stroke:#222,stroke-width:2px,color:#000
-  style S3 fill:#222,stroke:#222,stroke-width:2px,color:#fff
-```
-
-| 命令 | 说明 |
-|------|------|
-| `pip install harness-flow` | 安装 CLI |
-| `harness init` | 交互式向导 → 生成 skills、agents、rules 到 `.cursor/` |
-| `harness init --force` | 重新生成所有产物（配置变更或版本升级后使用） |
-| `harness update` | 自更新包 + 运行配置迁移 |
-| `harness update --check` | 仅检查新版本，不安装 |
 
 ---
 
@@ -154,38 +161,27 @@ flowchart LR
 
 ---
 
-## 你的 AI 工程团队
+## 安装与升级
 
 ```mermaid
-classDiagram
-    class 架构师 {
-        +评审设计
-        +检查依赖
-        +评估安全
-    }
-    class 产品负责人 {
-        +评审愿景
-        +验证需求
-        +检查用户价值
-    }
-    class 工程师 {
-        +评审代码
-        +检查模式
-        +评估性能
-    }
-    class QA {
-        +编写测试
-        +运行CI
-        +检查边界
-    }
-    class 项目经理 {
-        +跟踪范围
-        +管理交付
-        +评估风险
-    }
+flowchart LR
+  S1["安装\npip install harness-flow"]
+  S2["初始化\nharness init"]
+  S3["升级\nharness update"]
+  S1 --> S2 --> S3
+
+  style S1 fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style S2 fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style S3 fill:#222,stroke:#222,stroke-width:2px,color:#fff
 ```
 
-> **不是模拟** — 这些角色作为并行 AI 子代理运行，各自拥有独立系统提示，独立评分。
+| 命令 | 说明 |
+|------|------|
+| `pip install harness-flow` | 安装 CLI |
+| `harness init` | 交互式向导 → 生成 skills、agents、rules 到 `.cursor/` |
+| `harness init --force` | 重新生成所有产物（配置变更或版本升级后使用） |
+| `harness update` | 自更新包 + 运行配置迁移 |
+| `harness update --check` | 仅检查新版本，不安装 |
 
 ---
 
