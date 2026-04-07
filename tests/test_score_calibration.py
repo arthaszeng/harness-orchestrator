@@ -146,28 +146,58 @@ def test_parse_eval_aggregate_score(content: str, expected: float | None) -> Non
 runner = CliRunner()
 
 
-def test_gate_output_includes_score_band(tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Gate output should include score band text when eval has aggregate score."""
-    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-099"
-    task_dir.mkdir(parents=True)
+def test_classify_score_non_numeric_inputs() -> None:
+    """Non-numeric inputs should return None gracefully."""
+    assert classify_score(None) is None  # type: ignore[arg-type]
+    assert classify_score("8.5") is ScoreBand.SHIP  # type: ignore[arg-type]
+    assert classify_score("x") is None  # type: ignore[arg-type]
 
+
+def _make_gate_task(tmp_path, score: str, verdict: str = "PASS"):
+    """Helper: create minimal task structure for gate CLI test."""
+    task_dir = tmp_path / ".harness-flow" / "tasks" / "task-099"
+    task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / "plan.md").write_text("# Plan\nSome content\n")
     (task_dir / "code-eval-r1.md").write_text(
-        "# Eval\n## Verdict: PASS\nWeighted avg: 8.5/10\n"
+        f"# Eval\n## Verdict: {verdict}\nWeighted avg: {score}/10\n"
     )
+    return task_dir
 
+
+@pytest.mark.parametrize(
+    "score, expected_keywords, verdict",
+    [
+        ("8.5", ["shippable", "可发布"], "PASS"),
+        ("7.0", ["iteration", "迭代"], "PASS"),
+        ("4.0", ["re-planning", "返工"], "PASS"),
+    ],
+    ids=["SHIP", "ITERATE", "REDO"],
+)
+def test_gate_output_score_band_all_tiers(
+    tmp_path, monkeypatch, score: str, expected_keywords: list[str], verdict: str,
+) -> None:
+    """Gate output should include correct band text for each tier."""
+    _make_gate_task(tmp_path, score, verdict)
     monkeypatch.chdir(tmp_path)
 
     from harness.core import gates as gates_mod
-    original_get_epoch = gates_mod.get_head_commit_epoch
     monkeypatch.setattr(gates_mod, "get_head_commit_epoch", lambda _: None)
 
     result = runner.invoke(app, ["gate", "--task", "task-099"])
+    assert result.exit_code == 0
+    assert f"{score}/10" in result.output
+    assert any(kw in result.output.lower() for kw in expected_keywords)
 
-    monkeypatch.setattr(gates_mod, "get_head_commit_epoch", original_get_epoch)
 
-    assert "8.5/10" in result.output
-    assert any(
-        kw in result.output.lower()
-        for kw in ["shippable", "可发布"]
-    )
+def test_gate_blocked_does_not_show_score_band(tmp_path, monkeypatch) -> None:
+    """When gate is blocked, score band should NOT appear even if score exists."""
+    _make_gate_task(tmp_path, "8.5", "ITERATE")
+    monkeypatch.chdir(tmp_path)
+
+    from harness.core import gates as gates_mod
+    monkeypatch.setattr(gates_mod, "get_head_commit_epoch", lambda _: None)
+
+    result = runner.invoke(app, ["gate", "--task", "task-099"])
+    assert result.exit_code == 1
+    assert "shippable" not in result.output.lower()
+    assert "可发布" not in result.output

@@ -66,6 +66,12 @@ class GateVerdict:
         return [c for c in self.checks if c.status == CheckStatus.WARNING]
 
 
+_AGGREGATE_SCORE_RE = re.compile(
+    r"(?:Weighted\s+avg|Weighted\s+Average|\*\*Average\*\*)\s*[:|]\s*\**(\d+(?:\.\d+)?)\**\s*/\s*10",
+    re.IGNORECASE,
+)
+
+
 def parse_eval_aggregate_score(content: str) -> float | None:
     """Extract the aggregate review score from eval markdown content.
 
@@ -86,11 +92,6 @@ def parse_eval_aggregate_score(content: str) -> float | None:
         return None
     return val
 
-
-_AGGREGATE_SCORE_RE = re.compile(
-    r"(?:Weighted\s+avg|Weighted\s+Average|\*\*Average\*\*)\s*[:|]\s*\**(\d+(?:\.\d+)?)\**\s*/\s*10",
-    re.IGNORECASE,
-)
 
 _CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
 _LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
