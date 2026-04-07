@@ -1,7 +1,5 @@
 [中文](README.zh-CN.md)
 
-
-
 # harness-flow
 
 ### Agent writes code. Harness Flow ships products.
@@ -12,34 +10,15 @@
 [PyPI](https://pypi.org/project/harness-flow/)
 [License: MIT](LICENSE)
 
-
-
 ## The Problem
 
 AI agents can write code — but they **can't ship products**. They lack navigation (goal management), traffic rules (quality gates), and a dashcam (audit trail). The bottleneck has shifted from *"can AI write code?"* to *"can AI autonomously deliver?"*
 
 ## Where Harness Flow Fits
 
-```
-                      The Evolution of Software Development
-
-            .-.                                                          
-           (o o)        .-.          .-.            .-.                   
-           /|          (o o)        (o o)          (o o)  ___             
-          / | \         /|\          /|\    ~~>     -|-- |___|            
-  .------' /|  )       / | \        / \            /|   |seat|           
-  |  ape  / / /       /  |  \      /   \          / \   |____|           
-  '------'_/_/       /   |   \    /     \        /   \  /    \           
-  ________|_|       _____|_____  _________|     ========------=====      
-                                                                         
-       L0               L1              L3               L5              
-   Manual Code      AI Assistant    Agent Mode      Harness Flow         
-    vim + gcc         Copilot      Cursor Agent    Autonomous Ship       
-                                   Claude Code                           
-                                                                         
-  Write every       You drive,     AI writes,       AI ships it.         
-  line by hand.     AI assists.    but crashes.     You sit back.        
-```
+<p align="center">
+  <img src="docs/assets/evolution-l5-en.png" alt="The Evolution of Software Development: from manual coding (L0) to AI assistant (L1) to agent mode (L3) to Harness Flow autonomous delivery (L5)" width="800" />
+</p>
 
 ### The Three Pillars of L5
 
@@ -110,8 +89,6 @@ That's it — plan, build, 5-role review, and PR. One command.
 
 **What you'll see:** the agent generates a spec + contract, 5 reviewers challenge the plan in parallel, then the agent implements, runs CI, gets code reviewed by the same 5 roles, and opens a PR — all autonomously.
 
-
-
 ---
 
 ## Deep Dive
@@ -134,15 +111,11 @@ Harness gives you a **complete engineering team** inside Cursor — each role re
 
 Each role can use a different model via `[native.role_models]` in config. If some reviewers fail, the pipeline continues with available perspectives (graceful degradation).
 
-
-
 **Contract-Driven Development**
 
 Every task starts with a **spec + contract** — deliverables, acceptance criteria, and risk analysis — reviewed by 5 roles before any code is written.
 
 The contract lives in `.harness-flow/tasks/task-NNN/plan.md` and serves as the single source of truth. Runtime state is tracked in `workflow-state.json` alongside it.
-
-
 
 **Fix-First Auto-Remediation**
 
@@ -152,8 +125,6 @@ Every review finding is classified before presenting it to you:
 - **ASK** (security, behavior change, architecture, low confidence) → batched and presented for your decision
 
 Typical auto-fixes: unused imports, stale comments, missing null checks, naming inconsistencies, obvious N+1 queries.
-
-
 
 **Full Audit Trail**
 
@@ -173,8 +144,6 @@ Plans, reviews, build logs, gate results — all persisted per task. Every decis
     ├── workflow-state.json  # canonical task phase / gate / blocker tracking
     └── ...                  # feedback ledger, intervention audit, etc. (optional)
 ```
-
-
 
 ---
 
@@ -207,8 +176,6 @@ Plans, reviews, build logs, gate results — all persisted per task. Every decis
 | `/harness-vision` | "I have an idea" or "a direction" | Explore or clarify → structured vision → roadmap/backlog → iterative build/eval/ship loop |
 
 
-
-
 **Utility & pipeline skills**
 
 
@@ -223,15 +190,11 @@ Plans, reviews, build logs, gate results — all persisted per task. Every decis
 | `/harness-doc-release` | Documentation sync: detect stale docs after code changes                         |
 
 
-
-
 **Progress & next-step hints**
 
 - `**harness workflow next`** — one machine-readable line for agents/scripts (task id, phase, suggested skill).
-- `**harness status**` — Rich panel for humans ("what to do next" in task language).
+- `**harness status`** — Rich panel for humans ("what to do next" in task language).
 - `**HARNESS_PROGRESS**` — one-line boundary marker emitted by Cursor skills.
-
-
 
 ---
 
@@ -252,8 +215,6 @@ Project settings live in `.harness-flow/config.toml`:
 | `workflow.branch_prefix`  | "agent"   | Task branch prefix                                                |
 
 
-
-
 **CLI reference**
 
 
@@ -268,8 +229,6 @@ Project settings live in `.harness-flow/config.toml`:
 | `harness save-build-log --task <id> [--body]`            | Save build log                                  |
 | `harness git-prepare-branch --task-key <key>`            | Create or resume task branch                    |
 | `harness git-sync-trunk [--json]`                        | Sync feature branch with trunk                  |
-
-
 
 
 ---
