@@ -1,6 +1,6 @@
 [中文](README.zh-CN.md)
 
-<div align="center">
+
 
 # harness-flow
 
@@ -8,11 +8,11 @@
 
 **L5 autonomous delivery for the vibe coding era — you're the copilot now.**
 
-[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/pypi/v/harness-flow)](https://pypi.org/project/harness-flow/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[Python](https://www.python.org/)
+[PyPI](https://pypi.org/project/harness-flow/)
+[License: MIT](LICENSE)
 
-</div>
+
 
 ## The Problem
 
@@ -21,31 +21,34 @@ AI agents can write code — but they **can't ship products**. They lack navigat
 ## Where Harness Flow Fits
 
 ```
-   EVOLUTION: from coding ape to autonomous delivery
+                      The Evolution of Software Development
 
-      (ape)               (upright)             (modern)                (copilot)
-        __                  __                    __                      __
-      _/ o\_               / o\                 _/o \_                 __\o/__
-     /  /|  \             / /|\                /  |  \               _/  |   \_
-    /  / \   \           /  / \               /  / \  \             /___/ \___\
-      _/ \_               _/ \_                 _/ \_                  /   \
-
-       L0                   L1                    L3                      L5
-    Manual coding        AI assistant          Agent mode            Harness Flow
-      vim + gcc            Copilot       Cursor Agent/Claude Code   Autonomous ship
-
-   write every line   you drive + AI aid  AI writes but drifts      AI ships products
-      by hand          (hands on wheel)   (no nav/rules/record)     human is copilot
-
-   ─────────────────────────────────────────────────────────────────────────────────────
+            .-.                                                          
+           (o o)        .-.          .-.            .-.                   
+           /|          (o o)        (o o)          (o o)  ___             
+          / | \         /|\          /|\    ~~>     -|-- |___|            
+  .------' /|  )       / | \        / \            /|   |seat|           
+  |  ape  / / /       /  |  \      /   \          / \   |____|           
+  '------'_/_/       /   |   \    /     \        /   \  /    \           
+  ________|_|       _____|_____  _________|     ========------=====      
+                                                                         
+       L0               L1              L3               L5              
+   Manual Code      AI Assistant    Agent Mode      Harness Flow         
+    vim + gcc         Copilot      Cursor Agent    Autonomous Ship       
+                                   Claude Code                           
+                                                                         
+  Write every       You drive,     AI writes,       AI ships it.         
+  line by hand.     AI assists.    but crashes.     You sit back.        
 ```
 
 ### The Three Pillars of L5
 
-|  | Navigation | Traffic Rules | Dashcam |
-|--|:----------:|:------------:|:-------:|
-|  | vision → plan → roadmap | 5-role review + gates + trust | audit trail + learnings + retro |
-|  | AI knows **where** to go | AI obeys the **rules** | every decision **recorded** |
+
+|     | Navigation               | Traffic Rules                 | Dashcam                         |
+| --- | ------------------------ | ----------------------------- | ------------------------------- |
+|     | vision → plan → roadmap  | 5-role review + gates + trust | audit trail + learnings + retro |
+|     | AI knows **where** to go | AI obeys the **rules**        | every decision **recorded**     |
+
 
 ---
 
@@ -69,9 +72,12 @@ flowchart LR
   style Ship fill:#fff,stroke:#222,stroke-width:2px,color:#000
 ```
 
+
+
 One requirement in → one PR out. Both plan and code are reviewed by 5 parallel AI reviewers. Findings from 2+ roles on the same issue are flagged `[HIGH CONFIDENCE]`.
 
 **Fix-First** classifies every review finding:
+
 - **AUTO-FIX** — high certainty + small blast radius + reversible → fixed immediately
 - **ASK** — security, behavior change, architecture → batched for your decision
 
@@ -104,42 +110,41 @@ That's it — plan, build, 5-role review, and PR. One command.
 
 **What you'll see:** the agent generates a spec + contract, 5 reviewers challenge the plan in parallel, then the agent implements, runs CI, gets code reviewed by the same 5 roles, and opens a PR — all autonomously.
 
-<!-- TODO: Add a demo recording (GIF or video) showing the full flow from requirement to PR -->
+
 
 ---
 
 ## Deep Dive
 
-<details>
-<summary><strong>Your AI Engineering Team — 5 parallel reviewers</strong></summary>
+**Your AI Engineering Team — 5 parallel reviewers**
 
 Harness gives you a **complete engineering team** inside Cursor — each role reviews both your plan and your code:
 
-| Role | Plan Review | Code Review |
-|------|------------|-------------|
-| **Architect** | Feasibility, module impact, dependencies | Conformance, layering, coupling, security |
-| **Product Owner** | Vision alignment, user value, acceptance criteria | Requirement coverage, behavioral correctness |
-| **Engineer** | Implementation feasibility, code reuse, tech debt | Code quality, DRY, patterns, performance |
-| **QA** | Test strategy, boundary values, regression risk | Test coverage, edge cases, CI health |
-| **Project Manager** | Task decomposition, parallelism, scope | Scope drift, plan completion, delivery risk |
+
+| Role                | Plan Review                                       | Code Review                                  |
+| ------------------- | ------------------------------------------------- | -------------------------------------------- |
+| **Architect**       | Feasibility, module impact, dependencies          | Conformance, layering, coupling, security    |
+| **Product Owner**   | Vision alignment, user value, acceptance criteria | Requirement coverage, behavioral correctness |
+| **Engineer**        | Implementation feasibility, code reuse, tech debt | Code quality, DRY, patterns, performance     |
+| **QA**              | Test strategy, boundary values, regression risk   | Test coverage, edge cases, CI health         |
+| **Project Manager** | Task decomposition, parallelism, scope            | Scope drift, plan completion, delivery risk  |
+
 
 > **Not a simulation** — these roles run as parallel AI subagents with distinct system prompts, each scoring independently. Findings from 2+ roles are flagged as high confidence.
 
 Each role can use a different model via `[native.role_models]` in config. If some reviewers fail, the pipeline continues with available perspectives (graceful degradation).
 
-</details>
 
-<details>
-<summary><strong>Contract-Driven Development</strong></summary>
+
+**Contract-Driven Development**
 
 Every task starts with a **spec + contract** — deliverables, acceptance criteria, and risk analysis — reviewed by 5 roles before any code is written.
 
 The contract lives in `.harness-flow/tasks/task-NNN/plan.md` and serves as the single source of truth. Runtime state is tracked in `workflow-state.json` alongside it.
 
-</details>
 
-<details>
-<summary><strong>Fix-First Auto-Remediation</strong></summary>
+
+**Fix-First Auto-Remediation**
 
 Every review finding is classified before presenting it to you:
 
@@ -148,10 +153,9 @@ Every review finding is classified before presenting it to you:
 
 Typical auto-fixes: unused imports, stale comments, missing null checks, naming inconsistencies, obvious N+1 queries.
 
-</details>
 
-<details>
-<summary><strong>Full Audit Trail</strong></summary>
+
+**Full Audit Trail**
 
 Plans, reviews, build logs, gate results — all persisted per task. Every decision is traceable.
 
@@ -170,19 +174,21 @@ Plans, reviews, build logs, gate results — all persisted per task. Every decis
     └── ...                  # feedback ledger, intervention audit, etc. (optional)
 ```
 
-</details>
+
 
 ---
 
 ## Installation & Upgrade
 
-| Command | What it does |
-|---------|-------------|
-| `pip install harness-flow` | Install the CLI |
-| `harness init` | Interactive wizard → generates skills, agents, rules into `.cursor/` |
-| `harness init --force` | Regenerate all artifacts (after config changes or version upgrade) |
-| `harness update` | Self-update the package + run config migration |
-| `harness update --check` | Check for new version without installing |
+
+| Command                    | What it does                                                         |
+| -------------------------- | -------------------------------------------------------------------- |
+| `pip install harness-flow` | Install the CLI                                                      |
+| `harness init`             | Interactive wizard → generates skills, agents, rules into `.cursor/` |
+| `harness init --force`     | Regenerate all artifacts (after config changes or version upgrade)   |
+| `harness update`           | Self-update the package + run config migration                       |
+| `harness update --check`   | Check for new version without installing                             |
+
 
 ---
 
@@ -192,76 +198,79 @@ Plans, reviews, build logs, gate results — all persisted per task. Every decis
 
 `/harness-vision` covers everything from vague ideas to clear directions — it auto-detects whether to explore or clarify.
 
-<details>
-<summary><strong>Entry points</strong></summary>
+**Entry points**
 
-| Skill | When to use | What it does |
-|-------|------------|-------------|
-| `/harness-plan` | "I have a requirement" | Refine plan + 5-role review → auto build/eval/ship/retro |
+
+| Skill             | When to use                       | What it does                                                                              |
+| ----------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/harness-plan`   | "I have a requirement"            | Refine plan + 5-role review → auto build/eval/ship/retro                                  |
 | `/harness-vision` | "I have an idea" or "a direction" | Explore or clarify → structured vision → roadmap/backlog → iterative build/eval/ship loop |
 
-</details>
 
-<details>
-<summary><strong>Utility & pipeline skills</strong></summary>
 
-| Skill | What it does |
-|-------|-------------|
-| `/harness-investigate` | Systematic bug investigation: reproduce → hypothesize → verify → minimal fix |
-| `/harness-learn` | Memverse knowledge management: store, retrieve, update project learnings |
-| `/harness-retro` | Engineering retrospective: commit analytics, hotspot detection, trend tracking |
-| `/harness-build` | Implement the contract, run CI, triage failures, write a structured build log |
-| `/harness-eval` | 5-role code review (architect + product-owner + engineer + qa + project-manager) |
-| `/harness-ship` | Full pipeline: test → review → fix → commit → push → PR |
-| `/harness-doc-release` | Documentation sync: detect stale docs after code changes |
 
-</details>
+**Utility & pipeline skills**
 
-<details>
-<summary><strong>Progress & next-step hints</strong></summary>
 
-- **`harness workflow next`** — one machine-readable line for agents/scripts (task id, phase, suggested skill).
-- **`harness status`** — Rich panel for humans ("what to do next" in task language).
-- **`HARNESS_PROGRESS`** — one-line boundary marker emitted by Cursor skills.
+| Skill                  | What it does                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| `/harness-investigate` | Systematic bug investigation: reproduce → hypothesize → verify → minimal fix     |
+| `/harness-learn`       | Memverse knowledge management: store, retrieve, update project learnings         |
+| `/harness-retro`       | Engineering retrospective: commit analytics, hotspot detection, trend tracking   |
+| `/harness-build`       | Implement the contract, run CI, triage failures, write a structured build log    |
+| `/harness-eval`        | 5-role code review (architect + product-owner + engineer + qa + project-manager) |
+| `/harness-ship`        | Full pipeline: test → review → fix → commit → push → PR                          |
+| `/harness-doc-release` | Documentation sync: detect stale docs after code changes                         |
 
-</details>
+
+
+
+**Progress & next-step hints**
+
+- `**harness workflow next`** — one machine-readable line for agents/scripts (task id, phase, suggested skill).
+- `**harness status**` — Rich panel for humans ("what to do next" in task language).
+- `**HARNESS_PROGRESS**` — one-line boundary marker emitted by Cursor skills.
+
+
 
 ---
 
-<details>
-<summary><strong>Configuration</strong></summary>
+**Configuration**
 
 Project settings live in `.harness-flow/config.toml`:
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `workflow.max_iterations` | 3 | Max review iterations per task |
-| `workflow.pass_threshold` | 7.0 | Evaluator pass threshold (1-10) |
-| `workflow.auto_merge` | true | Auto-merge branch after pass |
-| `native.evaluator_model` | "inherit" | Default model for review roles; falls back to IDE default |
-| `native.review_gate` | "eng" | Review gate strictness (`eng` = hard gate, `advisory` = log only) |
-| `native.plan_review_gate` | "auto" | Plan review gate (`human` / `ai` / `auto`) |
-| `native.role_models.*` | `{}` | Per-role model overrides; falls back to IDE default |
-| `workflow.branch_prefix` | "agent" | Task branch prefix |
 
-</details>
+| Key                       | Default   | Description                                                       |
+| ------------------------- | --------- | ----------------------------------------------------------------- |
+| `workflow.max_iterations` | 3         | Max review iterations per task                                    |
+| `workflow.pass_threshold` | 7.0       | Evaluator pass threshold (1-10)                                   |
+| `workflow.auto_merge`     | true      | Auto-merge branch after pass                                      |
+| `native.evaluator_model`  | "inherit" | Default model for review roles; falls back to IDE default         |
+| `native.review_gate`      | "eng"     | Review gate strictness (`eng` = hard gate, `advisory` = log only) |
+| `native.plan_review_gate` | "auto"    | Plan review gate (`human` / `ai` / `auto`)                        |
+| `native.role_models.`*    | `{}`      | Per-role model overrides; falls back to IDE default               |
+| `workflow.branch_prefix`  | "agent"   | Task branch prefix                                                |
 
-<details>
-<summary><strong>CLI reference</strong></summary>
 
-| Command | Description |
-|---------|-------------|
-| `harness init [--name] [--ci] [-y] [--force]` | Initialize project (interactive wizard) |
-| `harness status` | Show current task progress |
-| `harness gate [--task]` | Check ship-readiness gates |
-| `harness update [--check] [--force]` | Self-update + config migration |
-| `harness git-preflight [--json]` | Preflight checks (clean tree, branch, worktree) |
-| `harness save-eval --task <id> [--kind] [--verdict] ...` | Save evaluation results |
-| `harness save-build-log --task <id> [--body]` | Save build log |
-| `harness git-prepare-branch --task-key <key>` | Create or resume task branch |
-| `harness git-sync-trunk [--json]` | Sync feature branch with trunk |
 
-</details>
+
+**CLI reference**
+
+
+| Command                                                  | Description                                     |
+| -------------------------------------------------------- | ----------------------------------------------- |
+| `harness init [--name] [--ci] [-y] [--force]`            | Initialize project (interactive wizard)         |
+| `harness status`                                         | Show current task progress                      |
+| `harness gate [--task]`                                  | Check ship-readiness gates                      |
+| `harness update [--check] [--force]`                     | Self-update + config migration                  |
+| `harness git-preflight [--json]`                         | Preflight checks (clean tree, branch, worktree) |
+| `harness save-eval --task <id> [--kind] [--verdict] ...` | Save evaluation results                         |
+| `harness save-build-log --task <id> [--body]`            | Save build log                                  |
+| `harness git-prepare-branch --task-key <key>`            | Create or resume task branch                    |
+| `harness git-sync-trunk [--json]`                        | Sync feature branch with trunk                  |
+
+
+
 
 ---
 
@@ -274,3 +283,4 @@ pip install -e ".[dev]"
 pytest
 ruff check src/ tests/
 ```
+
