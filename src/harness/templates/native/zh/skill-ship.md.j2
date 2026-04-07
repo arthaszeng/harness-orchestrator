@@ -297,18 +297,32 @@ CRITICAL 发现被标记但交付继续。
    - 可长期有效
    - 可跨项目 / 跨语言复用
    - 与对应角色高度相关
-3. **去重守卫**（防止同一会话中 eval 已捕获后 ship 重复写入）：
+3. **域注册守卫**（每个会话首次写入前运行一次）：
+   对每个将接收写入的角色域调用 `manage_domain`。
+   `manage_domain` 是幂等的 — 注册已存在的域是无操作，
+   因此**跳过 `list_domains`**，直接注册：
+   ```
+   manage_domain(domain="{{ project_name or memverse_domain }}-architect-learning", action="add")
+   manage_domain(domain="{{ project_name or memverse_domain }}-engineer-learning", action="add")
+   manage_domain(domain="{{ project_name or memverse_domain }}-qa-learning", action="add")
+   manage_domain(domain="{{ project_name or memverse_domain }}-product-learning", action="add")
+   manage_domain(domain="{{ project_name or memverse_domain }}-project-manager-learning", action="add")
+   ```
+   5 个调用**并行**发出。如果本会话已注册过域（如 eval 在 ship 之前已运行），
+   则完全跳过。
+4. **去重守卫**（防止同一会话中 eval 已捕获后 ship 重复写入）：
    对每个合格的 `[LEARNING]` 条目，写入前先调用：
    ```
    search_memory(query=<learning key 或简短文本>, domains="{{ project_name or memverse_domain }}-<role>-learning", limit=5)
    ```
    如果已存在实质相同的见解 → **跳过**（记录为 `skipped-dedup`）。
    仅在无近似重复时写入。
-4. 对每个非重复的 `[LEARNING]` 条目，由**父协调器**（你）调用 `add_memories`
+5. 对每个非重复的 `[LEARNING]` 条目，由**父协调器**（你）调用 `add_memories`
    并附带结构化 metadata（JSON 字符串）。子代理不得自行调用 `add_memories`。
+   **text 必须包含 `[domain]` 前缀**以强化 Memverse 域推断：
    ```
    add_memories(
-     text="<学习见解文本>",
+     text="[{{ project_name or memverse_domain }}-<role>-learning] <学习见解文本>",
      domain="{{ project_name or memverse_domain }}-<role>-learning",
      metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
    )
@@ -316,7 +330,8 @@ CRITICAL 发现被标记但交付继续。
    **注意**：metadata 只写不可搜索 — `search_memory` 不能按 metadata 字段过滤。
    需要精确 metadata 过滤时，使用 `list_memories` + 调用方内存解析。
    写入采用 non-blocking fire-and-forget，不以写入结果阻塞 gate。
-5. 记录计数：`LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open`。
+   **并行写入**：当多条学习成果就绪时，并发 dispatch 所有 `add_memories` 调用（不要串行）。
+6. 记录计数：`LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`。
 
 如果 Memverse MCP 不可用：静默跳过。
 {% else %}

@@ -46,10 +46,16 @@ RECENT LEARNINGS ({{ memverse_domain }})
 - **confidence**：1-10（这个学习有多确定？）
 - **files**：相关文件（可选）
 
-通过 Memverse `add_memories` 以结构化 metadata（JSON 字符串）存储：
+写入前确保目标域已注册（`manage_domain` 是幂等的）：
+```
+manage_domain(domain="{{ memverse_domain }}", action="add")
+```
+
+通过 Memverse `add_memories` 以结构化 metadata（JSON 字符串）存储。
+**text 必须包含 `[domain]` 前缀**以强化 Memverse 域推断：
 ```
 add_memories(
-  text="{insight}",
+  text="[{{ memverse_domain }}] {insight}",
   domain="{{ memverse_domain }}",
   metadata="{\"type\": \"{type}\", \"key\": \"{key}\", \"confidence\": {confidence}, \"source\": \"user-stated\", \"files\": [\"{files}\"], \"branch\": \"{branch}\", \"commit\": \"{commit}\"}"
 )
@@ -182,16 +188,28 @@ PRIOR LEARNINGS (relevant to this diff):
 
 在 `/harness-eval` 和 `/harness-ship` 工作流结束时：
 
-1. 审查评估中的所有发现
-2. 对任何非显而易见的发现（置信度 >= 7）且揭示了模式或陷阱的：
+1. **域注册守卫**（每个会话一次）：
+   对每个将接收写入的角色域调用 `manage_domain`（幂等，跳过 `list_domains`）：
+   ```
+   manage_domain(domain="{{ memverse_domain }}-architect-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-engineer-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-qa-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-product-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-project-manager-learning", action="add")
+   ```
+   5 个调用并行发出。如果本会话已注册过，则跳过。
+2. 审查评估中的所有发现
+3. 对任何非显而易见的发现（置信度 >= 7）且揭示了模式或陷阱的：
    - **去重守卫**：写入前在目标角色学习域中 `search_memory` 该 learning key；
      若已存在近似重复 → 跳过（记录为 `skipped-dedup`）
    - 由**父协调器**通过 Memverse `add_memories` 自动捕获为学习成果（附带 metadata）
+   - **text 必须包含 `[domain]` 前缀**（如 `[{{ memverse_domain }}-qa-learning] 见解文本`）
    - 子代理不得自行调用 `add_memories` — 它们在输出契约中输出 `[LEARNING]` 条目
    - Type：pattern（如果是好的实践）或 pitfall（如果是常见错误）
    - Source："observed"
    - Confidence：与发现的置信度相同
-3. 记录："从本次评审中捕获了 N 个新的学习成果，M 个 skipped-dedup"
+   - **并行写入**：所有 `add_memories` 调用并发 dispatch
+4. 记录："从本次评审中捕获了 N 个新的学习成果，M 个 skipped-dedup，K 个 domain-registered"
 
 ---
 

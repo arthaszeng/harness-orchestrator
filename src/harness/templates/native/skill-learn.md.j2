@@ -46,10 +46,16 @@ Prompt for (or extract from context):
 - **confidence**: 1-10 (how certain is this learning?)
 - **files**: related files (optional)
 
-Store via Memverse `add_memories` with structured metadata (JSON string):
+Before writing, ensure the target domain is registered (`manage_domain` is idempotent):
+```
+manage_domain(domain="{{ memverse_domain }}", action="add")
+```
+
+Store via Memverse `add_memories` with structured metadata (JSON string).
+**Text must include a `[domain]` prefix** to reinforce Memverse domain inference:
 ```
 add_memories(
-  text="{insight}",
+  text="[{{ memverse_domain }}] {insight}",
   domain="{{ memverse_domain }}",
   metadata="{\"type\": \"{type}\", \"key\": \"{key}\", \"confidence\": {confidence}, \"source\": \"user-stated\", \"files\": [\"{files}\"], \"branch\": \"{branch}\", \"commit\": \"{commit}\"}"
 )
@@ -182,16 +188,28 @@ PRIOR LEARNINGS (relevant to this diff):
 
 At the end of `/harness-eval` and `/harness-ship` workflows:
 
-1. Review all findings from the evaluation
-2. For any non-obvious finding (confidence >= 7) that reveals a pattern or pitfall:
+1. **Domain registration guard** (once per session):
+   Call `manage_domain` for each role domain that will receive writes (idempotent, skip `list_domains`):
+   ```
+   manage_domain(domain="{{ memverse_domain }}-architect-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-engineer-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-qa-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-product-learning", action="add")
+   manage_domain(domain="{{ memverse_domain }}-project-manager-learning", action="add")
+   ```
+   Fire all 5 in parallel. Skip if already done in this session.
+2. Review all findings from the evaluation
+3. For any non-obvious finding (confidence >= 7) that reveals a pattern or pitfall:
    - **Dedup guard**: before writing, `search_memory` with the learning key in the target
      role-learning domain; skip if a near-duplicate already exists (log as `skipped-dedup`)
    - The **parent orchestrator** auto-captures as a learning via Memverse `add_memories` with metadata
+   - **Text must include a `[domain]` prefix** (e.g. `[{{ memverse_domain }}-qa-learning] insight text`)
    - Sub-agents do NOT call `add_memories` — they output `[LEARNING]` items in their Output Contract
    - Type: pattern (if good practice) or pitfall (if common mistake)
    - Source: "observed"
    - Confidence: same as the finding's confidence
-3. Log: "Captured N new learnings, M skipped-dedup from this review"
+   - **Parallel writes**: dispatch all `add_memories` calls concurrently
+4. Log: "Captured N new learnings, M skipped-dedup, K domain-registered from this review"
 
 ---
 
