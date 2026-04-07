@@ -105,6 +105,10 @@ def test_finalize_after_merge_happy_path(tmp_path: Path, monkeypatch):
         "harness.core.post_ship.PostShipManager._resolve_task_branch",
         lambda self, **kwargs: "agent/task-006-post-ship-cleanup",
     )
+    monkeypatch.setattr(
+        "harness.core.post_ship.PostShipManager._cleanup_worktree",
+        lambda self, task_key: None,
+    )
 
     calls: list[list[str]] = []
 
@@ -367,3 +371,65 @@ def test_resolve_task_branch_rejects_mismatched_pr_head_ref(tmp_path: Path, monk
         pr_head_ref="agent/task-999-other",
     )
     assert resolved is None
+
+
+def test_cleanup_worktree_removes_matching_entry(tmp_path: Path, monkeypatch):
+    """Post-ship cleanup finds matching worktree entry and removes it."""
+    manager = _manager(tmp_path)
+    removed: list[str] = []
+
+    class _FakeManager:
+        def __init__(self, **_kw):
+            pass
+
+        def list_worktrees(self):
+            return [{"task_key": "task-006", "branch": "agent/task-006-demo"}]
+
+        def remove_worktree(self, identifier, *, prune_branch=True, force=False):
+            removed.append(identifier)
+            return GitOperationResult(ok=True, code="OK", message="removed")
+
+    monkeypatch.setattr(
+        "harness.core.post_ship.run_git_result",
+        lambda args, *_a, **_k: GitOperationResult(ok=True, code="OK", stdout=str(tmp_path / ".git") + "\n"),
+    )
+    monkeypatch.setattr("harness.core.worktree_lifecycle.WorktreeLifecycleManager", _FakeManager)
+    manager._cleanup_worktree("task-006")
+    assert removed == ["task-006"]
+
+
+def test_cleanup_worktree_no_matching_entry(tmp_path: Path, monkeypatch):
+    """Post-ship cleanup with no matching worktree entry does nothing."""
+    manager = _manager(tmp_path)
+    removed: list[str] = []
+
+    class _FakeManager:
+        def __init__(self, **_kw):
+            pass
+
+        def list_worktrees(self):
+            return [{"task_key": "task-999", "branch": "agent/task-999"}]
+
+        def remove_worktree(self, identifier, **_kw):
+            removed.append(identifier)
+            return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr(
+        "harness.core.post_ship.run_git_result",
+        lambda args, *_a, **_k: GitOperationResult(ok=True, code="OK", stdout=str(tmp_path / ".git") + "\n"),
+    )
+    monkeypatch.setattr("harness.core.worktree_lifecycle.WorktreeLifecycleManager", _FakeManager)
+    manager._cleanup_worktree("task-006")
+    assert removed == []
+
+
+def test_cleanup_worktree_failure_does_not_raise(tmp_path: Path, monkeypatch):
+    """Worktree cleanup failure is silently handled (best-effort)."""
+    manager = _manager(tmp_path)
+
+    monkeypatch.setattr(
+        "harness.core.post_ship.run_git_result",
+        lambda args, *_a, **_k: GitOperationResult(ok=False, code="ERR", message="git fail"),
+    )
+    # Should not raise even when git commands fail internally
+    manager._cleanup_worktree("task-006")
