@@ -8,80 +8,43 @@
 [![PyPI](https://img.shields.io/pypi/v/harness-flow)](https://pypi.org/project/harness-flow/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Your AI Engineering Team
-
-Harness gives you a **complete engineering team** inside Cursor — each role reviews both your plan and your code:
-
-```mermaid
-classDiagram
-    class HarnessTeam {
-        +Requirement
-        +Codebase
-        +IDE: Cursor
-    }
-    class Architect {
-        +ReviewDesign
-        +CheckDependencies
-        +EvaluateSecurity
-    }
-    class ProductOwner {
-        +ReviewVision
-        +ValidateRequirements
-        +CheckUserValue
-    }
-    class Engineer {
-        +ReviewCode
-        +CheckPatterns
-        +EvaluatePerformance
-    }
-    class QA {
-        +WriteTests
-        +RunCI
-        +CheckEdgeCases
-    }
-    class ProjectManager {
-        +TrackScope
-        +ManageDelivery
-        +AssessRisk
-    }
-
-    HarnessTeam --> Architect
-    HarnessTeam --> ProductOwner
-    HarnessTeam --> Engineer
-    HarnessTeam --> QA
-    HarnessTeam --> ProjectManager
-```
-
-> **Not a simulation** — these roles run as parallel AI subagents with distinct system prompts, each scoring independently. Findings from 2+ roles are flagged as high confidence.
-
----
-
 ## How it works
 
 ```mermaid
-flowchart LR
-  You["🧑‍💻 Requirement"]
-  Plan["📋 Plan"]
-  PR1["5-role\nplan review"]
-  Build["🔨 Build\nimplement + CI"]
-  Eval["🔍 Eval"]
-  PR2["5-role\ncode review"]
-  Ship["🚀 Ship\ncommit + PR"]
+flowchart TB
+  Req["Requirement"] --> Plan["Plan"]
+  Plan --> PlanReview["5-role plan review"]
+  PlanReview --> Build["Build + CI"]
+  Build --> CodeReview["5-role code review"]
+  CodeReview --> Ship["Ship → PR"]
 
-  You --> Plan --> PR1 --> Build --> Eval --> PR2 --> Ship
-
-  subgraph "5 parallel reviewers"
-    direction TB
+  subgraph reviewers [" "]
+    direction LR
     A["Architect"]
     PO["Product Owner"]
-    E["Engineer"]
-    QA["QA"]
+    Eng["Engineer"]
+    Q["QA"]
     PM["Project Manager"]
   end
 
-  PR1 -.-> A & PO & E & QA & PM
-  PR2 -.-> A & PO & E & QA & PM
+  PlanReview -.-> reviewers
+  CodeReview -.-> reviewers
+
+  style Req fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style Plan fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style PlanReview fill:#222,stroke:#222,stroke-width:2px,color:#fff
+  style Build fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style CodeReview fill:#222,stroke:#222,stroke-width:2px,color:#fff
+  style Ship fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style A fill:#fff,stroke:#222,stroke-width:1px,color:#000
+  style PO fill:#fff,stroke:#222,stroke-width:1px,color:#000
+  style Eng fill:#fff,stroke:#222,stroke-width:1px,color:#000
+  style Q fill:#fff,stroke:#222,stroke-width:1px,color:#000
+  style PM fill:#fff,stroke:#222,stroke-width:1px,color:#000
+  style reviewers fill:none,stroke:#222,stroke-width:1px,stroke-dasharray: 5 5
 ```
+
+Both **plan review** and **code review** dispatch the same 5 parallel reviewers. Findings from 2+ roles are flagged as high confidence.
 
 **Fix-First** classifies every review finding before presenting it:
 - **AUTO-FIX** — high certainty, small blast radius → fixed immediately
@@ -108,24 +71,31 @@ Each role can use a different model via `[native.role_models]` in config. Invali
 
 ### 0. 10-minute happy path
 
-```mermaid
-flowchart LR
-  S1["① Install\npip install harness-flow"]
-  S2["② Init\nharness init"]
-  S3["③ Update\nharness update"]
-  S1 --> S2 --> S3
-```
+**Step 1** — Install:
 
 ```bash
 pip install harness-flow
-cd /path/to/your/project
+```
+
+**Step 2** — Initialize in your project:
+
+```bash
+cd <YOUR_PROJECT_PATH>
 harness init
 ```
 
-Then open Cursor and type:
+**Step 3** — Open Cursor and type a requirement:
 
 ```
 /harness-plan add input validation to the user registration endpoint
+```
+or
+```
+/harness-plan 帮我完成这张卡：JIRA-XXXX
+```
+or
+```
+/harness-plan 帮我完成SSO的相关接口
 ```
 
 That's it — plan, build, 5-role review, and PR in one command.
@@ -134,15 +104,88 @@ That's it — plan, build, 5-role review, and PR in one command.
 
 ---
 
+## Installation & Upgrade
+
+```mermaid
+flowchart LR
+  S1["Install\npip install harness-flow"]
+  S2["Init\nharness init"]
+  S3["Upgrade\nharness update"]
+  S1 --> S2 --> S3
+
+  style S1 fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style S2 fill:#fff,stroke:#222,stroke-width:2px,color:#000
+  style S3 fill:#222,stroke:#222,stroke-width:2px,color:#fff
+```
+
+| Command | What it does |
+|---------|-------------|
+| `pip install harness-flow` | Install the CLI |
+| `harness init` | Interactive wizard → generates skills, agents, rules into `.cursor/` |
+| `harness init --force` | Regenerate all artifacts (after config changes or version upgrade) |
+| `harness update` | Self-update the package + run config migration |
+| `harness update --check` | Check for new version without installing |
+
+---
+
 ## Harness in Action
 
-> 🏗️ **Contract-driven development** — every task starts with a spec + contract. No code without a plan.
+### Contract-Driven Development
 
-> 🔍 **Adversarial multi-role review** — 5 AI reviewers challenge your code from different angles, in parallel. Weak spots get caught before merge.
+Every task starts with a **spec + contract** reviewed by 5 roles — no code without a plan.
 
-> 🔧 **Fix-First auto-remediation** — trivial findings are fixed instantly. You only see what matters.
+---
 
-> 📋 **Full audit trail** — plans, reviews, build logs, gate results. Every decision is traceable in `.harness-flow/tasks/`.
+### Adversarial Multi-Role Review
+
+**5 AI reviewers** challenge your code from different angles, **in parallel**. Weak spots get caught before merge.
+
+---
+
+### Fix-First Auto-Remediation
+
+Trivial findings are **fixed instantly** — unused imports, stale comments, missing null checks. You only see what matters.
+
+---
+
+### Full Audit Trail
+
+Plans, reviews, build logs, gate results — all persisted in `.harness-flow/tasks/`. **Every decision is traceable.**
+
+---
+
+## Your AI Engineering Team
+
+```mermaid
+classDiagram
+    class Architect {
+        +ReviewDesign
+        +CheckDependencies
+        +EvaluateSecurity
+    }
+    class ProductOwner {
+        +ReviewVision
+        +ValidateRequirements
+        +CheckUserValue
+    }
+    class Engineer {
+        +ReviewCode
+        +CheckPatterns
+        +EvaluatePerformance
+    }
+    class QA {
+        +WriteTests
+        +RunCI
+        +CheckEdgeCases
+    }
+    class ProjectManager {
+        +TrackScope
+        +ManageDelivery
+        +AssessRisk
+    }
+```
+
+> **Not a simulation** — these roles run as parallel AI subagents with distinct system prompts, each scoring independently.
 
 ---
 
