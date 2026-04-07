@@ -62,7 +62,8 @@ For precise metadata filtering, use `list_memories` + client-side parsing.
 Review existing learnings for staleness.
 
 1. Fetch all learnings for this project via `list_memories(domain="{{ memverse_domain }}", limit=100)`
-   (use `list_memories` for complete enumeration — `search_memory` may miss items with low semantic similarity)
+   (use `list_memories` for complete enumeration — `search_memory` may miss items with low semantic similarity).
+   If `has_more` is true, repeat with `offset` to paginate until all items are fetched.
 2. For each learning that references specific files:
    - Check if the file still exists
    - If deleted: flag as potentially stale
@@ -82,6 +83,7 @@ LEARNING HEALTH CHECK
 
 5. For stale/contradicting learnings:
    - If contradiction can be resolved by updating: use `update_memory(memory_id, new_content)` to merge/correct
+     (note: `update_memory` replaces only the searchable `text`; to change metadata, delete and re-add)
    - If truly obsolete: suggest deletion via `delete_memories`
 
 ### `/harness-learn export` — Export as Markdown
@@ -164,7 +166,8 @@ parse metadata client-side. The `metadata` field is returned by `list_memories` 
 At the start of `/harness-eval` and `/harness-ship` workflows:
 
 1. Extract key topics from the diff (file names, module names, patterns used)
-2. Call Memverse `search_memory` with these topics and domain "{{ memverse_domain }}"
+2. Call Memverse `search_memory` using multi-domain OR query (aligned with eval/ship):
+   `search_memory(query=<topics>, domains="{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-learning,{{ memverse_domain }}-project-manager-learning", limit=20)`
 3. If relevant learnings are found, display:
 
 ```

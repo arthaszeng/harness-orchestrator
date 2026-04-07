@@ -62,7 +62,8 @@ add_memories(
 审查已有的学习成果是否陈旧。
 
 1. 通过 `list_memories(domain="{{ memverse_domain }}", limit=100)` 获取此项目的所有学习成果
-   （使用 `list_memories` 做完整枚举 — `search_memory` 可能遗漏语义相似度低的条目）
+   （使用 `list_memories` 做完整枚举 — `search_memory` 可能遗漏语义相似度低的条目）。
+   若 `has_more` 为 true，使用 `offset` 继续分页直至获取全部条目。
 2. 对引用了具体文件的每个学习成果：
    - 检查文件是否仍然存在
    - 如果已删除：标记为可能已陈旧
@@ -82,6 +83,7 @@ LEARNING HEALTH CHECK
 
 5. 对陈旧/矛盾的学习成果：
    - 如果矛盾可以通过更新解决：使用 `update_memory(memory_id, new_content)` 合并/修正
+     （注：`update_memory` 仅替换可搜索的 `text`；需要更改 metadata 时，应删除后重新添加）
    - 如果确实过时：通过 `delete_memories` 建议删除
 
 ### `/harness-learn export` — 导出为 Markdown
@@ -164,7 +166,8 @@ LEARNING STATISTICS
 在 `/harness-eval` 和 `/harness-ship` 工作流开始时：
 
 1. 从 diff 中提取关键主题（文件名、模块名、使用的模式）
-2. 使用这些主题和 domain "{{ memverse_domain }}" 调用 Memverse `search_memory`
+2. 使用多域 OR 查询调用 Memverse `search_memory`（与 eval/ship 对齐）：
+   `search_memory(query=<topics>, domains="{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-learning,{{ memverse_domain }}-project-manager-learning", limit=20)`
 3. 如果找到相关学习成果，展示：
 
 ```

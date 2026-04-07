@@ -40,9 +40,10 @@ pipeline. Run straight through and output the evaluation result at the end.
 {% if memverse_enabled == "true" %}
 7. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
    If Memverse MCP is available, call `search_memory` with key topics from the diff.
-   Use multi-domain OR query (single call replaces dual windows):
+   Use multi-domain OR query (single call replaces dual windows).
+   Include the project domain plus all five role-learning domains:
    ```
-   search_memory(query=<key topics from diff>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-<role>-learning", limit=20)
+   search_memory(query=<key topics from diff>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning,{{ project_name or memverse_domain }}-engineer-learning,{{ project_name or memverse_domain }}-qa-learning,{{ project_name or memverse_domain }}-product-learning,{{ project_name or memverse_domain }}-project-manager-learning", limit=20)
    ```
    Display any relevant prior learnings (especially pitfalls) before starting the review.
 {% endif %}
