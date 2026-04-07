@@ -238,7 +238,7 @@ class TestDetectWorktreeEdgeCases:
             return subprocess.CompletedProcess(args, 0, stdout="\x00\xff\n")
 
         with patch("harness.core.worktree.run_git", side_effect=mock_run):
-            with pytest.raises(ValueError, match="null byte"):
+            with pytest.raises(ValueError, match="null (byte|character)"):
                 detect_worktree(tmp_path)
 
     def test_malformed_git_output_no_null(self, tmp_path: Path):
