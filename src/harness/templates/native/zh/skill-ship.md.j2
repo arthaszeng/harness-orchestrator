@@ -302,11 +302,11 @@ CRITICAL 发现被标记但交付继续。
    `manage_domain` 是幂等的 — 注册已存在的域是无操作，
    因此**跳过 `list_domains`**，直接注册：
    ```
-   manage_domain(domain="{{ project_name or memverse_domain }}-architect-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-engineer-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-qa-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-product-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-project-manager-learning", action="add")
+   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
    ```
    5 个调用**并行**发出。如果本会话已注册过域（如 eval 在 ship 之前已运行），
    则完全跳过。

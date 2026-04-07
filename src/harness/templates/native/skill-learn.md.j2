@@ -48,7 +48,7 @@ Prompt for (or extract from context):
 
 Before writing, ensure the target domain is registered (`manage_domain` is idempotent):
 ```
-manage_domain(domain="{{ memverse_domain }}", action="add")
+manage_domain(name="{{ memverse_domain }}", display="{{ memverse_domain }}", aliases="{{ memverse_domain }}", keywords="{{ memverse_domain }} learning")
 ```
 
 Store via Memverse `add_memories` with structured metadata (JSON string).
@@ -191,11 +191,11 @@ At the end of `/harness-eval` and `/harness-ship` workflows:
 1. **Domain registration guard** (once per session):
    Call `manage_domain` for each role domain that will receive writes (idempotent, skip `list_domains`):
    ```
-   manage_domain(domain="{{ memverse_domain }}-architect-learning", action="add")
-   manage_domain(domain="{{ memverse_domain }}-engineer-learning", action="add")
-   manage_domain(domain="{{ memverse_domain }}-qa-learning", action="add")
-   manage_domain(domain="{{ memverse_domain }}-product-learning", action="add")
-   manage_domain(domain="{{ memverse_domain }}-project-manager-learning", action="add")
+   manage_domain(name="{{ memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ memverse_domain }} architect", keywords="architecture learning patterns")
+   manage_domain(name="{{ memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ memverse_domain }} engineer", keywords="engineering learning patterns")
+   manage_domain(name="{{ memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ memverse_domain }} qa", keywords="testing qa learning patterns")
+   manage_domain(name="{{ memverse_domain }}-product-learning", display="Product Learning", aliases="{{ memverse_domain }} product", keywords="product learning patterns")
+   manage_domain(name="{{ memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ memverse_domain }} pm", keywords="project management learning patterns")
    ```
    Fire all 5 in parallel. Skip if already done in this session.
 2. Review all findings from the evaluation

@@ -97,11 +97,11 @@ After the evaluation is complete, capture non-obvious insights as learnings:
    `manage_domain` is idempotent — registering an already-existing domain is a no-op,
    so **skip `list_domains`** and just register directly:
    ```
-   manage_domain(domain="{{ project_name or memverse_domain }}-architect-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-engineer-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-qa-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-product-learning", action="add")
-   manage_domain(domain="{{ project_name or memverse_domain }}-project-manager-learning", action="add")
+   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
+   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
    ```
    Fire all 5 calls **in parallel**. If this session already registered domains
    (e.g. eval ran before ship), skip entirely.
