@@ -5,6 +5,12 @@ Treat `vision.md` as a **living document**, not an append-only log.
 - Do NOT include libraries, frameworks, file paths, endpoint names, schema/table names, or step-by-step build choices unless they are true hard constraints.
 - If technical detail matters, record the constraint in outcome terms; implementation choices belong in `plan.md`, not `vision.md`.
 
+### Hard Limit (non-negotiable)
+
+**`vision.md` must NEVER exceed 150 lines.** Count the lines after every write.
+If the file exceeds 150 lines, you MUST perform a **full consolidation** before writing it back
+(see Step D below). There are no exceptions — this limit exists to prevent context bloat.
+
 ### File Structure Convention
 
 `vision.md` has **three zones** (maintain this structure on every write):
@@ -19,24 +25,23 @@ Treat `vision.md` as a **living document**, not an append-only log.
 ## Chosen Direction
 
 ## Recent Deltas
-(Up to 5 incremental entries, newest first)
+(Up to 3 incremental entries, newest first)
 ### [Date] — [Title]
 ...
 
 ## Archive
-(Folded old entries that have been superseded)
-<details><summary>[Date] — [Title]</summary>
-...
-</details>
+(One-line tombstones only — full text lives in git history)
+- [Date] — [Title] — absorbed into summary / superseded by [newer delta title]
 ```
 
 ### Step A: Evaluate
 
 1. Read `.harness-flow/vision.md` (create with the three-zone skeleton if missing)
-2. Review each entry in `## Recent Deltas`:
+2. **Count the total lines.** If already ≥ 120 lines, mark `consolidation_needed = true`.
+3. Review each entry in `## Recent Deltas`:
    - Is this delta **still current** (not contradicted or superseded by a newer entry)?
    - Has the core direction in this delta been **absorbed** into the top-level summary?
-3. Count the number of entries in `## Recent Deltas`.
+4. Count the number of entries in `## Recent Deltas`.
 
 ### Step B: Update
 
@@ -56,19 +61,33 @@ Then choose **one** of these actions:
 
 ### Step C: Archive
 
-After Step B, if `## Recent Deltas` contains **more than 5 entries**:
+After Step B, if `## Recent Deltas` contains **more than 3 entries**:
 
 1. Identify the **oldest entries** whose content has been fully absorbed into the top-level summary or superseded by newer deltas.
-2. Move them to `## Archive`, wrapping each in a `<details>` block:
+2. Move them to `## Archive` as **one-line tombstones** (not full text):
    ```markdown
-   <details><summary>[Date] — [Title]</summary>
-
-   (original delta content, unchanged)
-
-   </details>
+   - [Date] — [Title] — absorbed into summary / superseded by [newer delta title]
    ```
-3. Never delete content — archiving preserves the full audit trail.
-4. If you cannot confidently determine that an entry is superseded, **leave it in Recent Deltas**.
+3. The full original text is preserved in **git history** — do not copy it into the file.
+4. If you cannot confidently determine that an entry is superseded, **leave it in Recent Deltas** — but this does not exempt you from the 150-line hard limit (Step D will force consolidation).
+
+### Step D: Consolidation (mandatory when file > 150 lines)
+
+This step is **mandatory** when `consolidation_needed = true` (set in Step A)
+or when the file exceeds 150 lines after Steps B + C.
+
+**Goal: reduce the file to ≤ 100 lines (at least 50% reduction from the trigger point).**
+
+1. **Rewrite the top-level summary** — merge all still-valid directions from Recent Deltas
+   into the summary sections (Problem/User, North Star, Success Signals, Non-Goals, Chosen Direction).
+   Make the summary **complete and self-contained** so a reader needs nothing else.
+2. **Clear Recent Deltas** — all entries have been absorbed into the summary.
+   Only keep deltas from the current session that have not yet been merged.
+3. **Trim Archive** — keep only the one-line tombstones. Remove any full-text archive entries;
+   their content is preserved in git history.
+4. **Verify the line count** — the final file MUST be ≤ 100 lines.
+   If still over 100 lines, tighten the summary further (combine redundant signals, remove
+   non-goals that are obvious, shorten prose).
 
 ### Write back
 

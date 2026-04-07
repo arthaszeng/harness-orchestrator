@@ -855,9 +855,11 @@ def test_vision_includes_vision_core(tmp_path: Path):
     assert "Step A" in content
     assert "Step B" in content
     assert "Step C" in content
+    assert "Step D" in content
     assert "## Recent Deltas" in content
     assert "## Archive" in content
-    assert "<details>" in content
+    assert "150 lines" in content
+    assert "consolidation" in content.lower()
 
 
 def test_vision_stays_in_harness_workflow(tmp_path: Path):
@@ -1127,9 +1129,11 @@ def test_zh_vision_and_governance_agents_contain_loop_concepts(tmp_path: Path):
     assert "Step A" in content_vs
     assert "Step B" in content_vs
     assert "Step C" in content_vs
+    assert "Step D" in content_vs
     assert "## Recent Deltas" in content_vs
     assert "## Archive" in content_vs
-    assert "<details>" in content_vs
+    assert "150" in content_vs
+    assert "consolidation_needed" in content_vs
 
     po = tmp_path / ".cursor" / "agents" / "harness-product-owner.md"
     content_po = po.read_text(encoding="utf-8")
