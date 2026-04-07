@@ -220,7 +220,7 @@ Context is organized into three layers:
 - **Selective rule activation**: `NativeModeConfig.rule_activation` controls per-rule generation:
 `"always"` (default), `"phase_match"` (adds marker comment), `"disabled"` (skips file).
 - **`generate_native_artifacts()`** writes:
-  - **10 skills** under `.cursor/skills/harness/<skill-name>/SKILL.md`
+  - **9 skills** under `.cursor/skills/harness/<skill-name>/SKILL.md`
   - **5 agents** under `.cursor/agents/*.md` (with `<!-- context: layers ... -->` metadata)
   - **Up to 4 rules** under `.cursor/rules/*.mdc` (count depends on `rule_activation`)
   - **Eval resources** (checklist and specialist docs) under `.cursor/skills/harness/harness-eval/`
