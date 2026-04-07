@@ -169,12 +169,10 @@ Project settings live in `.harness-flow/config.toml`:
 
 ## Development
 
-`harness init` generates **10 skills**, **5 subagents**, **4 rules** into `.cursor/`. All task state lives under `.harness-flow/` (local-first).
+`harness init` generates **10 skills**, **5 subagents**, **4 rules** into `.cursor/`. All task state lives under `.harness-flow/` (local-first). See [MIT License](LICENSE).
 
 ```bash
 pip install -e ".[dev]"
 pytest
 ruff check src/ tests/
 ```
-
-[MIT License](LICENSE)

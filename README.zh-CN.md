@@ -72,10 +72,8 @@ harness init
 - **AUTO-FIX** — 高确定性、影响面小 → 立即修复
 - **ASK** — 安全发现、行为变更、低置信度 → 交由你决策
 
-**优雅降级**：如果部分评审者失败，流水线会使用可用的评审结果继续，而非阻塞。
-
 <details>
-<summary><strong>5 角色评审详情</strong></summary>
+<summary><strong>5 角色评审详情</strong>（优雅降级 — 部分评审者失败时使用可用结果继续）</summary>
 
 | 角色 | 计划审查 | 代码评审 |
 |------|---------|---------|
@@ -173,12 +171,10 @@ harness init
 
 ## 开发
 
-`harness init` 生成 **10 个 skill**、**5 个 subagent**、**4 条 rule** 到 `.cursor/`。所有任务状态存放在 `.harness-flow/`（本地优先）。
+`harness init` 生成 **10 个 skill**、**5 个 subagent**、**4 条 rule** 到 `.cursor/`。所有任务状态存放在 `.harness-flow/`（本地优先）。查看 [MIT License](LICENSE)。
 
 ```bash
 pip install -e ".[dev]"
 pytest
 ruff check src/ tests/
 ```
-
-[MIT License](LICENSE)
