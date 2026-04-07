@@ -2,89 +2,31 @@
 
 # harness-flow
 
-> **Cursor 原生 AI 工程框架** — 一句需求输入，一个 PR 输出，全程由 AI 团队评审。
+> **Agent 写代码，Harness Flow 交付产品**
+> — vibe coding 的 L5 自动驾驶，人类回到副驾
 
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/harness-flow)](https://pypi.org/project/harness-flow/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## 你的 AI 工程团队
+## 问题
 
-Harness 在 Cursor 内为你组建了一支**完整的工程团队** — 每个角色同时评审你的计划和代码：
+AI Agent 能写代码了——但**不能交付产品**。缺导航（目标管理）、缺交规（质量门禁）、缺行车记录仪（审计与学习）。瓶颈已从 *"AI 能不能写代码"* 升级为 *"AI 能不能自主交付"*。
 
-```mermaid
-classDiagram
-    class Architect["架构师"] {
-        +评审设计
-        +检查依赖
-        +评估安全
-    }
-    class ProductOwner["产品负责人"] {
-        +评审愿景
-        +验证需求
-        +检查用户价值
-    }
-    class Engineer["工程师"] {
-        +评审代码
-        +检查模式
-        +评估性能
-    }
-    class QA {
-        +编写测试
-        +运行CI
-        +检查边界
-    }
-    class ProjectManager["项目经理"] {
-        +跟踪范围
-        +管理交付
-        +评估风险
-    }
+## Harness Flow 的定位
 
-    style Architect fill:#fff,stroke:#222,color:#000
-    style ProductOwner fill:#fff,stroke:#222,color:#000
-    style Engineer fill:#fff,stroke:#222,color:#000
-    style QA fill:#fff,stroke:#222,color:#000
-    style ProjectManager fill:#fff,stroke:#222,color:#000
-```
+| 时代 | 隐喻 | 人类角色 | 代表 |
+|------|------|---------|------|
+| 手工编程 | 走路 | 写每一行 | vim + gcc |
+| AI 助手 | 人开车 | 掌方向盘，AI 补全 | GitHub Copilot |
+| Agent 模式 | L3 自动驾驶 | AI 能写但没导航、没交规、没记录 | Cursor Agent, Claude Code |
+| **Harness Flow** | **L5 自动驾驶** | **人坐副驾，AI 自主交付** | **harness-flow** |
 
-> **不是模拟** — 这些角色作为并行 AI 子代理运行，各自拥有独立系统提示，独立评分。被 2+ 角色发现的问题标注为高置信度。
+### L5 的三大支柱
 
----
-
-## 快速开始
-
-### 0. 约 10 分钟上手
-
-**第一步** — 安装：
-
-```bash
-pip install harness-flow
-```
-
-**第二步** — 在项目中初始化：
-
-```bash
-cd <YOUR_PROJECT_PATH>
-harness init
-```
-
-**第三步** — 打开 Cursor，输入需求：
-
-```
-/harness-plan add input validation to the user registration endpoint
-```
-
-```
-/harness-plan resolve JIRA-XXXX
-```
-
-```
-/harness-plan implement SSO integration for the auth module
-```
-
-就这样 — 计划、构建、5 角色评审、PR，一句话搞定。
-
-<!-- TODO: 添加 demo 录屏（GIF 或视频），展示从需求到 PR 的完整流程 -->
+- **导航系统** — vision → plan → roadmap：AI 知道开往哪
+- **交通规则** — 5 角色并行评审 + 质量门禁 + 信任边界：AI 遵守规则
+- **行车记录仪** — 完整审计轨迹 + 跨会话学习 + 回顾：每个决策可追溯
 
 ---
 
@@ -108,59 +50,89 @@ flowchart LR
   style Ship fill:#fff,stroke:#222,stroke-width:2px,color:#000
 ```
 
-**计划评审**和**代码评审**都会派遣同样的 5 个并行评审者。被 2+ 角色发现的同一问题标注为 `[HIGH CONFIDENCE]`。
+一句需求输入 → 一个 PR 输出。计划和代码都经过 5 个并行 AI 评审者审查。2+ 角色标记同一问题时标注 `[HIGH CONFIDENCE]`。
 
 **Fix-First** 在呈现前分类每个评审发现：
-- **AUTO-FIX** — 高确定性 + 影响面小 + 可逆 → 立即修复，重新运行测试
-- **ASK** — 安全发现、行为变更、架构变更、低置信度 → 批量呈现，交由你决策
+- **AUTO-FIX** — 高确定性 + 影响面小 + 可逆 → 立即修复
+- **ASK** — 安全、行为变更、架构 → 批量呈现，交由你决策
+
+---
+
+## 快速开始
+
+### 0. 约 10 分钟上手
+
+**第一步** — 安装：
+
+```bash
+pip install harness-flow
+```
+
+**第二步** — 在项目中初始化：
+
+```bash
+cd <YOUR_PROJECT_PATH>
+harness init
+```
+
+**第三步** — 打开 Cursor，输入需求：
+
+```
+/harness-plan 给用户注册接口添加输入验证
+```
+
+就这样 — 计划、构建、5 角色评审、PR，一句话搞定。
+
+**你会看到：** agent 生成 spec + 合约，5 个评审者并行挑战计划，然后 agent 实现、跑 CI、再经过 5 角色代码评审、开 PR — 全程自主。
+
+<!-- TODO: 添加 demo 录屏（GIF 或视频），展示从需求到 PR 的完整流程 -->
+
+---
+
+## 深入了解
 
 <details>
-<summary><strong>5 角色评审详情</strong>（优雅降级 — 部分评审者失败时使用可用结果继续）</summary>
+<summary><strong>你的 AI 工程团队 — 5 个并行评审者</strong></summary>
 
-| 角色 | 计划审查 | 代码评审 |
+Harness 在 Cursor 内为你组建了一支**完整的工程团队** — 每个角色同时评审你的计划和代码：
+
+| 角色 | 计划评审 | 代码评审 |
 |------|---------|---------|
-| **架构师** | 可行性、模块影响、依赖变更 | 架构合规性、分层、耦合、安全 |
+| **架构师** | 可行性、模块影响、依赖变更 | 架构合规、分层、耦合、安全 |
 | **产品负责人** | vision 对齐、用户价值、验收标准 | 需求覆盖、行为正确性 |
 | **工程师** | 实现可行性、代码复用、技术债 | 代码质量、DRY、模式一致、性能 |
 | **QA** | 测试策略、边界值、回归风险 | 测试覆盖、边界场景、CI 健康度 |
 | **项目经理** | 任务分解、并行度、scope | scope 漂移、计划完成度、交付风险 |
 
-每个角色可通过配置中的 `[native.role_models]` 使用不同模型。无效配置自动回退到 IDE 默认模型。
+> **不是模拟** — 这些角色作为并行 AI 子代理运行，各自拥有独立系统提示，独立评分。2+ 角色标记同一问题标注为高置信度。
+
+每个角色可通过 `[native.role_models]` 使用不同模型。部分评审者失败时使用可用结果继续（优雅降级）。
 
 </details>
 
----
-
-## Harness 工程实践
-
-### 契约驱动开发
+<details>
+<summary><strong>契约驱动开发</strong></summary>
 
 每个任务都从 **spec + 合约** 开始 — 包含交付物、验收标准和风险分析 — 经 5 角色审查后才编写代码。
 
-合约保存在 `.harness-flow/tasks/task-NNN/plan.md`，作为任务范围和验收标准的唯一事实来源。运行态状态（阶段、门禁状态、产物引用）由同目录下的 `workflow-state.json` 追踪。
+合约保存在 `.harness-flow/tasks/task-NNN/plan.md`，作为唯一事实来源。运行态状态由同目录的 `workflow-state.json` 追踪。
 
----
+</details>
 
-### 对抗式多角色评审
-
-**5 个 AI 评审者**从不同角度**并行**挑战你的工作 — 两次：一次审查计划，一次审查代码。
-
-2+ 个角色标记同一问题时，标记为 `[HIGH CONFIDENCE]`。超出评审者职责范围的跨角色发现会被过滤 — 但 `CRITICAL` 级别的会保留为 `[CROSS-ROLE]`。如果部分评审者失败，管线使用可用结果继续（优雅降级）。
-
----
-
-### Fix-First 自动修复
+<details>
+<summary><strong>Fix-First 自动修复</strong></summary>
 
 每个评审发现在呈现给你之前都会被分类：
 
 - **AUTO-FIX**（高确定性 + 影响面小 + 可逆）→ 立即修复，重新运行测试
-- **ASK**（安全、行为变更、架构变更、低置信度）→ 批量呈现，交由你决策
+- **ASK**（安全、行为变更、架构、低置信度）→ 批量呈现，交由你决策
 
 典型自动修复：未使用的导入、过时注释、缺失的空值检查、命名不一致、明显的 N+1 查询。
 
----
+</details>
 
-### 完整审计轨迹
+<details>
+<summary><strong>完整审计轨迹</strong></summary>
 
 计划、评审、构建日志、门禁结果 — 按任务持久化。每个决策都可追溯。
 
@@ -179,21 +151,11 @@ flowchart LR
     └── ...                  # feedback ledger、intervention audit 等（可选）
 ```
 
+</details>
+
 ---
 
 ## 安装与升级
-
-```mermaid
-flowchart LR
-  S1["安装\npip install harness-flow"]
-  S2["初始化\nharness init"]
-  S3["升级\nharness update"]
-  S1 --> S2 --> S3
-
-  style S1 fill:#fff,stroke:#222,stroke-width:2px,color:#000
-  style S2 fill:#fff,stroke:#222,stroke-width:2px,color:#000
-  style S3 fill:#222,stroke:#222,stroke-width:2px,color:#fff
-```
 
 | 命令 | 说明 |
 |------|------|
@@ -207,17 +169,17 @@ flowchart LR
 
 ## 所有技能
 
-**默认（大多数任务）：** `/harness-plan` — 任务边界已清楚时的单轮 plan → ship 路径。
+**默认（大多数任务）：** `/harness-plan` — 单轮 plan → ship 路径。
+
+`/harness-vision` 涵盖从模糊想法到清晰方向的全部场景——自动判断需要探索还是澄清。
 
 <details>
-<summary><strong>进阶入口</strong></summary>
-
-`/harness-vision` 涵盖从模糊想法到清晰方向的全部场景——自动判断需要探索还是澄清；单轮 plan → ship 时用 **`/harness-plan`**（single-round plan）。
+<summary><strong>入口</strong></summary>
 
 | 技能 | 何时用 | 功能 |
 |------|--------|------|
-| `/harness-vision` | "我有个想法"或"我有个方向" | 探索或澄清 → 结构化 vision → roadmap/backlog → 迭代式构建/评审/发布循环 |
 | `/harness-plan` | "我有个需求" | 细化计划 + 5 角色审查 → 自动构建/评审/发布/回顾 |
+| `/harness-vision` | "我有个想法"或"我有个方向" | 探索或澄清 → 结构化 vision → roadmap/backlog → 迭代式构建/评审/发布循环 |
 
 </details>
 
