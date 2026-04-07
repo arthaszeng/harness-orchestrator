@@ -135,25 +135,48 @@ Each role can use a different model via `[native.role_models]` in config. Invali
 
 ### Contract-Driven Development
 
-Every task starts with a **spec + contract** reviewed by 5 roles — no code without a plan.
+Every task starts with a **spec + contract** — deliverables, acceptance criteria, and risk analysis — reviewed by 5 roles before any code is written.
+
+The contract lives in `.harness-flow/tasks/task-NNN/plan.md` and serves as the single source of truth throughout the task lifecycle. Build logs, review rounds, and ship metrics all reference back to it.
 
 ---
 
 ### Adversarial Multi-Role Review
 
-**5 AI reviewers** challenge your code from different angles, **in parallel**. Weak spots get caught before merge.
+**5 AI reviewers** challenge your work from different angles, **in parallel** — twice: once for the plan, once for the code.
+
+Findings from 2+ roles on the same issue are flagged `[HIGH CONFIDENCE]`. Cross-role findings that fall outside a reviewer's domain are filtered to keep signal clean. If some reviewers fail, the pipeline continues with available perspectives (graceful degradation).
 
 ---
 
 ### Fix-First Auto-Remediation
 
-Trivial findings are **fixed instantly** — unused imports, stale comments, missing null checks. You only see what matters.
+Every review finding is classified before presenting it to you:
+
+- **AUTO-FIX** (high certainty + small blast radius + reversible) → fixed immediately, tests re-run
+- **ASK** (security, behavior change, architecture, low confidence) → batched and presented for your decision
+
+Typical auto-fixes: unused imports, stale comments, missing null checks, naming inconsistencies, obvious N+1 queries.
 
 ---
 
 ### Full Audit Trail
 
-Plans, reviews, build logs, gate results — all persisted in `.harness-flow/tasks/`. **Every decision is traceable.**
+Plans, reviews, build logs, gate results — all persisted per task. Every decision is traceable.
+
+```
+.harness-flow/
+├── config.toml              # project settings (CI command, trunk branch, language)
+├── vision.md                # product direction (optional)
+└── tasks/task-NNN/
+    ├── plan.md              # spec + contract
+    ├── handoff-plan.json    # structured context passed to build phase
+    ├── build-rN.md          # build log per round
+    ├── plan-eval-rN.md      # plan review per round
+    ├── code-eval-rN.md      # code review per round
+    ├── ship-metrics.json    # delivery metrics (scores, test count, coverage)
+    └── workflow-state.json  # canonical task phase / gate / blocker tracking
+```
 
 ---
 
