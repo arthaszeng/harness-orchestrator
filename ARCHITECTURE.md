@@ -46,6 +46,9 @@ Built with **Typer**. Core commands:
 | `git-prepare-branch` | Create/resume task branch on top of configured trunk.                                                            |
 | `git-sync-trunk`     | Sync the current feature branch against configured trunk.                                                        |
 | `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup (with wait-merge watcher mode). |
+| `worktree create`    | Create a git worktree with isolated branch, task directory, and IDE artifact copies.                             |
+| `worktree list`      | List all harness-managed worktrees with status (active/stale/unmanaged).                                         |
+| `worktree remove`    | Remove a worktree, clean up registry, and optionally prune the local branch.                                     |
 | `update`             | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes.                            |
 
 
@@ -120,6 +123,23 @@ Detects whether the current cwd is inside a Cursor parallel-agent git worktree
 with branch, common dir, and git dir. Used by `status` for worktree identity
 display and by worktree setup scripts for automatic `HARNESS_TASK_ID` binding.
 Isolation is task-resolution + UX scoped; no file-level distributed locking.
+
+### `worktree_lifecycle.py`
+
+Creates, lists, and removes git worktrees for parallel-agent isolation.
+`WorktreeLifecycleManager` orchestrates the full lifecycle:
+
+- **`create_worktree(task_key, short_desc)`** — `git worktree add -b` from trunk,
+  white-list copies IDE artifacts (`.cursor/skills`, `agents`, `rules`, `worktrees.json`)
+  and config files (`.harness-flow/config.toml`, `vision.md`), creates a task directory,
+  and registers the worktree in `.harness-flow/worktrees-registry.json`.
+- **`list_worktrees()`** — cross-references the JSON registry with `git worktree list --porcelain`
+  to classify entries as `active`, `stale` (registry-only), or `unmanaged` (git-only).
+- **`remove_worktree(identifier, prune_branch, force)`** — runs `git worktree remove`,
+  updates the registry atomically, and optionally deletes the local branch.
+
+Registry writes use atomic replace (`tempfile` + `os.replace`) to prevent partial writes.
+Distinct from `worktree.py` which provides read-only detection and branch→task-key extraction.
 
 ### `task_identity.py`
 
@@ -250,6 +270,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 - `.stop` — optional graceful stop flag (typically gitignored).
 - `tasks/`, `archive/` — task artifacts and history (convention from harness workflow docs).
 - `tasks/task-NNN/workflow-state.json` — canonical task-level phase/gate/blocker/artifact state.
+- `worktrees-registry.json` — JSON registry of harness-managed git worktrees (path, branch, task key, status).
 
 **Generated IDE (`.cursor/`)**
 
