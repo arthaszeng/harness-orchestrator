@@ -39,10 +39,6 @@ def _ok_result(**kw: object) -> GitOperationResult:
     return GitOperationResult(ok=True, code="OK", message="ok", **kw)
 
 
-def _fail_result(code: str = "FAIL", msg: str = "failed") -> GitOperationResult:
-    return GitOperationResult(ok=False, code=code, message=msg)
-
-
 class TestConcurrentRegistryWrite:
     """Registry writes under concurrent access — documented behavior: last-writer-wins.
 
@@ -164,11 +160,17 @@ class TestArtifactCopyIdempotency:
 class TestConcurrentCreateWorktreeSameKey:
     """Two threads calling create_worktree with the same task key concurrently.
 
-    Expected: at most one succeeds (path/registry guard), no registry corruption.
-    With mock git, the path-exists or registry-duplicate check should catch the race.
+    Under full mock (run_git_result always ok), the path-exists guard is the
+    primary mutual exclusion mechanism.  With Barrier-synced reads, both threads
+    may pass the registry-duplicate check simultaneously (known LWW limitation).
+
+    Invariants tested:
+    - Both threads complete without crash
+    - Final registry is valid JSON with correct schema
+    - At least one task-099 entry exists in registry
     """
 
-    def test_concurrent_create_same_key_at_most_one_succeeds(self, tmp_path: Path):
+    def test_concurrent_create_same_key_no_corruption(self, tmp_path: Path):
         _make_config(tmp_path)
         mgr = WorktreeLifecycleManager(tmp_path)
 
@@ -178,7 +180,6 @@ class TestConcurrentCreateWorktreeSameKey:
         original_read = mgr._read_registry
 
         def delayed_read_registry() -> list[dict]:
-            """Add barrier sync after read to maximize race window."""
             data = original_read()
             barrier.wait()
             return data
@@ -193,27 +194,26 @@ class TestConcurrentCreateWorktreeSameKey:
 
         wt_path = tmp_path.parent / f"{tmp_path.name}-wt-task-099"
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(create_in_thread, i) for i in range(2)]
-            for f in as_completed(futures):
-                f.result()
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(create_in_thread, i) for i in range(2)]
+                for f in as_completed(futures):
+                    f.result()
 
-        successes = [r for r in results if r is not None and r.ok]
-        failures = [r for r in results if r is not None and not r.ok]
+            assert all(r is not None for r in results), "Both threads must complete"
 
-        assert len(successes) + len(failures) == 2, "Both threads must complete"
+            reg_text = mgr._registry_path.read_text(encoding="utf-8")
+            data = json.loads(reg_text)
+            assert isinstance(data, dict)
+            assert data.get("version") == REGISTRY_VERSION
+            assert isinstance(data.get("worktrees"), list)
 
-        reg_text = mgr._registry_path.read_text(encoding="utf-8")
-        data = json.loads(reg_text)
-        assert isinstance(data, dict)
-        assert isinstance(data.get("worktrees"), list)
-
-        task_099_entries = [e for e in data["worktrees"] if e.get("task_key") == "task-099"]
-        assert len(task_099_entries) >= 1, "At least one registration must exist"
-
-        import shutil
-        if wt_path.exists():
-            shutil.rmtree(wt_path)
+            task_099_entries = [e for e in data["worktrees"] if e.get("task_key") == "task-099"]
+            assert len(task_099_entries) >= 1, "At least one registration must exist"
+        finally:
+            import shutil
+            if wt_path.exists():
+                shutil.rmtree(wt_path)
 
 
 class TestDetectWorktreeEdgeCases:
@@ -242,16 +242,21 @@ class TestDetectWorktreeEdgeCases:
                 detect_worktree(tmp_path)
 
     def test_malformed_git_output_no_null(self, tmp_path: Path):
-        """Git returning non-path garbage (no null bytes) should not crash."""
+        """Git returning non-path garbage (no null bytes) should not crash.
+
+        When both common_dir and git_dir resolve to different garbage paths,
+        detect_worktree may return a WorktreeInfo with those paths.  The key
+        invariant: no unhandled exception.
+        """
         import subprocess
-        from harness.core.worktree import detect_worktree
+        from harness.core.worktree import WorktreeInfo, detect_worktree
 
         def mock_run(args, cwd, *, timeout=30):
             return subprocess.CompletedProcess(args, 0, stdout="!@#$%^&*()\n")
 
         with patch("harness.core.worktree.run_git", side_effect=mock_run):
             result = detect_worktree(tmp_path)
-            assert result is None or isinstance(result, object)
+            assert result is None
 
     def test_empty_stdout(self, tmp_path: Path):
         """Git returning empty output should return None."""
@@ -266,7 +271,11 @@ class TestDetectWorktreeEdgeCases:
             assert result is None
 
     def test_whitespace_only_stdout(self, tmp_path: Path):
-        """Git returning whitespace-only output should handle gracefully."""
+        """Git returning whitespace-only output should not crash.
+
+        After strip(), both paths resolve to the same dir (cwd), so
+        common_dir == git_dir → returns None.
+        """
         import subprocess
         from harness.core.worktree import detect_worktree
 
@@ -275,4 +284,4 @@ class TestDetectWorktreeEdgeCases:
 
         with patch("harness.core.worktree.run_git", side_effect=mock_run):
             result = detect_worktree(tmp_path)
-            assert result is None or isinstance(result, object)
+            assert result is None
