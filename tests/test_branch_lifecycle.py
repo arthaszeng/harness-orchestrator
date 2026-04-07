@@ -61,22 +61,26 @@ def test_prepare_task_branch_rejects_dirty_repo(tmp_path: Path, monkeypatch):
 
 
 def test_sync_feature_with_trunk_reports_rebase_conflict(tmp_path: Path, monkeypatch):
+    """Rebase conflict on non-auto-resolvable file → abort with conflict file list."""
     manager = _manager(tmp_path)
-    responses = iter(
-        [
-            GitOperationResult(ok=True, code="OK", message="fetch ok"),
-            GitOperationResult(ok=False, code="REBASE_CONFLICT", message="rebase failed"),
-            GitOperationResult(ok=True, code="OK", message="abort ok"),
-        ]
-    )
 
-    monkeypatch.setattr(
-        "harness.core.branch_lifecycle.run_git_result",
-        lambda *args, **kwargs: next(responses),
-    )
+    def _mock_git(args, *_a, **_kw):
+        cmd = args[0] if args else ""
+        if cmd == "fetch":
+            return GitOperationResult(ok=True, code="OK", message="fetch ok")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="rebase failed")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout="src/main.py\n")
+        if args[:2] == ["rebase", "--abort"]:
+            return GitOperationResult(ok=True, code="OK", message="abort ok")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
     result = manager.sync_feature_with_trunk()
     assert result.ok is False
     assert result.code == "REBASE_CONFLICT"
+    assert "src/main.py" in result.context.get("manual_conflict_files", "")
 
 
 def test_prepare_task_branch_skips_when_worktree(tmp_path: Path, monkeypatch):
@@ -90,22 +94,124 @@ def test_prepare_task_branch_skips_when_worktree(tmp_path: Path, monkeypatch):
     assert result.code == "WORKTREE_SKIP"
 
 
-def test_sync_feature_with_trunk_reports_abort_failure(tmp_path: Path, monkeypatch):
+def test_sync_feature_with_trunk_auto_resolves_lock_files(tmp_path: Path, monkeypatch):
+    """Lock file conflict → auto-resolve with --ours, rebase --continue succeeds."""
     manager = _manager(tmp_path)
-    responses = iter(
-        [
-            GitOperationResult(ok=True, code="OK", message="fetch ok"),
-            GitOperationResult(ok=False, code="REBASE_CONFLICT", message="rebase failed"),
-            GitOperationResult(ok=False, code="REBASE_ABORT_FAILED", message="abort failed"),
-        ]
-    )
-    monkeypatch.setattr(
-        "harness.core.branch_lifecycle.run_git_result",
-        lambda *args, **kwargs: next(responses),
-    )
+
+    def _mock_git(args, *_a, **_kw):
+        cmd = args[0] if args else ""
+        if cmd == "fetch":
+            return GitOperationResult(ok=True, code="OK", message="fetch ok")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="rebase failed")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout="poetry.lock\n")
+        if args == ["checkout", "--ours", "poetry.lock"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["add", "poetry.lock"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "--continue"]:
+            return GitOperationResult(ok=True, code="OK", message="continue ok")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
+    result = manager.sync_feature_with_trunk()
+    assert result.ok is True
+    assert result.code == "REBASE_AUTO_RESOLVED"
+    assert "poetry.lock" in result.context.get("auto_resolved_files", "")
+
+
+def test_sync_feature_with_trunk_auto_resolves_cursor_files(tmp_path: Path, monkeypatch):
+    """Files under .cursor/ → auto-resolve."""
+    manager = _manager(tmp_path)
+
+    def _mock_git(args, *_a, **_kw):
+        if args == ["fetch", "origin", "main"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="conflict")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout=".cursor/rules/foo.mdc\n")
+        if args[:2] == ["checkout", "--ours"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args[0] == "add":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "--continue"]:
+            return GitOperationResult(ok=True, code="OK")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
+    result = manager.sync_feature_with_trunk()
+    assert result.ok is True
+    assert result.code == "REBASE_AUTO_RESOLVED"
+
+
+def test_sync_feature_with_trunk_mixed_conflict_aborts(tmp_path: Path, monkeypatch):
+    """Mix of auto-resolvable and manual files → abort with context."""
+    manager = _manager(tmp_path)
+
+    def _mock_git(args, *_a, **_kw):
+        if args[0] == "fetch":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="conflict")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout="poetry.lock\nsrc/app.py\n")
+        if args[:2] == ["rebase", "--abort"]:
+            return GitOperationResult(ok=True, code="OK")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
     result = manager.sync_feature_with_trunk()
     assert result.ok is False
-    assert result.code == "REBASE_ABORT_FAILED"
+    assert result.code == "REBASE_CONFLICT"
+    assert "src/app.py" in result.context.get("manual_conflict_files", "")
+
+
+def test_sync_feature_with_trunk_no_conflict(tmp_path: Path, monkeypatch):
+    """No conflict → normal success."""
+    manager = _manager(tmp_path)
+
+    def _mock_git(args, *_a, **_kw):
+        if args[0] == "fetch":
+            return GitOperationResult(ok=True, code="OK")
+        if args[:1] == ["rebase"]:
+            return GitOperationResult(ok=True, code="OK", message="rebase ok")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
+    result = manager.sync_feature_with_trunk()
+    assert result.ok is True
+    assert result.code == "OK"
+
+
+def test_sync_feature_with_trunk_continue_fails_non_conflict(tmp_path: Path, monkeypatch):
+    """Auto-resolve succeeds but rebase --continue fails for non-conflict reason → abort."""
+    manager = _manager(tmp_path)
+
+    def _mock_git(args, *_a, **_kw):
+        if args[0] == "fetch":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="conflict")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout="poetry.lock\n")
+        if args[:2] == ["checkout", "--ours"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args[0] == "add":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "--continue"]:
+            return GitOperationResult(ok=False, code="REBASE_CONTINUE_FAILED", message="hook failed")
+        if args == ["status", "--porcelain"]:
+            return GitOperationResult(ok=True, code="OK", stdout="M src/foo.py\n")
+        if args[:2] == ["rebase", "--abort"]:
+            return GitOperationResult(ok=True, code="OK")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
+    result = manager.sync_feature_with_trunk()
+    assert result.ok is False
+    assert result.code == "REBASE_CONTINUE_FAILED"
 
 
 def test_prepare_task_branch_resumes_existing_branch(tmp_path: Path, monkeypatch):
