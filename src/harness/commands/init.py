@@ -479,7 +479,6 @@ _GITIGNORE_RULES: list[str] = [
     ".cursor/skills/harness/",
     ".cursor/agents/harness-*.md",
     ".cursor/rules/harness-*.mdc",
-    ".cursor/worktrees.json",
 ]
 
 

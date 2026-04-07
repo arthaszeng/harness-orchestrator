@@ -314,23 +314,6 @@ def _render_template(tmpl_dir: Path, tmpl_name: str, context: dict[str, str]) ->
     return tmpl.render(**context)
 
 
-_WORKTREES_JSON = {
-    "setup-worktree-unix": [
-        "mkdir -p .harness-flow/tasks .harness-flow/archive",
-        'cp "$ROOT_WORKTREE_PATH/.harness-flow/config.toml" .harness-flow/ 2>/dev/null || true',
-        'cp "$ROOT_WORKTREE_PATH/.harness-flow/vision.md" .harness-flow/ 2>/dev/null || true',
-        'cp -r "$ROOT_WORKTREE_PATH/.cursor" . 2>/dev/null || true',
-        'TASK_ID=$(git branch --show-current 2>/dev/null | sed -n "s|^agent/\\(task-[0-9]*\\).*|\\1|p") && [ -n "$TASK_ID" ] && export HARNESS_TASK_ID="$TASK_ID"',
-    ],
-    "setup-worktree-windows": [
-        "mkdir .harness-flow\\tasks 2>nul & mkdir .harness-flow\\archive 2>nul",
-        'copy "%ROOT_WORKTREE_PATH%\\.harness-flow\\config.toml" .harness-flow\\ 2>nul',
-        'copy "%ROOT_WORKTREE_PATH%\\.harness-flow\\vision.md" .harness-flow\\ 2>nul',
-        'xcopy /E /I /Y "%ROOT_WORKTREE_PATH%\\.cursor" .cursor\\ 2>nul',
-        'for /f "tokens=2 delims=/" %%a in (\'git branch --show-current 2^>nul\') do for /f "tokens=1,2 delims=-" %%b in ("%%a") do if "%%b"=="task" set "HARNESS_TASK_ID=task-%%c"',
-    ],
-}
-
 
 def generate_native_artifacts(
     project_root: Path,
@@ -421,9 +404,6 @@ def generate_native_artifacts(
         typer.echo(t("native.generated_skill", path=_rel(project_root, dest)))
         count += 1
 
-    # Worktrees config → .cursor/worktrees.json
-    count += _generate_worktrees_json(project_root, force=force)
-
     if skipped:
         typer.echo(
             f"  [warn] {count} files generated, {len(skipped)} skipped due to errors: "
@@ -433,30 +413,6 @@ def generate_native_artifacts(
     typer.echo(t("native.done", count=count))
     return count
 
-
-def _generate_worktrees_json(project_root: Path, *, force: bool = False) -> int:
-    """Write .cursor/worktrees.json for Cursor Parallel Agents support.
-
-    Skips if the file already exists and *force* is False, because users may
-    have added project-specific setup commands.  Returns 1 if written, 0 if
-    skipped.
-    """
-    import json
-
-    cursor_dir = project_root / ".cursor"
-    cursor_dir.mkdir(parents=True, exist_ok=True)
-    out_path = cursor_dir / "worktrees.json"
-
-    if out_path.exists() and not force:
-        typer.echo(t("native.worktrees_skip", path=_rel(project_root, out_path)))
-        return 0
-
-    out_path.write_text(
-        json.dumps(_WORKTREES_JSON, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    typer.echo(t("native.worktrees_ok", path=_rel(project_root, out_path)))
-    return 1
 
 
 def _rel(root: Path, path: Path) -> str:

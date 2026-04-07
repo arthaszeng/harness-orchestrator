@@ -237,8 +237,8 @@ def test_generate_deploys_resource_files(tmp_path: Path):
     )
     cfg = HarnessConfig.load(tmp_path)
     count = generate_native_artifacts(tmp_path, cfg=cfg)
-    # 10 skills + 5 agents + 4 rules + 5 resources + 1 worktrees.json = 25
-    assert count >= 25
+    # 10 skills + 5 agents + 4 rules + 5 resources = 24
+    assert count >= 24
 
     eval_dir = tmp_path / ".cursor" / "skills" / "harness" / "harness-eval"
     assert (eval_dir / "review-checklist.md").exists()
@@ -1018,86 +1018,6 @@ def test_review_gate_references_plan_review_scores(tmp_path: Path):
     assert "plan review aggregate score" in content
     assert "Arch" in content
     assert "Aggregate" in content
-
-
-# --- Worktrees.json generation ---
-
-
-def test_worktrees_json_generated(tmp_path: Path):
-    """generate_native_artifacts creates .cursor/worktrees.json."""
-    cfg = _make_cfg(tmp_path)
-    generate_native_artifacts(tmp_path, cfg=cfg)
-    wt = tmp_path / ".cursor" / "worktrees.json"
-    assert wt.exists()
-    data = json.loads(wt.read_text(encoding="utf-8"))
-    assert "setup-worktree-unix" in data
-    assert "setup-worktree-windows" in data
-
-
-def test_worktrees_json_unix_scripts_correct(tmp_path: Path):
-    """Unix setup scripts copy .harness-flow/ config and .cursor/ directory."""
-    cfg = _make_cfg(tmp_path)
-    generate_native_artifacts(tmp_path, cfg=cfg)
-    data = json.loads((tmp_path / ".cursor" / "worktrees.json").read_text(encoding="utf-8"))
-    unix = data["setup-worktree-unix"]
-    assert isinstance(unix, list)
-    assert any("mkdir" in cmd and ".harness-flow/tasks" in cmd for cmd in unix)
-    assert any("config.toml" in cmd for cmd in unix)
-    assert any("vision.md" in cmd for cmd in unix)
-    assert any(".cursor" in cmd and "cp" in cmd for cmd in unix)
-    assert any("HARNESS_TASK_ID" in cmd for cmd in unix), "unix scripts should export HARNESS_TASK_ID"
-
-
-def test_worktrees_json_windows_scripts_correct(tmp_path: Path):
-    """Windows setup scripts use xcopy and Windows path separators."""
-    cfg = _make_cfg(tmp_path)
-    generate_native_artifacts(tmp_path, cfg=cfg)
-    data = json.loads((tmp_path / ".cursor" / "worktrees.json").read_text(encoding="utf-8"))
-    win = data["setup-worktree-windows"]
-    assert isinstance(win, list)
-    assert any("mkdir" in cmd and ".harness-flow" in cmd for cmd in win)
-    assert any("config.toml" in cmd for cmd in win)
-    assert any("vision.md" in cmd for cmd in win)
-    assert any("xcopy" in cmd and ".cursor" in cmd for cmd in win)
-    assert any("HARNESS_TASK_ID" in cmd for cmd in win), "windows scripts should set HARNESS_TASK_ID"
-
-
-def test_worktrees_json_skip_when_exists_no_force(tmp_path: Path):
-    """Existing worktrees.json is preserved when force=False."""
-    cfg = _make_cfg(tmp_path)
-    cursor_dir = tmp_path / ".cursor"
-    cursor_dir.mkdir(parents=True, exist_ok=True)
-    sentinel = '{"custom": true}\n'
-    (cursor_dir / "worktrees.json").write_text(sentinel, encoding="utf-8")
-
-    generate_native_artifacts(tmp_path, cfg=cfg, force=False)
-
-    assert (cursor_dir / "worktrees.json").read_text(encoding="utf-8") == sentinel
-
-
-def test_worktrees_json_overwrite_when_force(tmp_path: Path):
-    """Existing worktrees.json is overwritten when force=True."""
-    cfg = _make_cfg(tmp_path)
-    cursor_dir = tmp_path / ".cursor"
-    cursor_dir.mkdir(parents=True, exist_ok=True)
-    (cursor_dir / "worktrees.json").write_text('{"custom": true}\n', encoding="utf-8")
-
-    generate_native_artifacts(tmp_path, cfg=cfg, force=True)
-
-    data = json.loads((cursor_dir / "worktrees.json").read_text(encoding="utf-8"))
-    assert "setup-worktree-unix" in data
-    assert "custom" not in data
-
-
-def test_worktrees_json_count_incremented(tmp_path: Path):
-    """worktrees.json is counted in the returned artifact count."""
-    cfg = _make_cfg(tmp_path)
-    count_with = generate_native_artifacts(tmp_path, cfg=cfg, force=True)
-
-    (tmp_path / ".cursor" / "worktrees.json").write_text('{"x":1}', encoding="utf-8")
-    count_without = generate_native_artifacts(tmp_path, cfg=cfg, force=False)
-
-    assert count_with == count_without + 1
 
 
 # --- resolve_native_lang ---

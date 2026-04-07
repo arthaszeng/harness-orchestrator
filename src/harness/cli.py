@@ -91,14 +91,6 @@ def workflow_next_cmd(
 app.add_typer(workflow_cli, name="workflow")
 
 
-def _register_worktree_cli() -> None:
-    from harness.commands.worktree import worktree_cli
-
-    app.add_typer(worktree_cli, name="worktree")
-
-
-_register_worktree_cli()
-
 
 @app.command()
 def init(

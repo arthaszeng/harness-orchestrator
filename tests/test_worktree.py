@@ -105,3 +105,47 @@ class TestExtractTaskIdFromBranch:
         from harness.core.worktree import extract_task_key_from_branch
 
         assert extract_task_key_from_branch("feat/task-123-scope", cwd=tmp_path) == "task-123"
+
+
+class TestDetectWorktreeEdgeCases:
+    """Edge cases for detect_worktree: malformed stdout, empty stdout, whitespace-only."""
+
+    def test_malformed_git_output_with_null_bytes(self, tmp_path: Path):
+        """Null bytes in git stdout → ValueError (documents current behavior)."""
+
+        def mock_run(args, cwd, *, timeout=30):
+            return subprocess.CompletedProcess(args, 0, stdout="\x00\xff\n")
+
+        with patch("harness.core.worktree.run_git", side_effect=mock_run):
+            with pytest.raises(ValueError, match="null (byte|character)"):
+                detect_worktree(tmp_path)
+
+    def test_malformed_git_output_no_null(self, tmp_path: Path):
+        """Non-path garbage (no null bytes) should not crash."""
+
+        def mock_run(args, cwd, *, timeout=30):
+            return subprocess.CompletedProcess(args, 0, stdout="!@#$%^&*()\n")
+
+        with patch("harness.core.worktree.run_git", side_effect=mock_run):
+            result = detect_worktree(tmp_path)
+            assert result is None
+
+    def test_empty_stdout(self, tmp_path: Path):
+        """Empty git output should return None."""
+
+        def mock_run(args, cwd, *, timeout=30):
+            return subprocess.CompletedProcess(args, 0, stdout="")
+
+        with patch("harness.core.worktree.run_git", side_effect=mock_run):
+            result = detect_worktree(tmp_path)
+            assert result is None
+
+    def test_whitespace_only_stdout(self, tmp_path: Path):
+        """Whitespace-only output: after strip(), both resolve to same dir → None."""
+
+        def mock_run(args, cwd, *, timeout=30):
+            return subprocess.CompletedProcess(args, 0, stdout="   \n  \t  ")
+
+        with patch("harness.core.worktree.run_git", side_effect=mock_run):
+            result = detect_worktree(tmp_path)
+            assert result is None

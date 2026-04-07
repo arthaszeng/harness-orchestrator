@@ -62,19 +62,9 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     **跳过步骤 4–5。** 继续下一阶段。
 
   - **task key 不同**（当前分支属于另一个任务/agent）：
-    **不要在此分支上继续。** 使用 worktree 创建隔离的工作环境：
-    1. 确定下一个任务编号（按步骤 5 的方式计算 task-NNN）
-    2. 创建 worktree：
-       ```bash
-       harness worktree create task-NNN --desc <short-desc> --json
-       ```
-    3. 迁移到 worktree 目录（使用 Cursor MCP `move_agent_to_root`）：
-       ```
-       CallMcpTool: cursor-app-control / move_agent_to_root
-       arguments: { "path": "<worktree 路径>" }
-       ```
-       如果 MCP 不可用，提示用户在新 worktree 目录中打开 Cursor 窗口。
-    4. 迁移后，**从步骤 1 重新开始预检**（此时将检测到 worktree 环境并在步骤 2 短路）。
+    **不要在此分支上继续。** 引导用户在独立的 worktree 中启动新 agent：
+    1. 提示用户："当前分支属于另一个任务。请在 Cursor 中新建 agent 时指定一个独立的 worktree 目录，或手动切换到正确的分支。"
+    2. **中止** — 不要在属于其他任务的分支上继续操作。
 
   - **task key 为空**（提取失败，如非标准分支名 `{{ branch_prefix }}/foo-bar`）：
     按**恢复任务**处理（与 task key 相同的路径一致）。
