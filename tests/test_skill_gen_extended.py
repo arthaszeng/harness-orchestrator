@@ -1,6 +1,5 @@
 """skill_gen.py 扩展功能测试：角色裁剪、项目语言检测、hook、资源部署、递归组合、5 角色系统"""
 
-import json
 from pathlib import Path
 from unittest.mock import patch
 
