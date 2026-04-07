@@ -199,6 +199,7 @@ class PostShipManager:
             )
 
         if not task_branch:
+            self._cleanup_worktree(task_key)
             return GitOperationResult(
                 ok=True,
                 code="POST_SHIP_DONE",
@@ -284,12 +285,12 @@ class PostShipManager:
 
             mgr = WorktreeLifecycleManager(project_root=root)
             entries = mgr.list_worktrees()
-            match = [e for e in entries if e.get("task_key") == task_key]
+            match = [e for e in entries if e.task_key == task_key]
             if not match:
                 return
 
             for entry in match:
-                identifier = entry.get("task_key") or entry.get("branch", "")
+                identifier = entry.task_key or entry.branch
                 result = mgr.remove_worktree(identifier, prune_branch=False, force=True)
                 if result.ok:
                     _log.info("post-ship: removed worktree for %s", task_key)

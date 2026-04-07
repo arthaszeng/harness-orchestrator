@@ -375,6 +375,8 @@ def test_resolve_task_branch_rejects_mismatched_pr_head_ref(tmp_path: Path, monk
 
 def test_cleanup_worktree_removes_matching_entry(tmp_path: Path, monkeypatch):
     """Post-ship cleanup finds matching worktree entry and removes it."""
+    from harness.core.worktree_lifecycle import WorktreeEntry
+
     manager = _manager(tmp_path)
     removed: list[str] = []
 
@@ -383,7 +385,7 @@ def test_cleanup_worktree_removes_matching_entry(tmp_path: Path, monkeypatch):
             pass
 
         def list_worktrees(self):
-            return [{"task_key": "task-006", "branch": "agent/task-006-demo"}]
+            return [WorktreeEntry(task_key="task-006", branch="agent/task-006-demo", path="/tmp/wt", created_at="")]
 
         def remove_worktree(self, identifier, *, prune_branch=True, force=False):
             removed.append(identifier)
@@ -400,6 +402,8 @@ def test_cleanup_worktree_removes_matching_entry(tmp_path: Path, monkeypatch):
 
 def test_cleanup_worktree_no_matching_entry(tmp_path: Path, monkeypatch):
     """Post-ship cleanup with no matching worktree entry does nothing."""
+    from harness.core.worktree_lifecycle import WorktreeEntry
+
     manager = _manager(tmp_path)
     removed: list[str] = []
 
@@ -408,7 +412,7 @@ def test_cleanup_worktree_no_matching_entry(tmp_path: Path, monkeypatch):
             pass
 
         def list_worktrees(self):
-            return [{"task_key": "task-999", "branch": "agent/task-999"}]
+            return [WorktreeEntry(task_key="task-999", branch="agent/task-999", path="/tmp/wt", created_at="")]
 
         def remove_worktree(self, identifier, **_kw):
             removed.append(identifier)

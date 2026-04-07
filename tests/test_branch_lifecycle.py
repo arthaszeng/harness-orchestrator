@@ -168,6 +168,40 @@ def test_sync_feature_with_trunk_mixed_conflict_aborts(tmp_path: Path, monkeypat
     assert "src/app.py" in result.context.get("manual_conflict_files", "")
 
 
+def test_sync_feature_with_trunk_multi_commit_auto_resolve(tmp_path: Path, monkeypatch):
+    """Multi-commit rebase: first continue triggers new conflict, second resolves."""
+    manager = _manager(tmp_path)
+    continue_count = {"n": 0}
+
+    def _mock_git(args, *_a, **_kw):
+        if args[0] == "fetch":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "origin/main"]:
+            return GitOperationResult(ok=False, code="REBASE_CONFLICT", message="conflict")
+        if args == ["diff", "--name-only", "--diff-filter=U"]:
+            return GitOperationResult(ok=True, code="OK", stdout="poetry.lock\n")
+        if args[:2] == ["checkout", "--ours"]:
+            return GitOperationResult(ok=True, code="OK")
+        if args[0] == "add":
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["rebase", "--continue"]:
+            continue_count["n"] += 1
+            if continue_count["n"] == 1:
+                return GitOperationResult(ok=False, code="REBASE_CONTINUE_FAILED", message="next commit conflict")
+            return GitOperationResult(ok=True, code="OK")
+        if args == ["status", "--porcelain"]:
+            if continue_count["n"] == 1:
+                return GitOperationResult(ok=True, code="OK", stdout="UU poetry.lock\n")
+            return GitOperationResult(ok=True, code="OK", stdout="")
+        return GitOperationResult(ok=True, code="OK")
+
+    monkeypatch.setattr("harness.core.branch_lifecycle.run_git_result", _mock_git)
+    result = manager.sync_feature_with_trunk()
+    assert result.ok is True
+    assert result.code == "REBASE_AUTO_RESOLVED"
+    assert continue_count["n"] == 2
+
+
 def test_sync_feature_with_trunk_no_conflict(tmp_path: Path, monkeypatch):
     """No conflict → normal success."""
     manager = _manager(tmp_path)
