@@ -387,8 +387,8 @@ def load_current_workflow_state(
 
     When *explicit_task_id* or *env_task_id* (including ``HARNESS_TASK_ID``)
     resolves to a directory, that result is authoritative — the session
-    mismatch guard is skipped so that worktree-copied ``state.json`` with
-    a stale ``session_task_id`` does not block state loading.
+    mismatch guard is skipped so that a copied ``state.json`` with a stale
+    ``session_task_id`` does not block state loading.
     """
     if env_task_id is None:
         env_task_id = os.environ.get("HARNESS_TASK_ID") or None

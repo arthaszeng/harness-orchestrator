@@ -10,7 +10,8 @@
 - **Removed worktree subsystem**: `harness.core.worktree` module and `harness.commands.worktree_init` deleted. Worktree symlink setup is now handled by Cursor's native `.cursor/worktrees.json` post-create hook. If not using Cursor, create symlinks manually: `ln -sfn <main-tree>/.harness-flow .harness-flow` and similarly for `.cursor/skills/harness`, `.cursor/agents`, `.cursor/rules`.
 - **Removed `context.worktree` field** from `harness git-preflight --json` output. Scripts consuming this field should remove the check.
 - **Removed `WORKTREE_SKIP`** return from `prepare_task_branch()` in linked worktrees. Branch preparation now executes normally regardless of worktree status.
-- **Renamed `DirtyWorktreeError`** → `DirtyWorkingTreeError` in `harness.integrations.git_ops`. A compatibility alias `DirtyWorktreeError` is retained.
+- **Removed `DirtyWorktreeError` compatibility alias** in `harness.integrations.git_ops`. Use `DirtyWorkingTreeError` directly. Migration: `from harness.integrations.git_ops import DirtyWorkingTreeError`.
+- **Renamed error code `DIRTY_WORKTREE`** → `DIRTY_WORKING_TREE` in `GitOperationResult` and i18n keys (`git_preflight.recovery.DIRTY_WORKING_TREE`). Scripts matching the old code string should update accordingly.
 - **Moved `extract_task_key_from_branch` / `extract_task_id_from_branch`** from `harness.core.worktree` to `harness.core.task_identity`.
 
 ### Changed

@@ -46,7 +46,7 @@ def test_extract_from_branch_hybrid(branch: str, expected: str | None):
 
 
 class TestExtractTaskIdFromBranch:
-    """Migrated from test_worktree.py after worktree module removal."""
+    """Tests for branch-name-based task identity extraction."""
 
     @pytest.mark.parametrize("branch,expected", [
         ("agent/task-001-feature", "task-001"),

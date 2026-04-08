@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from harness.integrations.git_ops import (
-    DirtyWorktreeError,
+    DirtyWorkingTreeError,
     current_branch,
     ensure_clean,
     ensure_clean_result,
@@ -53,14 +53,14 @@ class TestEnsureClean:
     def test_dirty_repo_raises(self, tmp_path: Path):
         repo = _init_repo(tmp_path)
         (repo / "dirty.txt").write_text("uncommitted", encoding="utf-8")
-        with pytest.raises(DirtyWorktreeError):
+        with pytest.raises(DirtyWorkingTreeError):
             ensure_clean(repo)
 
     def test_staged_changes_raise(self, tmp_path: Path):
         repo = _init_repo(tmp_path)
         (repo / "staged.txt").write_text("staged", encoding="utf-8")
         _git(["add", "staged.txt"], repo)
-        with pytest.raises(DirtyWorktreeError):
+        with pytest.raises(DirtyWorkingTreeError):
             ensure_clean(repo)
 
     def test_ensure_clean_result_reports_code(self, tmp_path: Path):
@@ -68,7 +68,7 @@ class TestEnsureClean:
         (repo / "dirty.txt").write_text("x", encoding="utf-8")
         result = ensure_clean_result(repo)
         assert result.ok is False
-        assert result.code == "DIRTY_WORKTREE"
+        assert result.code == "DIRTY_WORKING_TREE"
 
 
 class TestRunGitResult:

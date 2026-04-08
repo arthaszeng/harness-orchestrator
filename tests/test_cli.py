@@ -275,7 +275,7 @@ class TestGitLifecycleCommands:
             def preflight_repo_state(self):
                 return GitOperationResult(
                     ok=False,
-                    code="DIRTY_WORKTREE",
+                    code="DIRTY_WORKING_TREE",
                     message="working tree has uncommitted changes",
                 )
 
