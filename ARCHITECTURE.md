@@ -72,6 +72,20 @@ renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` 
 
 Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run **`harness init --force`** in the target repository when regeneration is needed.
 
+### `worktree_init.py`
+
+CLI command (`harness worktree-init`) that creates symlinks in a linked worktree
+pointing back to the main worktree's shared artifacts:
+
+- `.harness-flow` (task state, config, vision)
+- `.cursor/skills/harness` (generated skill templates)
+- `.cursor/agents` (agent definitions)
+- `.cursor/rules` (rule files)
+
+**Trust boundary:** Worktree creation and removal is the responsibility of
+Cursor IDE (via its "Worktree" agent mode) or the user's own `git worktree`
+commands. Harness only detects existing worktrees and initializes shared symlinks.
+
 ---
 
 ## Core (`src/harness/core/`)
@@ -113,28 +127,18 @@ Registry/events remain audit-only metadata, not gate authorities.
 
 ### `worktree.py`
 
-Detects whether the current cwd is inside a Cursor parallel-agent git worktree
-(via `git rev-parse --git-common-dir` vs `--git-dir`). Returns `WorktreeInfo`
-with branch, common dir, and git dir. Used by `status` for worktree identity
-display and by worktree setup scripts for automatic `HARNESS_TASK_ID` binding.
-Isolation is task-resolution + UX scoped; no file-level distributed locking.
+Read-only detection and metadata extraction for Cursor parallel-agent git worktrees.
 
-### `worktree_lifecycle.py`
+- **`detect_worktree(cwd)`** — compares `git rev-parse --git-common-dir` vs `--git-dir`;
+  returns `WorktreeInfo` (branch, common dir, git dir) when inside a linked worktree,
+  `None` for the main working tree.
+- **`resolve_main_worktree_root(cwd)`** — derives the main worktree root from
+  `common_dir.parent`; used by `worktree-init` to locate symlink sources.
+- **`extract_task_key_from_branch(branch)`** — delegates to `TaskIdentityResolver`
+  for `agent/<task-key>-*` branch name parsing.
 
-Creates, lists, and removes git worktrees for parallel-agent isolation.
-`WorktreeLifecycleManager` orchestrates the full lifecycle:
-
-- **`create_worktree(task_key, short_desc)`** — `git worktree add -b` from trunk,
-  white-list copies IDE artifacts (`.cursor/skills`, `agents`, `rules`, `worktrees.json`)
-  and config files (`.harness-flow/config.toml`, `vision.md`), creates a task directory,
-  and registers the worktree in `.harness-flow/worktrees-registry.json`.
-- **`list_worktrees()`** — cross-references the JSON registry with `git worktree list --porcelain`
-  to classify entries as `active`, `stale` (registry-only), or `unmanaged` (git-only).
-- **`remove_worktree(identifier, prune_branch, force)`** — runs `git worktree remove`,
-  updates the registry atomically, and optionally deletes the local branch.
-
-Registry writes use atomic replace (`tempfile` + `os.replace`) to prevent partial writes.
-Distinct from `worktree.py` which provides read-only detection and branch→task-key extraction.
+Used by `status` for worktree identity display, `branch_lifecycle` for `WORKTREE_SKIP`,
+and `worktree-init` for symlink setup.
 
 ### `task_identity.py`
 

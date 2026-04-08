@@ -148,11 +148,11 @@ git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 
 对每个失败的测试，确定归属：
 
-1. 在基础分支上运行同一测试：
+1. 在基础分支上运行同一测试（worktree 安全 — 使用 detached HEAD 而非分支切换）：
    ```bash
-   git stash && git checkout {{ trunk_branch }} && {{ ci_command }} 2>&1; git checkout - && git stash pop
+   CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
    ```
-   （或使用 `git diff` 检查失败的测试文件是否在本分支被修改）
+   （或使用 `git diff origin/{{ trunk_branch }}...HEAD` 检查失败的测试文件是否在本分支被修改）
 
 2. **预存在的失败**（在基础分支上也失败）：记录并继续。不是你的问题。
 3. **分支内失败**（在基础分支通过，在 HEAD 失败）：这是你的问题。必须修复。

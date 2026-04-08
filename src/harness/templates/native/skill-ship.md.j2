@@ -149,11 +149,11 @@ Run the full test suite:
 
 For each failing test, determine ownership:
 
-1. Run the same test on the base branch:
+1. Run the same test on the base branch (worktree-safe — uses detached HEAD instead of branch checkout):
    ```bash
-   git stash && git checkout {{ trunk_branch }} && {{ ci_command }} 2>&1; git checkout - && git stash pop
+   CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
    ```
-   (Or use `git diff` to check if the failing test file was modified on this branch)
+   (Or use `git diff origin/{{ trunk_branch }}...HEAD` to check if the failing test file was modified on this branch)
 
 2. **Pre-existing failure** (fails on base branch too): Note it, continue. Not your problem.
 3. **In-branch failure** (passes on base, fails on HEAD): This IS your problem. Must fix.
