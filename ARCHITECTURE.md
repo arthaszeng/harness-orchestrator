@@ -72,6 +72,20 @@ renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` 
 
 Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run **`harness init --force`** in the target repository when regeneration is needed.
 
+### `worktree_init.py`
+
+CLI command (`harness worktree-init`) that creates symlinks in a linked worktree
+pointing back to the main worktree's shared artifacts:
+
+- `.harness-flow` (task state, config, vision)
+- `.cursor/skills/harness` (generated skill templates)
+- `.cursor/agents` (agent definitions)
+- `.cursor/rules` (rule files)
+
+**Trust boundary:** Worktree creation and removal is the responsibility of
+Cursor IDE (via its "Worktree" agent mode) or the user's own `git worktree`
+commands. Harness only detects existing worktrees and initializes shared symlinks.
+
 ---
 
 ## Core (`src/harness/core/`)
@@ -125,20 +139,6 @@ Read-only detection and metadata extraction for Cursor parallel-agent git worktr
 
 Used by `status` for worktree identity display, `branch_lifecycle` for `WORKTREE_SKIP`,
 and `worktree-init` for symlink setup.
-
-### `commands/worktree_init.py`
-
-CLI command (`harness worktree-init`) that creates symlinks in a linked worktree
-pointing back to the main worktree's shared artifacts:
-
-- `.harness-flow` (task state, config, vision)
-- `.cursor/skills/harness` (generated skill templates)
-- `.cursor/agents` (agent definitions)
-- `.cursor/rules` (rule files)
-
-**Trust boundary:** Worktree creation and removal is the responsibility of
-Cursor IDE (via its "Worktree" agent mode) or the user's own `git worktree`
-commands. Harness only detects existing worktrees and initializes shared symlinks.
 
 ### `task_identity.py`
 
