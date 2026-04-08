@@ -12,7 +12,7 @@ from harness.integrations.git_ops import run_git
 
 WORKTREE_SYMLINK_TARGETS: list[str] = [
     ".harness-flow",
-    ".cursor/skills/harness",
+    ".cursor/skills",
     ".cursor/agents",
     ".cursor/rules",
 ]
