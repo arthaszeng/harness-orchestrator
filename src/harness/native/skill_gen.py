@@ -402,9 +402,6 @@ def generate_native_artifacts(
         typer.echo(t("native.generated_skill", path=_rel(project_root, dest)))
         count += 1
 
-    # Worktrees hook → .cursor/worktrees.json
-    _write_worktrees_json(project_root, force=force)
-
     if skipped:
         typer.echo(
             f"  [warn] {count} files generated, {len(skipped)} skipped due to errors: "
@@ -414,39 +411,6 @@ def generate_native_artifacts(
     typer.echo(t("native.done", count=count))
     return count
 
-
-
-_WORKTREES_JSON = """\
-{
-  "setup-worktree": [
-    "ln -sfn \\"$ROOT_WORKTREE_PATH/.harness-flow\\" .harness-flow",
-    "mkdir -p .cursor/skills",
-    "ln -sfn \\"$ROOT_WORKTREE_PATH/.cursor/skills/harness\\" .cursor/skills/harness",
-    "ln -sfn \\"$ROOT_WORKTREE_PATH/.cursor/agents\\" .cursor/agents",
-    "ln -sfn \\"$ROOT_WORKTREE_PATH/.cursor/rules\\" .cursor/rules"
-  ],
-  "setup-worktree-windows": [
-    "mklink /D .harness-flow \\"%ROOT_WORKTREE_PATH%\\\\.harness-flow\\"",
-    "mkdir .cursor\\\\skills 2>nul",
-    "mklink /D .cursor\\\\skills\\\\harness \\"%ROOT_WORKTREE_PATH%\\\\.cursor\\\\skills\\\\harness\\"",
-    "mklink /D .cursor\\\\agents \\"%ROOT_WORKTREE_PATH%\\\\.cursor\\\\agents\\"",
-    "mklink /D .cursor\\\\rules \\"%ROOT_WORKTREE_PATH%\\\\.cursor\\\\rules\\""
-  ]
-}
-"""
-
-
-def _write_worktrees_json(project_root: Path, *, force: bool = False) -> None:
-    """Write .cursor/worktrees.json for Cursor's post-create worktree hook.
-
-    Skipped when the file already exists unless *force* is True.
-    """
-    out = project_root / ".cursor" / "worktrees.json"
-    if out.exists() and not force:
-        return
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_WORKTREES_JSON, encoding="utf-8")
-    typer.echo(f"  ✓ {_rel(project_root, out)}")
 
 
 def _rel(root: Path, path: Path) -> str:

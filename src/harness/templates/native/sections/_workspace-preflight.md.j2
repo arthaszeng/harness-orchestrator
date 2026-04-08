@@ -8,6 +8,27 @@
 {% if preflight_mode == "entry" %}
 Before any planning or exploration, ensure the workspace is ready for a new task.
 
+### 0. Worktree Bootstrap
+
+If `.harness-flow` directory does **not** exist in the current working directory, you may be in a linked git worktree that has not been set up yet.
+
+```bash
+harness worktree-setup
+```
+
+This creates symlinks to the main worktree's `.harness-flow`, `.cursor/skills/harness`, `.cursor/agents`, and `.cursor/rules`.
+If the command is not available, create the symlinks manually:
+```bash
+MAIN=$(git rev-parse --git-common-dir | xargs dirname)
+ln -sfn "$MAIN/.harness-flow" .harness-flow
+mkdir -p .cursor/skills
+ln -sfn "$MAIN/.cursor/skills/harness" .cursor/skills/harness
+ln -sfn "$MAIN/.cursor/agents" .cursor/agents
+ln -sfn "$MAIN/.cursor/rules" .cursor/rules
+```
+
+If `.harness-flow` already exists, skip this step.
+
 Preferred structured preflight:
 
 ```bash

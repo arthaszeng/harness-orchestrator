@@ -7,16 +7,21 @@
 - **Removed CLI commands**: `git-post-ship-watch`, `git-post-ship-reconcile`, `worktree-init`
 - **Removed `SessionState` persistence**: `state.json` is no longer created or read. All state is now exclusively managed through `workflow-state.json` per task directory.
 - **Removed `--wait-merge` / `--timeout-sec` / `--poll-interval-sec` options** from `git-post-ship`
-- **Removed worktree subsystem**: `harness.core.worktree` module and `harness.commands.worktree_init` deleted. Worktree symlink setup is now handled by Cursor's native `.cursor/worktrees.json` post-create hook. If not using Cursor, create symlinks manually: `ln -sfn <main-tree>/.harness-flow .harness-flow` and similarly for `.cursor/skills/harness`, `.cursor/agents`, `.cursor/rules`.
+- **Removed worktree subsystem**: `harness.core.worktree` module and `harness.commands.worktree_init` deleted. Use `harness worktree-setup` to create symlinks in linked worktrees.
 - **Removed `context.worktree` field** from `harness git-preflight --json` output. Scripts consuming this field should remove the check.
 - **Removed `WORKTREE_SKIP`** return from `prepare_task_branch()` in linked worktrees. Branch preparation now executes normally regardless of worktree status.
 - **Removed `DirtyWorktreeError` compatibility alias** in `harness.integrations.git_ops`. Use `DirtyWorkingTreeError` directly. Migration: `from harness.integrations.git_ops import DirtyWorkingTreeError`.
 - **Renamed error code `DIRTY_WORKTREE`** → `DIRTY_WORKING_TREE` in `GitOperationResult` and i18n keys (`git_preflight.recovery.DIRTY_WORKING_TREE`). Scripts matching the old code string should update accordingly.
 - **Moved `extract_task_key_from_branch` / `extract_task_id_from_branch`** from `harness.core.worktree` to `harness.core.task_identity`.
 
-### Fixed
+### Added
 
-- **`worktrees.json` key name**: Changed `"setup-worktree-unix"` → `"setup-worktree"` to match Cursor's expected key. This fixes worktree setup not running on macOS/Linux. Run `harness init --force` to regenerate.
+- **`harness worktree-setup` CLI command**: Creates symlinks in linked git worktrees pointing to the main tree's `.harness-flow`, `.cursor/skills/harness`, `.cursor/agents`, and `.cursor/rules`. Replaces the unreliable Cursor `worktrees.json` hook mechanism.
+- **Preflight templates** (en/zh): Added Step 0 "Worktree Bootstrap" that detects missing `.harness-flow` and runs `harness worktree-setup` automatically.
+
+### Removed
+
+- **`.cursor/worktrees.json` generation**: `harness init` no longer generates this file. Cursor 3.0's agentic worktree setup does not reliably execute it; use `harness worktree-setup` instead.
 
 ### Changed
 

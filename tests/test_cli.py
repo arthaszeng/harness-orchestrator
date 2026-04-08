@@ -41,6 +41,7 @@ class TestHelpOutput:
         assert "update" in result.output
         assert "save-intervention-audit" in result.output
         assert "save-ship-metrics" in result.output
+        assert "worktree-setup" in result.output
 
     def test_help_does_not_list_install(self):
         result = runner.invoke(app, ["--help"])

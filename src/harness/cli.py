@@ -326,6 +326,13 @@ def save_intervention_audit(
     run_save_intervention_audit(task=task, event_type=event_type, command=command, summary=summary)
 
 
+@app.command(name="worktree-setup")
+def worktree_setup() -> None:
+    """Create symlinks in a linked worktree to share artifacts from the main tree."""
+    from harness.commands.worktree_setup import run_worktree_setup
+    run_worktree_setup()
+
+
 @app.command()
 def update(
     check: bool = typer.Option(

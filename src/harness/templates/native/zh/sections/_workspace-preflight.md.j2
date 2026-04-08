@@ -8,6 +8,27 @@
 {% if preflight_mode == "entry" %}
 在开始规划或探索之前，确保工作区已准备好接受新任务。
 
+### 0. Worktree 引导
+
+如果当前工作目录中**不存在** `.harness-flow` 目录，你可能在一个尚未初始化的 linked git worktree 中。
+
+```bash
+harness worktree-setup
+```
+
+该命令会创建指向主工作树的 `.harness-flow`、`.cursor/skills/harness`、`.cursor/agents` 和 `.cursor/rules` 的 symlink。
+如果命令不可用，手动创建 symlink：
+```bash
+MAIN=$(git rev-parse --git-common-dir | xargs dirname)
+ln -sfn "$MAIN/.harness-flow" .harness-flow
+mkdir -p .cursor/skills
+ln -sfn "$MAIN/.cursor/skills/harness" .cursor/skills/harness
+ln -sfn "$MAIN/.cursor/agents" .cursor/agents
+ln -sfn "$MAIN/.cursor/rules" .cursor/rules
+```
+
+如果 `.harness-flow` 已存在，跳过此步骤。
+
 优先使用结构化预检命令：
 
 ```bash
