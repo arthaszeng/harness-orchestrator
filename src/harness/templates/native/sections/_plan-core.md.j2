@@ -30,7 +30,7 @@ Every decision during planning falls into one of three categories:
 2. Read `.harness-flow/config.toml` and `.harness-flow/vision.md` (if they exist)
 3. Scan the project structure: key directories, languages, frameworks, existing patterns
 4. Run `git log --oneline -10` for recent activity context
-5. Check existing task directories: `ls .harness-flow/tasks/` to determine the next task number
+5. Determine the next task number: run `harness task next-id` (or `harness task next-id --json` for `{"next_id": "task-NNN", "max_existing": N}`)
 
 ### Produce Spec + Contract
 

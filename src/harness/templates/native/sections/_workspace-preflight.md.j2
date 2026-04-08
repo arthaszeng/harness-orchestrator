@@ -95,6 +95,13 @@ If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't ex
 
 1. Determine the next task number:
    ```bash
+   harness task next-id
+   ```
+   This outputs the next available `task-NNN` identifier (e.g. `task-054`).
+   Use `harness task next-id --json` for structured output: `{"next_id": "task-054", "max_existing": 53}`.
+
+   Fallback (if CLI unavailable):
+   ```bash
    mkdir -p .harness-flow/tasks
    ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
    ```

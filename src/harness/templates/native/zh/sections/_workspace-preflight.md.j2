@@ -95,6 +95,13 @@ git pull origin {{ trunk_branch }}
 
 1. 确定下一个任务编号：
    ```bash
+   harness task next-id
+   ```
+   输出下一个可用的 `task-NNN` 标识符（如 `task-054`）。
+   使用 `harness task next-id --json` 获取结构化输出：`{"next_id": "task-054", "max_existing": 53}`。
+
+   回退（如 CLI 不可用）：
+   ```bash
    mkdir -p .harness-flow/tasks
    ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
    ```

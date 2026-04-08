@@ -30,7 +30,7 @@
 2. 读取 `.harness-flow/config.toml` 和 `.harness-flow/vision.md`（如果存在）
 3. 扫描项目结构：关键目录、语言、框架、已有模式
 4. 运行 `git log --oneline -10` 了解最近的活动上下文
-5. 检查已有任务目录：`ls .harness-flow/tasks/` 确定下一个任务编号
+5. 确定下一个任务编号：运行 `harness task next-id`（或 `harness task next-id --json` 获取 `{"next_id": "task-NNN", "max_existing": N}`）
 
 ### 生成 Spec + 合约
 

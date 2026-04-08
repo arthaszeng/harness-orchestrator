@@ -40,12 +40,17 @@ Run straight through and output the PR URL at the end.
 Before running the full pre-flight, check whether it can be skipped — if the plan
 stage already completed in this session, most pre-flight work is redundant.
 
-1. Scan `.harness-flow/tasks/` for the latest `task-NNN` directory
-2. Read `TASK_DIR/workflow-state.json`
+1. Resolve the current task:
+   ```bash
+   harness task resolve --json
+   ```
+   This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
+   Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the latest `task-NNN` directory.
+2. Read `TASK_DIR/workflow-state.json` (or use fields already returned by `task resolve`).
 3. **Enter fast path if ALL conditions are met**:
    - `workflow-state.json` exists and is valid
    - `phase` is `contracted`, `building`, `evaluating`, or `shipping` (past plan stage)
-   - `handoff_summary` is non-empty (prior stage wrote a handoff)
+   - `has_handoff_summary` is `true` (prior stage wrote a handoff)
    - Current branch starts with `{{ branch_prefix }}/` (already on a feature branch)
 
 4. **Fast path behavior**:
@@ -171,7 +176,14 @@ Analyze the diff to ensure changed code paths have adequate test coverage.
 
 ### Quick Path (small change optimization)
 
-Count changed code files (only `.py`/`.ts`/`.js`/`.tsx`/`.jsx`/`.mjs` etc.):
+Count changed code files using the diff-stat CLI:
+```bash
+harness diff-stat --json
+```
+This outputs: `{"total": N, "code": N, "test": N, "doc": N, "other": N, "has_md_changes": bool, "files": [...]}`.
+Use the `code` field for the threshold check below.
+
+Fallback (if CLI unavailable):
 ```bash
 git diff {{ trunk_branch }}..HEAD --name-only | grep -E '\.(py|ts|js|tsx|jsx|mjs)$' | wc -l
 ```
@@ -576,10 +588,12 @@ git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 
 **Precondition**: Check whether the diff contains `.md` file changes:
 ```bash
-git diff {{ trunk_branch }}..HEAD --name-only | grep '\.md$'
+harness diff-stat --json
 ```
-- **No `.md` files changed**: Silently skip the entire doc-release step.
-- **`.md` files changed**: Run the `/harness-doc-release` workflow:
+Check the `has_md_changes` field. Fallback: `git diff {{ trunk_branch }}..HEAD --name-only | grep '\.md$'`
+
+- **`has_md_changes` is `false` (no `.md` files changed)**: Silently skip the entire doc-release step.
+- **`has_md_changes` is `true` (`.md` files changed)**: Run the `/harness-doc-release` workflow:
 
 1. Compare the diff against all `.md` files in the project
 2. Auto-fix factual inaccuracies (file paths, version numbers, function names)

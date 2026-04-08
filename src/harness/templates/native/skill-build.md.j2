@@ -35,9 +35,14 @@ which means DO IT. Implement everything and output the build result.
 
 ## Step 1: Read the Contract
 
-1. Find the current task: most recent `task-NNN` directory under `.harness-flow/tasks/`
-2. **Check stage summary:** If `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field,
-   read it first — it provides a compact summary of the plan (decisions, risks, open items).
+1. Resolve the current task:
+   ```bash
+   harness task resolve --json
+   ```
+   This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
+   Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the most recent `task-NNN` directory.
+2. **Check stage summary:** If `has_handoff_summary` is `true` (or `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field),
+   read the handoff summary first — it provides a compact summary of the plan (decisions, risks, open items).
    Use this as your primary context; only read the full `plan.md` for details not covered.
    (Backward compat: if `handoff-plan.json` exists but `handoff_summary` is empty, read that instead.)
 3. **Structured plan handoff:** If `TASK_DIR/handoff-plan.json` exists, read it **before** broad repo search.

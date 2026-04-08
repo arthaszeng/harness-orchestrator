@@ -26,9 +26,14 @@ pipeline. Run straight through and output the evaluation result at the end.
 
 ## Step 0: Context Gathering
 
-1. Detect the current task: find the most recent `task-NNN` directory under `.harness-flow/tasks/`
-2. **Check stage summary:** If `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field,
-   read it first — it provides a compact summary of the build (what was built, CI result,
+1. Resolve the current task:
+   ```bash
+   harness task resolve --json
+   ```
+   This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
+   Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the most recent `task-NNN` directory.
+2. **Check stage summary:** If `has_handoff_summary` is `true` (or `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field),
+   read the handoff summary first — it provides a compact summary of the build (what was built, CI result,
    decisions, risks, open items). Use this as your primary context for understanding what changed.
    (Backward compat: if `handoff-build.json` exists but `handoff_summary` is empty, read that instead.)
 3. **Structured handoffs:** Read `TASK_DIR/handoff-plan.json` and `TASK_DIR/handoff-build.json` when present
