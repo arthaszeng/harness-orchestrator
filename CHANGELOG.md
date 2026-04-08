@@ -14,6 +14,10 @@
 - **Renamed error code `DIRTY_WORKTREE`** → `DIRTY_WORKING_TREE` in `GitOperationResult` and i18n keys (`git_preflight.recovery.DIRTY_WORKING_TREE`). Scripts matching the old code string should update accordingly.
 - **Moved `extract_task_key_from_branch` / `extract_task_id_from_branch`** from `harness.core.worktree` to `harness.core.task_identity`.
 
+### Fixed
+
+- **`worktrees.json` key name**: Changed `"setup-worktree-unix"` → `"setup-worktree"` to match Cursor's expected key. This fixes worktree setup not running on macOS/Linux. Run `harness init --force` to regenerate.
+
 ### Changed
 
 - `**status` and `progress**` fully rewritten to use `WorkflowState` as the sole data source. SessionState-based dashboards removed.

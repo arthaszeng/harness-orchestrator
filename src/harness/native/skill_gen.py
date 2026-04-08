@@ -418,7 +418,7 @@ def generate_native_artifacts(
 
 _WORKTREES_JSON = """\
 {
-  "setup-worktree-unix": [
+  "setup-worktree": [
     "ln -sfn \\"$ROOT_WORKTREE_PATH/.harness-flow\\" .harness-flow",
     "mkdir -p .cursor/skills",
     "ln -sfn \\"$ROOT_WORKTREE_PATH/.cursor/skills/harness\\" .cursor/skills/harness",
