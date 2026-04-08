@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import typer
 
-from harness.core.state import TaskState
+from harness.core.task_ops import archive_task, mark_task_done
 from harness.core.workflow_state import (
     iter_archive_dirs,
     iter_task_dirs,
     load_workflow_state,
-    sync_task_state,
 )
 
 
@@ -102,82 +100,25 @@ def run_task_list(
 
 def run_task_archive(*, task: str, force: bool = False) -> None:
     """Move a done task from tasks/ to archive/."""
-    from harness.core.workflow_state import _resolver_for_agents_dir
-
     cwd = Path.cwd()
     agents_dir = cwd / ".harness-flow"
-    tasks_dir = agents_dir / "tasks"
-    archive_dir = agents_dir / "archive"
 
-    resolver = _resolver_for_agents_dir(agents_dir)
-    if not resolver.is_valid_task_key(task):
-        typer.echo(f"  ✗ Invalid task ID: {task}", err=True)
-        raise typer.Exit(1)
-
-    source = tasks_dir / task
-    if not source.is_relative_to(tasks_dir):
-        typer.echo(f"  ✗ Invalid task path: {task}", err=True)
-        raise typer.Exit(1)
-
-    if not source.is_dir():
-        typer.echo(f"  ✗ Task directory not found: {task}", err=True)
-        raise typer.Exit(1)
-
-    target = archive_dir / task
-    if target.exists():
-        typer.echo(f"  ✗ Archive target already exists: {target.relative_to(cwd)}", err=True)
-        raise typer.Exit(1)
-
-    ws = load_workflow_state(source)
-    if not force:
-        if ws is None:
-            typer.echo(f"  ✗ No workflow-state.json found for {task} (use --force to skip)", err=True)
-            raise typer.Exit(1)
-        if ws.phase != TaskState.DONE:
-            typer.echo(
-                f"  ✗ Task {task} is in phase '{ws.phase.value}', not 'done' (use --force to skip)",
-                err=True,
-            )
-            raise typer.Exit(1)
-
-    if not (source / "plan.md").exists():
+    if not (agents_dir / "tasks" / task / "plan.md").exists():
         typer.echo(f"  ⚠ Warning: {task}/plan.md not found", err=True)
 
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(source), str(target))
-    typer.echo(f"  ✓ Archived {task} → archive/{task}", err=True)
+    result = archive_task(agents_dir, task, force=force)
+    if result.ok:
+        typer.echo(f"  ✓ {result.message}", err=True)
+    else:
+        typer.echo(f"  ✗ {result.message}", err=True)
+        raise typer.Exit(1)
 
 
 def run_task_done(*, task: str) -> None:
     """Transition a task to phase=done and clear blockers."""
-    from harness.core.workflow_state import _resolver_for_agents_dir
-
-    cwd = Path.cwd()
-    agents_dir = cwd / ".harness-flow"
-    tasks_dir = agents_dir / "tasks"
-
-    resolver = _resolver_for_agents_dir(agents_dir)
-    if not resolver.is_valid_task_key(task):
-        typer.echo(f"  ✗ Invalid task ID: {task}", err=True)
+    result = mark_task_done(Path.cwd() / ".harness-flow", task)
+    if result.ok:
+        typer.echo(f"  ✓ {result.message}", err=True)
+    else:
+        typer.echo(f"  ✗ {result.message}", err=True)
         raise typer.Exit(1)
-
-    task_dir = tasks_dir / task
-    if not task_dir.is_dir():
-        typer.echo(f"  ✗ Task directory not found: {task}", err=True)
-        raise typer.Exit(1)
-
-    ws = load_workflow_state(task_dir)
-    if ws and ws.phase == TaskState.DONE:
-        typer.echo(f"  ✓ Task {task} is already done.", err=True)
-        return
-
-    try:
-        sync_task_state(
-            task_dir,
-            phase=TaskState.DONE,
-            blocker={"kind": "", "reason": ""},
-        )
-    except ValueError as exc:
-        typer.echo(f"  ✗ Cannot mark {task} as done: {exc}", err=True)
-        raise typer.Exit(1) from None
-    typer.echo(f"  ✓ Task {task} marked as done.", err=True)

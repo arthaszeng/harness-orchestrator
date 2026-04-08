@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from harness.core.config import HarnessConfig
+from harness.core.state import TaskState
 from harness.core.task_identity import TaskIdentityResolver, extract_task_key_from_branch
 from harness.integrations.git_ops import (
     GitOperationResult,
@@ -70,6 +71,14 @@ class BranchLifecycleManager:
         return self.config.workflow.branch_prefix
 
     def preflight_repo_state(self) -> GitOperationResult:
+        """Run structured preflight checks.
+
+        This method acts as a **gateway** for all workflow entry points
+        (plan, vision, ship).  Beyond read-only diagnostics it may perform
+        controlled lifecycle side-effects — currently limited to
+        auto-archiving the current task when its phase is ``done`` and
+        ``config.workflow.auto_archive`` is enabled.
+        """
         clean = ensure_clean_result(self.project_root)
         if not clean.ok:
             return clean
@@ -81,16 +90,47 @@ class BranchLifecycleManager:
                 message="repository is in detached HEAD state",
             )
         task_key = extract_task_key_from_branch(branch, cwd=self.project_root) or ""
+
+        context: dict[str, str] = {
+            "branch": branch,
+            "trunk": self.trunk_branch,
+            "branch_task_key": task_key,
+        }
+
+        if task_key and self.config.workflow.auto_archive:
+            self._try_auto_archive(task_key, context)
+
         return GitOperationResult(
             ok=True,
             code="OK",
             message="preflight checks passed",
-            context={
-                "branch": branch,
-                "trunk": self.trunk_branch,
-                "branch_task_key": task_key,
-            },
+            context=context,
         )
+
+    def _try_auto_archive(self, task_key: str, context: dict[str, str]) -> None:
+        """Auto-archive the task if its phase is done.  Never raises."""
+        from harness.core.task_ops import archive_task
+        from harness.core.workflow_state import load_workflow_state
+
+        agents_dir = self.project_root / ".harness-flow"
+        task_dir = agents_dir / "tasks" / task_key
+
+        if not task_dir.is_dir():
+            return
+
+        ws = load_workflow_state(task_dir)
+        if ws is None or ws.phase != TaskState.DONE:
+            return
+
+        try:
+            result = archive_task(agents_dir, task_key)
+            if result.ok:
+                context["auto_archived"] = task_key
+                log.info("auto-archived task %s", task_key)
+            else:
+                log.warning("auto-archive skipped for %s: %s", task_key, result.message)
+        except Exception:
+            log.warning("auto-archive failed for %s", task_key, exc_info=True)
 
     def prepare_task_branch(self, task_key: str, short_desc: str = "") -> GitOperationResult:
         clean = ensure_clean_result(self.project_root)

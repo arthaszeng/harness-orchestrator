@@ -147,6 +147,7 @@ class WorkflowConfig(BaseModel):
     max_iterations: int = 3
     pass_threshold: float = 7.0
     auto_merge: bool = True
+    auto_archive: bool = True
     branch_prefix: str = "agent"
     trunk_branch: str = "main"
     task_id_strategy: Literal["numeric", "jira", "custom", "hybrid"] = "hybrid"
