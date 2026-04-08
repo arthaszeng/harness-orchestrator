@@ -227,11 +227,35 @@ def gh_ci_logs(
 
     First lists runs, finds the latest failed run, then fetches its failed
     job logs.  Returns ``(result, [FailedJobLog, ...])``.
+
+    If only *pr_number* is given, resolves the head branch first.
     """
+    resolved_branch = branch.strip() if branch and branch.strip() else None
+
+    if resolved_branch is None and pr_number is not None:
+        pr_result, pr_data = run_gh_json(
+            ["pr", "view", str(pr_number), "--json", "headRefName"],
+            cwd,
+            timeout=timeout,
+            code_on_error="CI_PR_RESOLVE_FAILED",
+        )
+        if pr_result.ok and isinstance(pr_data, dict):
+            resolved_branch = pr_data.get("headRefName")
+
+    if resolved_branch is None and pr_number is None:
+        return (
+            GitOperationResult(
+                ok=False,
+                code="CI_SELECTOR_REQUIRED",
+                message="either pr_number or branch must be provided",
+            ),
+            [],
+        )
+
     # Step 1: find the latest failed run
     args = ["run", "list", "--limit", "5", "--json", "databaseId,conclusion,status,headBranch"]
-    if branch:
-        args.extend(["--branch", branch.strip()])
+    if resolved_branch:
+        args.extend(["--branch", resolved_branch])
     result, runs = run_gh_json(args, cwd, timeout=timeout, code_on_error="CI_RUN_LIST_FAILED")
     if not result.ok or runs is None:
         return result, []

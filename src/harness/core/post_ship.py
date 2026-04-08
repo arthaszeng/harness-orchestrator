@@ -290,8 +290,6 @@ class PostShipManager:
                 code = "PR_LOOKUP_TIMEOUT"
             elif code == "GH_IO_ERROR":
                 code = "PR_LOOKUP_IO_ERROR"
-            elif code == "GH_NOT_FOUND":
-                code = "PR_LOOKUP_IO_ERROR"
             return GitOperationResult(
                 ok=False,
                 code=code,

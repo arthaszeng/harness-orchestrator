@@ -114,31 +114,6 @@ _INFRA_KEYWORDS = frozenset({
     "could not resolve host",
 })
 
-_AUTO_FIX_KEYWORDS = frozenset({
-    "syntaxerror",
-    "indentationerror",
-    "importerror",
-    "modulenotfounderror",
-    "nameerror",
-    "attributeerror",
-    "typeerror",
-    "ruff",
-    "lint",
-    "formatting",
-    "black",
-    "isort",
-    "mypy",
-    "type error",
-    "missing import",
-    "undefined name",
-    "unused import",
-    "assert",
-    "assertionerror",
-    "failed",
-    "error",
-})
-
-
 def _classify_failure(log_text: str) -> tuple[FailureCategory, str]:
     """Classify a failure log into a category with a one-line summary."""
     lower = log_text.lower()

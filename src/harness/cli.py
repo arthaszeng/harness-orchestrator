@@ -421,6 +421,8 @@ def ci_logs_cmd(
     """Retrieve logs from failed CI jobs."""
     from harness.commands.pr_lifecycle import run_ci_logs
 
+    if pr is None and not branch:
+        raise typer.BadParameter("either --pr or --branch is required")
     run_ci_logs(pr=pr, branch=branch, as_json=as_json)
 
 
