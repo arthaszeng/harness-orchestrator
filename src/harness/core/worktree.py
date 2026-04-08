@@ -31,8 +31,9 @@ def detect_worktree(cwd: Path | None = None) -> WorktreeInfo | None:
     """Detect if *cwd* is inside a Cursor parallel-agent worktree.
 
     Returns ``WorktreeInfo`` when the git common dir differs from the git dir
-    (indicating a linked worktree), or ``None`` for the main working tree or
-    when git is unavailable.
+    (indicating a linked worktree), or ``None`` for the main working tree,
+    when git is unavailable, or when git output is malformed (empty, contains
+    null bytes, etc.).
     """
     root = cwd or Path.cwd()
     try:
