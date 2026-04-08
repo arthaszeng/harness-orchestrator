@@ -19,14 +19,14 @@ def _manager(tmp_path: Path) -> BranchLifecycleManager:
     )
 
 
-def test_preflight_detects_dirty_worktree(tmp_path: Path, monkeypatch):
+def test_preflight_detects_dirty_working_tree(tmp_path: Path, monkeypatch):
     manager = _manager(tmp_path)
     monkeypatch.setattr("harness.core.branch_lifecycle.ensure_clean_result", lambda _cwd: GitOperationResult(
-        ok=False, code="DIRTY_WORKTREE", message="dirty",
+        ok=False, code="DIRTY_WORKING_TREE", message="dirty",
     ))
     result = manager.preflight_repo_state()
     assert result.ok is False
-    assert result.code == "DIRTY_WORKTREE"
+    assert result.code == "DIRTY_WORKING_TREE"
 
 
 def test_preflight_detects_detached_head(tmp_path: Path, monkeypatch):
@@ -52,11 +52,11 @@ def test_prepare_task_branch_rejects_dirty_repo(tmp_path: Path, monkeypatch):
     manager = _manager(tmp_path)
     monkeypatch.setattr(
         "harness.core.branch_lifecycle.ensure_clean_result",
-        lambda _cwd: GitOperationResult(ok=False, code="DIRTY_WORKTREE", message="dirty"),
+        lambda _cwd: GitOperationResult(ok=False, code="DIRTY_WORKING_TREE", message="dirty"),
     )
     result = manager.prepare_task_branch("task-001", "demo")
     assert result.ok is False
-    assert result.code == "DIRTY_WORKTREE"
+    assert result.code == "DIRTY_WORKING_TREE"
 
 
 def test_sync_feature_with_trunk_reports_rebase_conflict(tmp_path: Path, monkeypatch):

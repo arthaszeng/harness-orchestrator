@@ -50,8 +50,8 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     **Skip steps 3–4.** Proceed to the next phase.
 
   - **Task key differs** (branch belongs to another task/agent):
-    **Do NOT continue on this branch.** Ask the user to start a new Cursor agent session in a separate worktree:
-    1. Guide the user: "当前分支属于另一个任务。请在 Cursor 中新建 agent 时指定一个独立的 worktree 目录，或手动切换到正确的分支。"
+    **Do NOT continue on this branch.** Guide the user to switch branches or start a fresh session:
+    1. Guide the user: "当前分支属于另一个任务。请手动切换到正确的分支，或在新的独立工作目录中启动 agent。"
     2. **ABORT** — do not proceed on a branch belonging to a different task.
 
   - **Task key is empty** (extraction failed, e.g. non-standard branch name `{{ branch_prefix }}/foo-bar`):

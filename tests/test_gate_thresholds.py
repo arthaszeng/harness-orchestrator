@@ -144,4 +144,4 @@ def test_review_gate_custom_thresholds(tmp_path: Path):
 
 
 # Note: status.py threshold tests removed — _render_recent_result and
-# SessionState were removed in task-045 (worktree-share-cleanup).
+# SessionState were removed in task-045.

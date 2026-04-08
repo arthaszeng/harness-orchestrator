@@ -146,7 +146,7 @@ MESSAGES: dict[str, str] = {
     "workflow_next.recovery.corrupt": "说明：workflow-state.json 不是合法 JSON 或结构不对。建议：手工修复后重试，或重新执行 `/harness-plan`。",
     "workflow_next.recovery.unknown_phase": "说明：workflow-state.json 中的 phase 无法识别。建议：改为合法 phase 或重新执行 `/harness-plan`。",
 
-    "git_preflight.recovery.DIRTY_WORKTREE": "说明：工作区有未提交变更。建议：提交、stash 或丢弃变更后重试。",
+    "git_preflight.recovery.DIRTY_WORKING_TREE": "说明：工作区有未提交变更。建议：提交、stash 或丢弃变更后重试。",
     "git_preflight.recovery.DETACHED_HEAD": "说明：当前处于 detached HEAD。建议：先 `git checkout main`（或你的主干分支）再重试。",
     "git_preflight.recovery.generic": "说明：预检未通过。建议：根据上方提示处理 git 状态后，再次运行 `harness git-preflight`。",
 

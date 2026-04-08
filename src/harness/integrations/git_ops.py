@@ -179,8 +179,6 @@ class DirtyWorkingTreeError(RuntimeError):
     """Raised when the working tree has uncommitted changes at task start."""
 
 
-DirtyWorktreeError = DirtyWorkingTreeError
-
 
 def ensure_clean(cwd: Path) -> None:
     """Raise DirtyWorkingTreeError if the working tree is dirty."""
@@ -196,7 +194,7 @@ def ensure_clean_result(cwd: Path) -> GitOperationResult:
     if has_changes(cwd):
         return GitOperationResult(
             ok=False,
-            code="DIRTY_WORKTREE",
+            code="DIRTY_WORKING_TREE",
             message="working tree has uncommitted changes",
         )
     return GitOperationResult(ok=True, code="OK", message="working tree is clean")

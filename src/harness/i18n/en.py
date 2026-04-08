@@ -147,7 +147,7 @@ MESSAGES: dict[str, str] = {
     "workflow_next.recovery.unknown_phase": "What happened: workflow-state.json has an unknown phase. Suggestion: set phase to a valid value or re-run `/harness-plan`.",
 
     # ── git preflight recovery (stderr) ──────────────────────────
-    "git_preflight.recovery.DIRTY_WORKTREE": "What happened: git working tree has uncommitted changes. Suggestion: commit, stash, or discard changes, then retry.",
+    "git_preflight.recovery.DIRTY_WORKING_TREE": "What happened: git working tree has uncommitted changes. Suggestion: commit, stash, or discard changes, then retry.",
     "git_preflight.recovery.DETACHED_HEAD": "What happened: repository is in detached HEAD. Suggestion: `git checkout main` (or your trunk branch), then retry.",
     "git_preflight.recovery.generic": "What happened: preflight failed. Suggestion: read the message above, fix the underlying git state, then run `harness git-preflight` again.",
 
