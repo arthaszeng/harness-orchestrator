@@ -42,9 +42,13 @@ class TestGetLatestVersion:
             assert _get_latest_version() is None
 
     def test_returns_none_on_timeout(self):
+        import subprocess
         with (
             patch("harness.commands.update._get_latest_version_http", return_value=None),
-            patch("harness.commands.update.subprocess.run", side_effect=Exception("timeout")),
+            patch(
+                "harness.commands.update.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="pip", timeout=15),
+            ),
         ):
             assert _get_latest_version() is None
 

@@ -84,13 +84,11 @@ def _step_trunk_branch(project_root: Path) -> str:
 
     detected = "main"
     try:
-        result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            capture_output=True, text=True, cwd=str(project_root), timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            detected = result.stdout.strip()
-    except Exception:
+        from harness.integrations.git_ops import current_branch
+        branch = current_branch(project_root)
+        if branch:
+            detected = branch
+    except (OSError, subprocess.TimeoutExpired):
         pass
 
     trunk = typer.prompt(t("init.trunk_prompt"), default=detected)

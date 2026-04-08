@@ -12,6 +12,18 @@ from harness.core.branch_lifecycle import BranchLifecycleManager
 from harness.core.post_ship import PostShipManager
 
 
+def _emit_recovery_hint(code: str) -> None:
+    """Emit an i18n recovery hint for the given error code, if available."""
+    from harness.i18n import apply_project_lang_from_cwd, t
+
+    apply_project_lang_from_cwd(Path.cwd())
+    key = f"git_preflight.recovery.{code}"
+    msg = t(key)
+    if msg == key:
+        msg = t("git_preflight.recovery.generic")
+    typer.echo(msg, err=True)
+
+
 def run_git_preflight(*, as_json: bool = False) -> None:
     manager = BranchLifecycleManager.create(Path.cwd())
     result = manager.preflight_repo_state()
@@ -26,14 +38,7 @@ def run_git_preflight(*, as_json: bool = False) -> None:
     else:
         typer.echo(f"[{result.code}] {result.diagnostic}")
     if not result.ok:
-        from harness.i18n import apply_project_lang_from_cwd, t
-
-        apply_project_lang_from_cwd(Path.cwd())
-        key = f"git_preflight.recovery.{result.code}"
-        msg = t(key)
-        if msg == key:
-            msg = t("git_preflight.recovery.generic")
-        typer.echo(msg, err=True)
+        _emit_recovery_hint(result.code)
         raise typer.Exit(code=1)
 
 
@@ -51,6 +56,7 @@ def run_git_prepare_branch(*, task_key: str, short_desc: str = "", as_json: bool
     else:
         typer.echo(f"[{result.code}] {result.diagnostic}")
     if not result.ok:
+        _emit_recovery_hint(result.code)
         raise typer.Exit(code=1)
 
 
@@ -68,6 +74,7 @@ def run_git_sync_trunk(*, as_json: bool = False) -> None:
     else:
         typer.echo(f"[{result.code}] {result.diagnostic}")
     if not result.ok:
+        _emit_recovery_hint(result.code)
         raise typer.Exit(code=1)
 
 

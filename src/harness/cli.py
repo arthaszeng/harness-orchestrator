@@ -2,35 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
 import typer
 
 from harness import __version__
-
-def _log_debug_error(subcommand: str) -> None:
-    """Append a structured error entry to .harness-flow/debug.log.
-
-    Never raises — this is best-effort diagnostics that must not block
-    the user's command execution.
-    """
-    import traceback
-    from datetime import datetime, timezone
-
-    try:
-        log_dir = Path.cwd() / ".harness-flow"
-        if not log_dir.is_dir():
-            return
-        entry = (
-            f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] "
-            f"subcommand={subcommand} cwd={Path.cwd()}\n"
-            f"{traceback.format_exc()}\n"
-        )
-        (log_dir / "debug.log").open("a", encoding="utf-8").write(entry)
-    except Exception:
-        pass
-
 
 app = typer.Typer(
     name="harness",
@@ -47,7 +23,6 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
-    ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", "-v", callback=version_callback, is_eager=True,
         help="Show version and exit",
@@ -236,6 +211,7 @@ def save_eval(
     verdict: str = typer.Option(
         "PASS", "--verdict",
         help="Evaluation verdict: PASS or ITERATE",
+        case_sensitive=False,
     ),
     score: float = typer.Option(
         0.0, "--score",
@@ -250,7 +226,10 @@ def save_eval(
     from harness.commands.artifact import run_save_eval
     if kind not in {"code", "plan"}:
         raise typer.BadParameter("kind must be 'code' or 'plan'")
-    run_save_eval(task=task, kind=kind, verdict=verdict, score=score, body=body)
+    verdict_upper = verdict.upper()
+    if verdict_upper not in {"PASS", "ITERATE"}:
+        raise typer.BadParameter("verdict must be 'PASS' or 'ITERATE'")
+    run_save_eval(task=task, kind=kind, verdict=verdict_upper, score=score, body=body)
 
 
 @app.command(name="save-build-log")
@@ -362,6 +341,11 @@ def save_intervention_audit(
     ),
 ) -> None:
     """Save one intervention-audit event to task directory."""
+    _VALID_EVENT_TYPES = {"manual_confirmation", "manual_retry", "manual_compensation"}
+    if event_type not in _VALID_EVENT_TYPES:
+        raise typer.BadParameter(
+            f"event-type must be one of: {', '.join(sorted(_VALID_EVENT_TYPES))}"
+        )
     from harness.commands.artifact import run_save_intervention_audit
 
     run_save_intervention_audit(task=task, event_type=event_type, command=command, summary=summary)

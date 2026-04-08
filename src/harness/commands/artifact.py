@@ -7,7 +7,6 @@ import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
-import re
 
 import typer
 
@@ -236,19 +235,22 @@ def _infer_manual_interventions_per_task(task_dir: Path) -> float:
 
 
 def _infer_first_pass_rate(task_dir: Path) -> float:
+    from harness.core.gates import _CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE
+
     code_eval_rounds: list[int] = []
-    for path in task_dir.glob("code-eval-r*.md"):
-        match = re.search(r"code-eval-r(\d+)\.md$", path.name)
-        if match:
-            code_eval_rounds.append(int(match.group(1)))
-    for path in task_dir.glob("evaluation-r*.md"):
-        match = re.search(r"evaluation-r(\d+)\.md$", path.name)
-        if match:
-            code_eval_rounds.append(int(match.group(1)))
+    try:
+        entries = list(task_dir.iterdir())
+    except OSError:
+        return 0.0
+    for p in entries:
+        for pattern in (_CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE):
+            m = pattern.search(p.name)
+            if m:
+                code_eval_rounds.append(int(m.group(1)))
+                break
 
     if not code_eval_rounds:
         return 0.0
-    # First-pass only when there is exactly one code-eval round and it is r1.
     return 1.0 if sorted(set(code_eval_rounds)) == [1] else 0.0
 
 

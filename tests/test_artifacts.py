@@ -419,7 +419,7 @@ class TestCLISaveEval:
         assert state is not None
         assert state.gates.evaluation.status.value == "pending"
 
-    def test_save_eval_unknown_verdict_sets_blocked_gate(self, tmp_path: Path, monkeypatch):
+    def test_save_eval_unknown_verdict_rejected_by_cli(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".harness-flow" / "tasks" / "task-031"
         _seed_workflow_state(task_dir, "task-031")
@@ -428,10 +428,8 @@ class TestCLISaveEval:
             app,
             ["save-eval", "--kind", "code", "--task", "task-031", "--verdict", "UNKNOWN", "--score", "5.0"],
         )
-        assert result.exit_code == 0
-        state = load_workflow_state(task_dir)
-        assert state is not None
-        assert state.gates.evaluation.status.value == "blocked"
+        assert result.exit_code != 0
+        assert "PASS" in result.output or "ITERATE" in result.output
 
     def test_save_plan_eval_updates_plan_gate_only(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)

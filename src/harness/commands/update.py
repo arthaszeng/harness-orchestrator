@@ -38,7 +38,7 @@ def _get_latest_version_http() -> str | None:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
         return data.get("info", {}).get("version")
-    except Exception:
+    except (OSError, json.JSONDecodeError, ValueError, KeyError):
         return None
 
 
@@ -53,7 +53,7 @@ def _get_latest_version_pip() -> str | None:
             for line in result.stdout.splitlines():
                 if "harness-flow" in line and "(" in line:
                     return line.split("(")[1].split(")")[0].strip()
-    except Exception:
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return None
 
@@ -71,7 +71,7 @@ def _installed_distribution_version() -> str | None:
             text=True,
             timeout=10,
         )
-    except Exception:
+    except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:
         return None
@@ -153,7 +153,7 @@ def _migrate_config(project_root: Path) -> int:
         else:
             import tomli as tomllib
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, KeyError):
         console.print(f"  [cyber.warn]![/] {t('update.config_parse_error', path=str(config_path))}")
         return 1
 

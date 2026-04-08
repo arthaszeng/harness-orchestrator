@@ -235,15 +235,6 @@ def load_workflow_state(task_dir: Path) -> WorkflowState | None:
     return state
 
 
-# EVALUATING, PLANNING, and BUILDING are "lateral" transitions — they record
-# the current activity rather than gating pipeline progression.  CLI artifact
-# commands (save-eval, save-build-log) can set these from any phase.
-_LATERAL_PHASES: frozenset[TaskState] = frozenset({
-    TaskState.EVALUATING,
-    TaskState.PLANNING,
-    TaskState.BUILDING,
-})
-
 _VALID_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
     TaskState.IDLE: frozenset({
         TaskState.PLANNING,

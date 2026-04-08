@@ -137,38 +137,24 @@ class TestStepMemverse:
 
 
 class TestValidateModelName:
-    def test_inherit_is_valid(self):
-        assert validate_model_name("inherit") is True
-
-    def test_simple_model_name(self):
-        assert validate_model_name("gpt-4.1") is True
-
-    def test_complex_model_name(self):
-        assert validate_model_name("gpt-5.4-high") is True
-
-    def test_claude_model(self):
-        assert validate_model_name("claude-4.6-opus") is True
-
-    def test_short_model(self):
-        assert validate_model_name("o3") is True
-
-    def test_empty_string_invalid(self):
-        assert validate_model_name("") is False
-
-    def test_starts_with_digit_invalid(self):
-        assert validate_model_name("4gpt") is False
-
-    def test_spaces_invalid(self):
-        assert validate_model_name("gpt 4") is False
-
-    def test_special_chars_invalid(self):
-        assert validate_model_name("model@v2") is False
-
-    def test_underscore_valid(self):
-        assert validate_model_name("my_model") is True
-
-    def test_slash_invalid(self):
-        assert validate_model_name("org/model") is False
+    @pytest.mark.parametrize(
+        "name,expected",
+        [
+            ("inherit", True),
+            ("gpt-4.1", True),
+            ("gpt-5.4-high", True),
+            ("claude-4.6-opus", True),
+            ("o3", True),
+            ("my_model", True),
+            ("", False),
+            ("4gpt", False),
+            ("gpt 4", False),
+            ("model@v2", False),
+            ("org/model", False),
+        ],
+    )
+    def test_validate_model_name(self, name: str, expected: bool):
+        assert validate_model_name(name) is expected
 
 
 class TestDetectCursorRecentModels:

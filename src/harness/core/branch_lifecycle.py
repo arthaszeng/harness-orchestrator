@@ -17,7 +17,7 @@ from harness.integrations.git_ops import (
     run_git_result,
 )
 
-_log = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 _AUTO_RESOLVE_PATTERNS = (
     "poetry.lock",
@@ -254,7 +254,7 @@ class BranchLifecycleManager:
                 env={**os.environ, "GIT_EDITOR": "true"},
             )
             if cont.ok:
-                _log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
+                log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
                 return GitOperationResult(
                     ok=True,
                     code="REBASE_AUTO_RESOLVED",
@@ -290,7 +290,7 @@ class BranchLifecycleManager:
                 },
             )
 
-        _log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
+        log.info("rebase auto-resolved %d file(s): %s", len(auto_resolved), auto_resolved)
         return GitOperationResult(
             ok=True,
             code="REBASE_AUTO_RESOLVED",
@@ -317,5 +317,5 @@ class BranchLifecycleManager:
             message="failed to abort rebase",
         )
         if not result.ok:
-            _log.error("rebase --abort failed: %s", result.message)
+            log.error("rebase --abort failed: %s", result.message)
 

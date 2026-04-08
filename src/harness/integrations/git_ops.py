@@ -127,7 +127,7 @@ def has_changes(cwd: Path) -> bool:
 
 
 def get_diff_stat(cwd: Path) -> str:
-    """Get diff stat for the current branch relative to main."""
+    """Get diff stat for the last commit (HEAD~1)."""
     result = _run_git(["diff", "--stat", "HEAD~1"], cwd)
     return result.stdout.strip() if result.returncode == 0 else ""
 

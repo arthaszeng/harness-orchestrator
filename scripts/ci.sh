@@ -14,6 +14,6 @@ ruff check src/ tests/ || die "ruff check failed"
 
 # ── Tests ───────────────────────────────────────────────────────────────────
 step "Run tests"
-python -m pytest tests/ -v --tb=short || die "pytest failed"
+python3 -m pytest tests/ -v --tb=short || die "pytest failed"
 
 step "All checks passed ✓"

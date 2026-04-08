@@ -11,7 +11,7 @@ from pathlib import Path
 from harness.core.branch_lifecycle import BranchLifecycleManager
 from harness.integrations.git_ops import GitOperationResult, current_branch, ensure_clean_result, run_git_result
 
-_log = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 @dataclass

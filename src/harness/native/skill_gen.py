@@ -10,6 +10,7 @@ from __future__ import annotations
 import functools
 import importlib.resources
 from pathlib import Path
+from typing import Literal
 
 import jinja2
 import typer
@@ -33,7 +34,7 @@ def resolve_native_lang(project_root: Path | None = None, lang: str | None = Non
             pl = cfg.project.lang
             if pl in ("en", "zh"):
                 return pl
-        except Exception:
+        except (OSError, ValueError, KeyError):
             pass
     gl = get_lang()
     return gl if gl in ("en", "zh") else "en"
@@ -145,7 +146,7 @@ _LAYER_KEYS: dict[int, set[str]] = {
     },
 }
 
-ArtifactType = str  # "skill" | "agent" | "rule"
+ArtifactType = Literal["skill", "agent", "rule"]
 
 _ARTIFACT_LAYERS: dict[tuple[ArtifactType, str], set[int]] = {
     # Skills — layers per actual template key usage

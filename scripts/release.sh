@@ -16,10 +16,13 @@ die()   { printf "${RED}[release]${NC} %s\n" "$*" >&2; exit 1; }
 
 read_version() {
     python3 -c "
-import re
+import re, sys
 with open('pyproject.toml') as f:
     m = re.search(r'version\s*=\s*\"([^\"]+)\"', f.read())
-    print(m.group(1))
+if not m:
+    print('ERROR: could not parse version from pyproject.toml', file=sys.stderr)
+    sys.exit(1)
+print(m.group(1))
 "
 }
 
@@ -66,6 +69,10 @@ do_publish() {
     info "Building package..."
     python3 -m build
 
+    if [ -z "$(ls -A dist/ 2>/dev/null)" ]; then
+        die "dist/ is empty — build may have failed"
+    fi
+
     info "Uploading to PyPI..."
     python3 -m twine upload dist/*
     ok "Published $(read_version) to PyPI"
@@ -103,7 +110,7 @@ do_full_release() {
 
     # Test
     info "Running tests..."
-    python -m pytest tests/ -q --tb=line 2>&1 | tail -3
+    python3 -m pytest tests/ -q --tb=line 2>&1 | tail -3
     [ "${PIPESTATUS[0]:-0}" -eq 0 ] || die "Tests failed — aborting release"
     ok "Tests passed"
 

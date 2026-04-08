@@ -375,35 +375,3 @@ class TestGitLifecycleCommands:
         assert result.exit_code != 0
 
 
-class TestDebugLogOnReconcileFailure:
-    """D3: _log_debug_error writes structured entries without blocking."""
-
-    def test_log_debug_error_writes_to_debug_log(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        harness_dir = tmp_path / ".harness-flow"
-        harness_dir.mkdir()
-
-        from harness.cli import _log_debug_error
-
-        try:
-            raise RuntimeError("test boom")
-        except Exception:
-            _log_debug_error("gate")
-
-        log_path = harness_dir / "debug.log"
-        assert log_path.exists()
-        content = log_path.read_text(encoding="utf-8")
-        assert "subcommand=gate" in content
-        assert "RuntimeError" in content
-        assert "test boom" in content
-
-    def test_log_debug_error_no_harness_dir_is_noop(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        from harness.cli import _log_debug_error
-
-        try:
-            raise RuntimeError("should not write")
-        except Exception:
-            _log_debug_error("status")
-
-        assert not (tmp_path / ".harness-flow" / "debug.log").exists()

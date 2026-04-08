@@ -97,7 +97,7 @@ def _prompt_hash(prompt: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _to_text(val: object) -> str | None:
