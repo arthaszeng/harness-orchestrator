@@ -6,9 +6,13 @@ the historical ``task-NNN`` convention.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
+
+log = logging.getLogger(__name__)
 
 TaskIdStrategy = Literal["numeric", "jira", "custom", "hybrid"]
 
@@ -95,4 +99,29 @@ class TaskIdentityResolver:
         if not self.is_valid_task_key(task_key):
             raise ValueError(f"invalid task key: {task_key}")
         return task_key
+
+
+def extract_task_key_from_branch(branch: str, *, cwd: Path | None = None) -> str | None:
+    """Extract task key from an ``agent/<task-key>-*`` branch name."""
+    from harness.core.config import HarnessConfig
+
+    try:
+        cfg = HarnessConfig.load(cwd or Path.cwd())
+        resolver = TaskIdentityResolver.from_config(cfg)
+        branch_prefix = cfg.workflow.branch_prefix
+    except Exception:
+        log.debug("failed to load task identity config; using default resolver", exc_info=True)
+        resolver = TaskIdentityResolver()
+        branch_prefix = "agent"
+    return resolver.extract_from_branch(branch, branch_prefix=branch_prefix)
+
+
+def extract_task_id_from_branch(branch: str) -> str | None:
+    """Backward-compatible alias for task-key extraction.
+
+    Historically this function only supported ``task-NNN``. It now delegates
+    to the configured task-key resolver and returns ``None`` for non-matching
+    branch names.
+    """
+    return extract_task_key_from_branch(branch)
 

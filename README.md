@@ -224,7 +224,7 @@ Project settings live in `.harness-flow/config.toml`:
 | `harness status`                                         | Show current task progress                      |
 | `harness gate [--task]`                                  | Check ship-readiness gates                      |
 | `harness update [--check] [--force]`                     | Self-update + config migration                  |
-| `harness git-preflight [--json]`                         | Preflight checks (clean tree, branch, worktree) |
+| `harness git-preflight [--json]`                         | Preflight checks (clean tree, branch)            |
 | `harness save-eval --task <id> [--kind] [--verdict] ...` | Save evaluation results                         |
 | `harness save-build-log --task <id> [--body]`            | Save build log                                  |
 | `harness git-prepare-branch --task-key <key>`            | Create or resume task branch                    |

@@ -4,21 +4,21 @@
 
 ### Breaking Changes
 
-- **Removed CLI commands**: `git-post-ship-watch`, `git-post-ship-reconcile`
+- **Removed CLI commands**: `git-post-ship-watch`, `git-post-ship-reconcile`, `worktree-init`
 - **Removed `SessionState` persistence**: `state.json` is no longer created or read. All state is now exclusively managed through `workflow-state.json` per task directory.
 - **Removed `--wait-merge` / `--timeout-sec` / `--poll-interval-sec` options** from `git-post-ship`
-
-### Added
-
-- **`harness worktree-init`** — creates symlinks in a linked git worktree pointing to the main tree's `.harness-flow/`, `.cursor/skills/harness/`, `.cursor/agents/`, and `.cursor/rules/`. Enables sharing harness state across worktrees without runtime path changes.
-- **`resolve_main_worktree_root()`** in `worktree.py` — resolves the root of the main working tree from a linked worktree.
+- **Removed worktree subsystem**: `harness.core.worktree` module and `harness.commands.worktree_init` deleted. Worktree symlink setup is now handled by Cursor's native `.cursor/worktrees.json` post-create hook. If not using Cursor, create symlinks manually: `ln -sfn <main-tree>/.harness-flow .harness-flow` and similarly for `.cursor/skills/harness`, `.cursor/agents`, `.cursor/rules`.
+- **Removed `context.worktree` field** from `harness git-preflight --json` output. Scripts consuming this field should remove the check.
+- **Removed `WORKTREE_SKIP`** return from `prepare_task_branch()` in linked worktrees. Branch preparation now executes normally regardless of worktree status.
+- **Renamed `DirtyWorktreeError`** → `DirtyWorkingTreeError` in `harness.integrations.git_ops`. A compatibility alias `DirtyWorktreeError` is retained.
+- **Moved `extract_task_key_from_branch` / `extract_task_id_from_branch`** from `harness.core.worktree` to `harness.core.task_identity`.
 
 ### Changed
 
-- **`status` and `progress`** fully rewritten to use `WorkflowState` as the sole data source. SessionState-based dashboards removed.
-- **`harness init`** in a linked worktree now suggests `harness worktree-init` instead of `--force`.
-- **Preflight templates** (en/zh) updated to reference `harness worktree-init` instead of manual directory copying.
+- `**status` and `progress**` fully rewritten to use `WorkflowState` as the sole data source. SessionState-based dashboards removed.
+- **Preflight templates** (en/zh) simplified: worktree detection step removed, steps renumbered 1–4.
 - **Ship templates** (en/zh) removed Step 8.25 (post-ship watcher auto-trigger).
+- `**harness init`** no longer blocks execution inside a linked worktree.
 
 ### Removed
 
@@ -31,11 +31,11 @@
 
 ### Added
 
-- **`harness workflow next`** — prints one machine-readable `HARNESS_NEXT task=… phase=… skill=… hint="…"` line from the latest task’s `workflow-state.json`, using the **same task resolution as `harness gate`** (explicit `--task`, then `HARNESS_TASK_ID`, then latest numeric `task-NNN`).
+- `**harness workflow next`** — prints one machine-readable `HARNESS_NEXT task=… phase=… skill=… hint="…"` line from the latest task’s `workflow-state.json`, using the **same task resolution as `harness gate`** (explicit `--task`, then `HARNESS_TASK_ID`, then latest numeric `task-NNN`).
 
 ### Changed
 
-- **Native skill templates (SSOT):** clarify the default pipeline **`/harness-build` → `/harness-ship`**; **`/harness-ship` does not implement feature code** (tests, mandatory 5-role eval, `harness save-eval`, `harness gate`, PR). Added a short **continuity + eval gate** block to plan/build/ship skills to reduce skipped eval and “plan/build then stop” behavior on weaker models. Vision/plan execution text aligned.
+- **Native skill templates (SSOT):** clarify the default pipeline `**/harness-build` → `/harness-ship`**; `**/harness-ship` does not implement feature code** (tests, mandatory 5-role eval, `harness save-eval`, `harness gate`, PR). Added a short **continuity + eval gate** block to plan/build/ship skills to reduce skipped eval and “plan/build then stop” behavior on weaker models. Vision/plan execution text aligned.
 - **Merged `/harness-brainstorm` into `/harness-vision`** — Vision now auto-detects whether to explore (Socratic questioning + approach options) or clarify (quick 1–2 questions). The loop controller (Roadmap/Backlog/ActivePlan/FeedbackLedger/StopConditions) is now part of Vision. Brainstorm entry point removed.
 
 ## 4.1.0

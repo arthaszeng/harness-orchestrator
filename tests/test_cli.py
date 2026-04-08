@@ -65,7 +65,6 @@ class TestHelpOutput:
         assert "git-prepare-branch" in clean
         assert "git-sync-trunk" in clean
         assert "git-post-ship" in clean
-        assert "worktree-init" in clean
 
 
 class TestGateCommand:

@@ -30,18 +30,7 @@ git status --porcelain
   - `git checkout -- .` 丢弃变更
 - 不要继续。不要自动暂存。
 
-### 2. Worktree 检测
-
-```bash
-COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
-GITDIR=$(git rev-parse --git-dir 2>/dev/null)
-```
-
-如果 `$COMMON` ≠ `$GITDIR`，你在 **Cursor parallel-agent worktree** 中。
-运行 `harness worktree-init` 从主工作树建立 `.harness-flow/` 和 `.cursor/` 的符号链接（若尚未链接）。
-**跳过步骤 3–5** — worktree 已经在正确的 feature branch 上。继续下一阶段。
-
-### 3. 分支检查
+### 2. 分支检查
 
 ```bash
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -49,7 +38,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 - 如果 `$CURRENT_BRANCH` 以 `{{ branch_prefix }}/` 开头：
   从 `harness git-preflight --json` 的 `context.branch_task_key` 获取当前分支所属的 task key。
-  与你本次要推进的**目标 task key** 对比（目标 task key = 用户显式给出的 task id，或你在步骤 5 中将要确定的下一个 task-NNN 编号）。
+  与你本次要推进的**目标 task key** 对比（目标 task key = 用户显式给出的 task id，或你在步骤 4 中将要确定的下一个 task-NNN 编号）。
 
   - **task key 相同**（恢复同一任务）：
     通知用户："当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
@@ -58,7 +47,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
     ```
     如果 rebase 冲突：尝试自动解决机械性冲突（如版本文件排序）；如果复杂，运行 `git rebase --abort` 并中止。
-    **跳过步骤 4–5。** 继续下一阶段。
+    **跳过步骤 3–4。** 继续下一阶段。
 
   - **task key 不同**（当前分支属于另一个任务/agent）：
     **不要在此分支上继续。** 引导用户在独立的 worktree 中启动新 agent：
@@ -69,9 +58,9 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     按**恢复任务**处理（与 task key 相同的路径一致）。
 
 - 如果 `$CURRENT_BRANCH` 是 `HEAD`（detached）：**中止** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
-- 否则：继续步骤 4。
+- 否则：继续步骤 3。
 
-### 4. 对齐主干
+### 3. 对齐主干
 
 ```bash
 git checkout {{ trunk_branch }}
@@ -81,7 +70,7 @@ git pull origin {{ trunk_branch }}
 如果 `git pull` 失败（网络错误、冲突或 `{{ trunk_branch }}` 不存在）：
 **中止** — 显示错误输出并引导："无法更新 `{{ trunk_branch }}`，请手动解决后重新运行。"
 
-### 5. 创建 Feature Branch
+### 4. 创建 Feature Branch
 
 1. 确定下一个任务编号：
    ```bash

@@ -11,7 +11,6 @@ from rich.table import Table
 
 from harness.core.progress import suggest_next_action
 from harness.core.ui import get_ui
-from harness.core.worktree import detect_worktree, extract_task_id_from_branch
 from harness.core.workflow_progress_line import format_harness_progress_line
 from harness.core.workflow_state import (
     WorkflowState,
@@ -55,18 +54,11 @@ def run_status(*, verbose: bool = False, progress_line: bool = False) -> None:
     ui.banner("status", __version__)
 
     agents_dir = Path.cwd() / ".harness-flow"
-    wt = detect_worktree()
     _, workflow_state = load_current_workflow_state(agents_dir)
 
     if workflow_state is None:
         ui.info("no active session.")
         return
-
-    if wt is not None:
-        label = wt.branch or str(wt.git_dir)
-        task_hint = extract_task_id_from_branch(wt.branch) if wt.branch else None
-        suffix = f" → {task_hint}" if task_hint else ""
-        console.print(f"  [dim]\\[Worktree: {label}{suffix}][/dim]")
 
     action = suggest_next_action(workflow_state)
     console.print(Panel(

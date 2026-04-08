@@ -289,12 +289,6 @@ def run_init(
 
     git_clean_before = _git_is_clean(project_root)
 
-    from harness.core.worktree import detect_worktree
-    wt = detect_worktree(project_root)
-    if wt is not None and not force:
-        console.print(f"  [cyber.fail]✗[/] {t('init.worktree_blocked')}")
-        raise typer.Exit(1)
-
     if force and config_exists:
         _run_reinit(project_root)
         return

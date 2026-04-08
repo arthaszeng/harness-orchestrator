@@ -149,7 +149,7 @@ Run the full test suite:
 
 For each failing test, determine ownership:
 
-1. Run the same test on the base branch (worktree-safe — uses detached HEAD instead of branch checkout):
+1. Run the same test on the base branch (uses detached HEAD instead of branch checkout):
    ```bash
    CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
    ```

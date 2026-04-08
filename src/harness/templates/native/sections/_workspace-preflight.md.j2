@@ -30,20 +30,7 @@ If the output is **non-empty**, **ABORT** immediately:
   - `git checkout -- .` to discard changes
 - Do NOT proceed. Do NOT auto-stash.
 
-### 2. Worktree Detection
-
-```bash
-COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
-GITDIR=$(git rev-parse --git-dir 2>/dev/null)
-```
-
-If `$COMMON` ≠ `$GITDIR`, you are in a **Cursor parallel-agent worktree**.
-Run `harness worktree-init` to set up symlinks for `.harness-flow/` and
-`.cursor/` from the main working tree (if not already linked).
-**Skip steps 3–5** — the worktree is already on the correct feature branch.
-Proceed to the next phase.
-
-### 3. Branch Check
+### 2. Branch Check
 
 ```bash
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -51,7 +38,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 - If `$CURRENT_BRANCH` starts with `{{ branch_prefix }}/`:
   Get the current branch's task key from `harness git-preflight --json` → `context.branch_task_key`.
-  Compare it with your **target task key** (the task id the user explicitly gave, or the next task-NNN number you will determine in step 5).
+  Compare it with your **target task key** (the task id the user explicitly gave, or the next task-NNN number you will determine in step 4).
 
   - **Task key matches** (resuming the same task):
     Inform the user: "当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
@@ -60,7 +47,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
     ```
     If rebase conflicts: try auto-resolve mechanical cases (e.g. version file ordering); if complex, `git rebase --abort` and ABORT.
-    **Skip steps 4–5.** Proceed to the next phase.
+    **Skip steps 3–4.** Proceed to the next phase.
 
   - **Task key differs** (branch belongs to another task/agent):
     **Do NOT continue on this branch.** Ask the user to start a new Cursor agent session in a separate worktree:
@@ -71,9 +58,9 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     Treat as **resuming** (same path as matching task key).
 
 - If `$CURRENT_BRANCH` is `HEAD` (detached): **ABORT** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
-- Otherwise: continue to step 4.
+- Otherwise: continue to step 3.
 
-### 4. Trunk Alignment
+### 3. Trunk Alignment
 
 ```bash
 git checkout {{ trunk_branch }}
@@ -83,7 +70,7 @@ git pull origin {{ trunk_branch }}
 If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't exist):
 **ABORT** — show the error output and guide: "无法更新 `{{ trunk_branch }}`，请手动解决后重新运行。"
 
-### 5. Create Feature Branch
+### 4. Create Feature Branch
 
 1. Determine the next task number:
    ```bash

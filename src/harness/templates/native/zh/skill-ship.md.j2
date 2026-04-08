@@ -148,7 +148,7 @@ git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 
 对每个失败的测试，确定归属：
 
-1. 在基础分支上运行同一测试（worktree 安全 — 使用 detached HEAD 而非分支切换）：
+1. 在基础分支上运行同一测试（使用 detached HEAD 而非分支切换）：
    ```bash
    CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
    ```

@@ -7,7 +7,6 @@ from pathlib import Path
 from harness.core.branch_lifecycle import BranchLifecycleManager
 from harness.core.config import HarnessConfig
 from harness.core.task_identity import TaskIdentityResolver
-from harness.core.worktree import WorktreeInfo
 from harness.integrations.git_ops import GitOperationResult
 
 
@@ -81,17 +80,6 @@ def test_sync_feature_with_trunk_reports_rebase_conflict(tmp_path: Path, monkeyp
     assert result.ok is False
     assert result.code == "REBASE_CONFLICT"
     assert "src/main.py" in result.context.get("manual_conflict_files", "")
-
-
-def test_prepare_task_branch_skips_when_worktree(tmp_path: Path, monkeypatch):
-    manager = _manager(tmp_path)
-    monkeypatch.setattr(
-        "harness.core.branch_lifecycle.detect_worktree",
-        lambda _cwd: WorktreeInfo(common_dir=tmp_path / ".git", git_dir=tmp_path / ".git/worktrees/x", branch="agent/task-001"),
-    )
-    result = manager.prepare_task_branch("task-001", "demo")
-    assert result.ok is True
-    assert result.code == "WORKTREE_SKIP"
 
 
 def test_sync_feature_with_trunk_auto_resolves_lock_files(tmp_path: Path, monkeypatch):
@@ -285,7 +273,6 @@ def test_preflight_returns_branch_task_key_for_agent_branch(tmp_path: Path, monk
         lambda _cwd: GitOperationResult(ok=True, code="OK", message="clean"),
     )
     monkeypatch.setattr("harness.core.branch_lifecycle.current_branch", lambda _cwd: "agent/task-036-worktree-bug-bash")
-    monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
     extract_calls: list[dict] = []
 
     def _spy_extract(branch, **kwargs):
@@ -312,7 +299,6 @@ def test_preflight_returns_empty_task_key_for_non_agent_branch(tmp_path: Path, m
         lambda _cwd: GitOperationResult(ok=True, code="OK", message="clean"),
     )
     monkeypatch.setattr("harness.core.branch_lifecycle.current_branch", lambda _cwd: "main")
-    monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
     monkeypatch.setattr(
         "harness.core.branch_lifecycle.extract_task_key_from_branch",
         lambda branch, **_kw: None,
@@ -330,7 +316,6 @@ def test_preflight_returns_empty_task_key_for_nonstandard_agent_branch(tmp_path:
         lambda _cwd: GitOperationResult(ok=True, code="OK", message="clean"),
     )
     monkeypatch.setattr("harness.core.branch_lifecycle.current_branch", lambda _cwd: "agent/foo-bar")
-    monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
     monkeypatch.setattr(
         "harness.core.branch_lifecycle.extract_task_key_from_branch",
         lambda branch, **_kw: None,
@@ -346,7 +331,6 @@ def test_prepare_task_branch_resumes_existing_branch(tmp_path: Path, monkeypatch
         "harness.core.branch_lifecycle.ensure_clean_result",
         lambda _cwd: GitOperationResult(ok=True, code="OK"),
     )
-    monkeypatch.setattr("harness.core.branch_lifecycle.detect_worktree", lambda _cwd: None)
     responses = iter(
         [
             GitOperationResult(ok=True, code="OK", message="checkout trunk"),

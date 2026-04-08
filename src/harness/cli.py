@@ -182,18 +182,6 @@ def git_post_ship(
     )
 
 
-@app.command(name="worktree-init")
-def worktree_init_cmd(
-    force: bool = typer.Option(
-        False, "--force", "-f",
-        help="Overwrite existing non-symlink targets",
-    ),
-) -> None:
-    """Set up symlinks in a git worktree to share .harness-flow/ and .cursor/ from the main tree."""
-    from harness.commands.worktree_init import run_worktree_init
-    run_worktree_init(force=force)
-
-
 @app.command(name="save-eval")
 def save_eval(
     kind: str = typer.Option(

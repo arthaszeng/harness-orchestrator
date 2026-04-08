@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from harness.core.config import HarnessConfig
-from harness.core.task_identity import TaskIdentityResolver
-from harness.core.worktree import detect_worktree, extract_task_key_from_branch
+from harness.core.task_identity import TaskIdentityResolver, extract_task_key_from_branch
 from harness.integrations.git_ops import (
     GitOperationResult,
     current_branch,
@@ -81,7 +80,6 @@ class BranchLifecycleManager:
                 code="DETACHED_HEAD",
                 message="repository is in detached HEAD state",
             )
-        wt = detect_worktree(self.project_root)
         task_key = extract_task_key_from_branch(branch, cwd=self.project_root) or ""
         return GitOperationResult(
             ok=True,
@@ -90,7 +88,6 @@ class BranchLifecycleManager:
             context={
                 "branch": branch,
                 "trunk": self.trunk_branch,
-                "worktree": "true" if wt is not None else "false",
                 "branch_task_key": task_key,
             },
         )
@@ -104,14 +101,6 @@ class BranchLifecycleManager:
                 ok=False,
                 code="INVALID_TASK_KEY",
                 message=f"task key '{task_key}' does not match strategy '{self.resolver.strategy}'",
-            )
-        wt = detect_worktree(self.project_root)
-        if wt is not None:
-            return GitOperationResult(
-                ok=True,
-                code="WORKTREE_SKIP",
-                message="worktree detected; skip automatic branch preparation",
-                context={"branch": wt.branch, "trunk": self.trunk_branch},
             )
         desc = _sanitize_short_desc(short_desc)
         branch_name = f"{self.branch_prefix}/{task_key}"

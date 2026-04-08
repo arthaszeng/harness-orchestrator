@@ -175,14 +175,17 @@ def stash_pop(cwd: Path) -> bool:
 # ── Branch lifecycle operations ──────────────────────────────────
 
 
-class DirtyWorktreeError(RuntimeError):
+class DirtyWorkingTreeError(RuntimeError):
     """Raised when the working tree has uncommitted changes at task start."""
 
 
+DirtyWorktreeError = DirtyWorkingTreeError
+
+
 def ensure_clean(cwd: Path) -> None:
-    """Raise DirtyWorktreeError if the working tree is dirty."""
+    """Raise DirtyWorkingTreeError if the working tree is dirty."""
     if has_changes(cwd):
-        raise DirtyWorktreeError(
+        raise DirtyWorkingTreeError(
             "Working tree has uncommitted changes. "
             "Commit or stash them before starting a task."
         )

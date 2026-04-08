@@ -170,15 +170,5 @@ MESSAGES: dict[str, str] = {
     "status.current_task": "当前任务",
     "status.stats_brief": "已完成 {completed} · 阻塞 {blocked} · 平均分 {avg:.1f}",
 
-    "init.worktree_blocked": "当前处于 git worktree 中。请使用 'harness worktree-init' 从主工作树建立符号链接，或回到主仓库执行 init。",
-
-    # ── worktree-init 命令 ────────────────────────────────────
-    "worktree_init.windows_unsupported": "Windows 上不可靠地支持符号链接。请手动从主工作树复制 .harness-flow/ 和 .cursor/。",
-    "worktree_init.not_worktree": "当前不在 git worktree 中。请从 linked worktree 目录运行此命令。",
-    "worktree_init.source_missing": "主工作树中不存在 {path}；已跳过。",
-    "worktree_init.exists_symlink_mismatch": "{path} 是指向其他位置的符号链接。使用 --force 覆盖。",
-    "worktree_init.exists_not_symlink": "{path} 已存在且不是符号链接。使用 --force 覆盖（将删除已有内容）。",
-    "worktree_init.done": "Worktree 初始化完成：{created} 个已创建，{skipped} 个已跳过。",
-    "worktree_init.nothing_created": "无需创建（{skipped} 个已跳过）。符号链接可能已就位。",
 
 }
