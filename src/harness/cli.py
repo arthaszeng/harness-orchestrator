@@ -80,6 +80,53 @@ def task_resolve_cmd(
     run_task_resolve(task=task or None, as_json=as_json)
 
 
+@task_cli.command("list")
+def task_list_cmd(
+    phase: str = typer.Option(
+        "",
+        "--phase",
+        help="Comma-separated phase filter (e.g. done,evaluating)",
+    ),
+    include_archived: bool = typer.Option(
+        False, "--include-archived", help="Include archived tasks",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """List tasks with phase, gates, and artifact count."""
+    from harness.commands.task_lifecycle import run_task_list
+
+    run_task_list(phase_filter=phase, include_archived=include_archived, as_json=as_json)
+
+
+@task_cli.command("archive")
+def task_archive_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID to archive (e.g. task-001)",
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Skip phase=done check",
+    ),
+) -> None:
+    """Move a completed task from tasks/ to archive/."""
+    from harness.commands.task_lifecycle import run_task_archive
+
+    run_task_archive(task=task, force=force)
+
+
+@task_cli.command("done")
+def task_done_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID to mark as done (e.g. task-001)",
+    ),
+) -> None:
+    """Mark a task as done (phase=done) and clear blockers."""
+    from harness.commands.task_lifecycle import run_task_done
+
+    run_task_done(task=task)
+
+
 app.add_typer(task_cli, name="task")
 
 
