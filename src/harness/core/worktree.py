@@ -61,6 +61,28 @@ def detect_worktree(cwd: Path | None = None) -> WorktreeInfo | None:
     return WorktreeInfo(common_dir=common_dir, git_dir=git_dir, branch=branch)
 
 
+def resolve_main_worktree_root(cwd: Path | None = None) -> Path | None:
+    """Return the root directory of the main working tree.
+
+    For a linked worktree, ``common_dir`` points to the shared ``.git``
+    directory inside the main checkout. Its parent is the main worktree root
+    in standard git layouts.
+
+    Returns ``None`` when not in a linked worktree or if detection fails.
+    """
+    wt = detect_worktree(cwd)
+    if wt is None:
+        return None
+    main_root = wt.common_dir.parent
+    if not (main_root / ".harness-flow").is_dir():
+        log.warning(
+            "main worktree root %s does not contain .harness-flow/; "
+            "symlink targets may not exist",
+            main_root,
+        )
+    return main_root
+
+
 def extract_task_key_from_branch(branch: str, *, cwd: Path | None = None) -> str | None:
     """Extract task key from an ``agent/<task-key>-*`` branch name."""
     try:

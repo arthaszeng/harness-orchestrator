@@ -41,14 +41,12 @@ Built with **Typer**. Core commands:
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `init`               | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts.                         |
 | `gate`               | Check ship-readiness gates for the current task (hard + soft checks).                                            |
-| `status`             | Load session state and render a Rich dashboard.                                                                  |
+| `status`             | Load workflow state and render a Rich dashboard.                                                                 |
 | `git-preflight`      | Structured git preflight checks with deterministic result codes.                                                 |
 | `git-prepare-branch` | Create/resume task branch on top of configured trunk.                                                            |
 | `git-sync-trunk`     | Sync the current feature branch against configured trunk.                                                        |
-| `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup (with wait-merge watcher mode). |
-| `worktree create`    | Create a git worktree with isolated branch, task directory, and IDE artifact copies.                             |
-| `worktree list`      | List all harness-managed worktrees with status (active/stale/unmanaged).                                         |
-| `worktree remove`    | Remove a worktree, clean up registry, and optionally prune the local branch.                                     |
+| `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup.                                |
+| `worktree-init`      | Set up symlinks in a git worktree to share .harness-flow/ and .cursor/ from the main tree.                       |
 | `update`             | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes.                            |
 
 
@@ -63,14 +61,12 @@ Two modes:
 - **Wizard mode** (no `.harness-flow/config.toml`): interactive setup (language → project info → trunk → CI → Memverse → evaluator model), writes config, generates artifacts.
 - **Reinit mode** (`.harness-flow/config.toml` exists): loads existing config, regenerates all `.cursor/` artifacts with `force=True`.
 
-**Writes:** `.harness-flow/config.toml` (from `templates/config.toml.j2`), `.harness-flow/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files (e.g. `.harness-flow/state.json`, `.harness-flow/.stop`).
+**Writes:** `.harness-flow/config.toml` (from `templates/config.toml.j2`), `.harness-flow/vision.md` when appropriate, then calls `generate_native_artifacts()` so `.cursor/` is populated. Updates `.gitignore` for harness-local files.
 
 ### `status.py`
 
-Loads **`SessionState`** from `.harness-flow/state.json`, then prefers task-level
-**`workflow-state.json`** under `.harness-flow/tasks/task-NNN/` when present so the
-dashboard can render canonical phase / gate / blocker information via **Rich**
-(`core/ui.py` patterns).
+Loads task-level **`workflow-state.json`** under `.harness-flow/tasks/task-NNN/` and
+renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` patterns).
 
 ### `update.py`
 
@@ -104,7 +100,7 @@ Minimal constants only:
 
 ### `state.py`
 
-**`SessionState`**, **`TaskRecord`**, **`CompletedTask`** (and related types) with **JSON** persistence under `.harness-flow/state.json` for resume-friendly dashboards.
+**`TaskState`** enumeration for workflow phases (idle, planning, contracted, building, evaluating, shipping, done, blocked).
 
 ### `workflow_state.py`
 
@@ -113,8 +109,7 @@ Task-level canonical workflow state stored at
 artifact refs, gate snapshots, blocker reason, and deterministic task discovery.
 `resolve_task_dir` resolves the active task with priority:
 `explicit_task_id` → `HARNESS_TASK_ID` env → `session_task_id` → latest numeric.
-`SessionState` is a session-summary compatibility layer; registry/events remain
-audit-only metadata, not gate authorities.
+Registry/events remain audit-only metadata, not gate authorities.
 
 ### `worktree.py`
 
@@ -154,12 +149,11 @@ Structured git lifecycle orchestration used by workflow entry points:
 preflight checks, trunk sync, task-branch prepare/resume, and feature rebase.
 Returns structured result codes/messages for deterministic agent handling.
 
-### `post_ship.py` / `post_ship_watcher.py`
+### `post_ship.py`
 
-Post-ship lifecycle orchestration. `post_ship.py` handles PR state lookup via `gh`,
+Post-ship lifecycle orchestration. Handles PR state lookup via `gh`,
 merged-only safety checks, trunk update, and local task-branch cleanup with guardrails
-(never delete trunk/current branch). `post_ship_watcher.py` polls PR state and triggers
-automatic finalization when merge is detected, returning stable timeout/closed codes.
+(never delete trunk/current branch).
 
 ### `handoff.py`
 
@@ -265,12 +259,8 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 
 - `config.toml` — harness configuration.
 - `vision.md` — product/engineering vision for skills.
-- `state.json` — session state (typically gitignored).
-- `progress.md` — human-readable progress log.
-- `.stop` — optional graceful stop flag (typically gitignored).
 - `tasks/`, `archive/` — task artifacts and history (convention from harness workflow docs).
 - `tasks/task-NNN/workflow-state.json` — canonical task-level phase/gate/blocker/artifact state.
-- `worktrees-registry.json` — JSON registry of harness-managed git worktrees (path, branch, task key, status).
 
 **Generated IDE (`.cursor/`)**
 

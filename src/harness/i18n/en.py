@@ -171,9 +171,16 @@ MESSAGES: dict[str, str] = {
     "status.next_title": "Next step",
     "status.current_task": "Current task",
     "status.stats_brief": "{completed} done · {blocked} blocked · avg {avg:.1f}",
-    "status.stats_reconcile_on": "Background sync: on (pending post-ship work)",
-    "status.stats_reconcile_off": "Background sync: off",
 
-    "init.worktree_blocked": "You are inside a git worktree. Running 'init' here would fork config from the main repo. Use 'harness init --force' to regenerate artifacts, or run 'init' from the main repository.",
+    "init.worktree_blocked": "You are inside a git worktree. Use 'harness worktree-init' to set up symlinks from the main tree, or run 'init' from the main repository.",
+
+    # ── worktree-init command ─────────────────────────────────
+    "worktree_init.windows_unsupported": "Symlinks are not reliably supported on Windows. Please manually copy .harness-flow/ and .cursor/ from the main worktree.",
+    "worktree_init.not_worktree": "Not inside a git worktree. Run this command from a linked worktree directory.",
+    "worktree_init.source_missing": "{path} does not exist in the main worktree; skipping.",
+    "worktree_init.exists_symlink_mismatch": "{path} is a symlink pointing elsewhere. Use --force to override.",
+    "worktree_init.exists_not_symlink": "{path} already exists and is not a symlink. Use --force to override (will delete existing).",
+    "worktree_init.done": "Worktree init complete: {created} created, {skipped} skipped.",
+    "worktree_init.nothing_created": "Nothing to create ({skipped} skipped). Symlinks may already be in place.",
 
 }

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import builtins
-import json
 import re
-import sys
 from pathlib import Path
 
 import pytest
@@ -68,8 +65,7 @@ class TestHelpOutput:
         assert "git-prepare-branch" in clean
         assert "git-sync-trunk" in clean
         assert "git-post-ship" in clean
-        assert "git-post-ship-watch" in clean
-        assert "git-post-ship-reconcile" in clean
+        assert "worktree-init" in clean
 
 
 class TestGateCommand:
@@ -185,54 +181,6 @@ class TestStatusCommand:
         assert "workflow-state.json" in cv
         assert "evaluating" in cv.lower()
 
-    def test_status_renders_auto_reconcile_skip_by_default(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
-        WorkflowState(task_id="task-001").save(task_dir)
-        result = runner.invoke(app, ["status"])
-        clean = _ANSI_RE.sub("", result.output)
-        assert result.exit_code == 0
-        assert "Background sync" in clean
-        assert "off" in clean.lower()
-
-    def test_status_renders_auto_reconcile_hit_when_pending_exists(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(
-            "harness.cli.is_auto_reconcile_eligible_subcommand",
-            lambda *_a, **_k: False,
-        )
-        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
-        WorkflowState(task_id="task-001").save(task_dir)
-        queue = tmp_path / ".harness-flow" / "post-ship-pending.jsonl"
-        queue.parent.mkdir(parents=True, exist_ok=True)
-        queue.write_text('{"task_key":"task-013"}\n', encoding="utf-8")
-        result = runner.invoke(app, ["status"])
-        clean = _ANSI_RE.sub("", result.output)
-        assert result.exit_code == 0
-        assert "Background sync" in clean
-        assert "on" in clean.lower()
-        assert "pending" in clean.lower()
-
-    def test_status_without_pending_does_not_import_git_lifecycle(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
-        WorkflowState(task_id="task-001").save(task_dir)
-        sys.modules.pop("harness.commands.git_lifecycle", None)
-
-        imported: list[str] = []
-        original_import = builtins.__import__
-
-        def _tracking_import(name, *args, **kwargs):
-            if name == "harness.commands.git_lifecycle":
-                imported.append(name)
-            return original_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", _tracking_import)
-        result = runner.invoke(app, ["status"])
-        assert result.exit_code == 0
-        assert imported == []
-
-
 class TestSaveFeedbackLedgerCommand:
     def test_save_feedback_ledger_writes_file_and_updates_state(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -305,32 +253,6 @@ class TestSaveFeedbackLedgerCommand:
 
 
 class TestGitLifecycleCommands:
-    def test_auto_reconcile_eligible_subcommand_true_for_status(self):
-        from harness.core.post_ship_pending import is_auto_reconcile_eligible_subcommand
-        assert is_auto_reconcile_eligible_subcommand("status") is True
-
-    def test_auto_reconcile_eligible_subcommand_false_for_save_eval(self):
-        from harness.core.post_ship_pending import is_auto_reconcile_eligible_subcommand
-        assert is_auto_reconcile_eligible_subcommand("save-eval") is False
-
-    def test_auto_reconcile_eligible_subcommand_false_for_none(self):
-        from harness.core.post_ship_pending import is_auto_reconcile_eligible_subcommand
-        assert is_auto_reconcile_eligible_subcommand(None) is False
-
-    def test_git_post_ship_background_reconcile_skips_manager_when_no_pending(self, monkeypatch):
-        from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
-
-        called = {"create": False}
-
-        def _create(*_args, **_kwargs):
-            called["create"] = True
-            return object()
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.has_pending_post_ship", lambda *_a, **_k: False)
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", _create)
-        run_git_post_ship_reconcile_background(max_items=20)
-        assert called["create"] is False
-
     def test_git_preflight_json_output(self, monkeypatch):
         from harness.integrations.git_ops import GitOperationResult
 
@@ -434,141 +356,8 @@ class TestGitLifecycleCommands:
         assert result.exit_code == 0
         assert '"code": "OK"' in result.output
 
-    def test_git_post_ship_wait_merge_json_output(self, monkeypatch):
-        from harness.integrations.git_ops import GitOperationResult
-
-        class _Watcher:
-            def wait_and_finalize(self, **_kwargs):
-                return GitOperationResult(ok=True, code="POST_SHIP_DONE", message="done")
-
-        class _Manager:
-            def infer_task_key_from_branch(self, _branch=None):
-                return "task-006"
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
-
-        result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--wait-merge", "--json"])
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["ok"] is True
-        assert payload["code"] == "POST_SHIP_DONE"
-        assert "message" in payload
-        assert "context" in payload
-
-    def test_git_post_ship_wait_merge_timeout_is_deferred(self, monkeypatch):
-        from harness.integrations.git_ops import GitOperationResult
-
-        class _Watcher:
-            def wait_and_finalize(self, **_kwargs):
-                return GitOperationResult(ok=False, code="PR_WAIT_TIMEOUT", message="timeout")
-
-        class _Manager:
-            def infer_task_key_from_branch(self, _branch=None):
-                return "task-009"
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
-        monkeypatch.setattr("harness.commands.git_lifecycle.enqueue_pending_post_ship", lambda *_a, **_k: True)
-
-        result = runner.invoke(
-            app,
-            ["git-post-ship", "--task-key", "task-009", "--pr", "99", "--wait-merge", "--json"],
-        )
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["ok"] is True
-        assert payload["code"] == "PR_WATCH_DEFERRED"
-        assert payload["context"]["fallback_reason"] == "timeout"
-
-    def test_git_post_ship_reconcile_json_output(self, monkeypatch):
-        monkeypatch.setattr(
-            "harness.commands.git_lifecycle.reconcile_pending_post_ship",
-            lambda *_a, **_k: {"processed": 2, "merged": 1, "closed": 0, "retained": 1, "failed": 0},
-        )
-        monkeypatch.setattr(
-            "harness.commands.git_lifecycle.record_intervention_event",
-            lambda *_a, **_k: True,
-        )
-
-        class _Manager:
-            pass
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
-        result = runner.invoke(app, ["git-post-ship-reconcile", "--json", "--max-items", "20"])
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["ok"] is True
-        assert payload["code"] == "POST_SHIP_RECONCILED"
-        assert payload["context"]["audit_write"] == "ok"
-
-    def test_git_post_ship_watch_json_output(self, monkeypatch, tmp_path: Path):
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(
-            "harness.commands.git_lifecycle.subprocess.Popen",
-            lambda *_a, **_k: type("P", (), {"pid": 43210})(),
-        )
-
-        class _Manager:
-            def infer_task_key_from_branch(self, _branch=None):
-                return "task-010"
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
-        result = runner.invoke(
-            app,
-            ["git-post-ship-watch", "--task-key", "task-010", "--pr", "70", "--json"],
-        )
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["ok"] is True
-        assert payload["code"] == "PR_WATCH_STARTED"
-        assert payload["context"]["poll_interval_sec"] == "10"
-
-    def test_git_post_ship_wait_merge_branch_changed_is_deferred(self, monkeypatch):
-        from harness.integrations.git_ops import GitOperationResult
-
-        class _Watcher:
-            def wait_and_finalize(self, **_kwargs):
-                return GitOperationResult(
-                    ok=False,
-                    code="POST_SHIP_DEFERRED_BRANCH_CHANGED",
-                    message="deferred",
-                )
-
-        class _Manager:
-            def infer_task_key_from_branch(self, _branch=None):
-                return "task-011"
-
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipManager.create", lambda *_a, **_k: _Manager())
-        monkeypatch.setattr("harness.commands.git_lifecycle.PostShipWatcher.create", lambda *_a, **_k: _Watcher())
-        monkeypatch.setattr("harness.commands.git_lifecycle.enqueue_pending_post_ship", lambda *_a, **_k: True)
-
-        result = runner.invoke(
-            app,
-            ["git-post-ship", "--task-key", "task-011", "--pr", "70", "--wait-merge", "--json"],
-        )
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["ok"] is True
-        assert payload["code"] == "PR_WATCH_DEFERRED"
-        assert payload["context"]["fallback_reason"] == "branch_changed"
-
     def test_git_post_ship_requires_selector(self):
         result = runner.invoke(app, ["git-post-ship", "--task-key", "task-006"])
-        assert result.exit_code != 0
-
-    def test_git_post_ship_rejects_invalid_timeout(self):
-        result = runner.invoke(
-            app,
-            ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--timeout-sec", "0"],
-        )
-        assert result.exit_code != 0
-
-    def test_git_post_ship_rejects_invalid_poll_interval(self):
-        result = runner.invoke(
-            app,
-            ["git-post-ship", "--task-key", "task-006", "--pr", "64", "--poll-interval-sec", "0"],
-        )
         assert result.exit_code != 0
 
     def test_git_post_ship_rejects_non_positive_pr(self):

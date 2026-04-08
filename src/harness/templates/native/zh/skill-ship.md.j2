@@ -566,23 +566,6 @@ git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 
 ---
 
-## 步骤 8.25：自动触发 Post-Ship Watcher
-
-在 PR 创建/更新后，立即自动启动 post-ship watcher（无需人工 post 命令）：
-
-1. 从当前分支或任务目录解析 `TASK_KEY`。
-2. 从创建/更新后的 PR URL 解析 `PR_NUMBER`。
-3. 启动后台 watcher（命令立即返回）：
-   ```bash
-   harness git-post-ship-watch --task-key TASK_KEY --pr PR_NUMBER --json
-   ```
-4. 行为约定：
-   - 若 PR 在等待窗口内已合并：自动执行 trunk 同步 + 本地分支清理。
-   - 若超时：在任务产物里写 blocker/retry 提示（不要求用户记忆底层细节）。
-   - 若 PR 未合并即关闭：停止清理并输出结构化错误码。
-
----
-
 ## 步骤 8.5：Doc-Release（按需调用）
 
 **前置条件**：检查 diff 中是否涉及 `.md` 文件变更：

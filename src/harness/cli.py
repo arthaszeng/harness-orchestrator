@@ -8,10 +8,6 @@ from typing import Optional
 import typer
 
 from harness import __version__
-from harness.core.post_ship_pending import (
-    has_pending_post_ship,
-    is_auto_reconcile_eligible_subcommand,
-)
 
 def _log_debug_error(subcommand: str) -> None:
     """Append a structured error entry to .harness-flow/debug.log.
@@ -58,16 +54,6 @@ def main(
     ),
 ) -> None:
     """Cursor-native multi-agent development framework."""
-    if not is_auto_reconcile_eligible_subcommand(ctx.invoked_subcommand):
-        return
-    if not has_pending_post_ship(Path.cwd()):
-        return
-    try:
-        from harness.commands.git_lifecycle import run_git_post_ship_reconcile_background
-
-        run_git_post_ship_reconcile_background(max_items=20)
-    except Exception:
-        _log_debug_error(ctx.invoked_subcommand or "unknown")
 
 
 workflow_cli = typer.Typer(help="Workflow hints from local task state (same resolution as gate)")
@@ -183,21 +169,6 @@ def git_post_ship(
     task_key: str = typer.Option("", "--task-key", "-t", help="Task key (e.g. task-001 or PROJ-123)"),
     pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
     branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
-    wait_merge: bool = typer.Option(
-        False,
-        "--wait-merge",
-        help="Wait for PR merge and auto-run post cleanup when merged",
-    ),
-    timeout_sec: int = typer.Option(
-        86400,
-        "--timeout-sec",
-        help="Timeout (seconds) when --wait-merge is enabled",
-    ),
-    poll_interval_sec: int = typer.Option(
-        10,
-        "--poll-interval-sec",
-        help="Polling interval (seconds) when --wait-merge is enabled",
-    ),
     as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
 ) -> None:
     """Run post-ship cleanup after PR merge."""
@@ -207,52 +178,20 @@ def git_post_ship(
         task_key=task_key,
         pr=pr,
         branch=branch,
-        wait_merge=wait_merge,
-        timeout_sec=timeout_sec,
-        poll_interval_sec=poll_interval_sec,
         as_json=as_json,
     )
 
 
-@app.command(name="git-post-ship-watch")
-def git_post_ship_watch(
-    task_key: str = typer.Option("", "--task-key", "-t", help="Task key (e.g. task-001 or PROJ-123)"),
-    pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
-    branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
-    timeout_sec: int = typer.Option(
-        86400,
-        "--timeout-sec",
-        help="Watcher timeout (seconds) before auto-stop",
+@app.command(name="worktree-init")
+def worktree_init_cmd(
+    force: bool = typer.Option(
+        False, "--force", "-f",
+        help="Overwrite existing non-symlink targets",
     ),
-    poll_interval_sec: int = typer.Option(
-        10,
-        "--poll-interval-sec",
-        help="Polling interval (seconds) for merge detection",
-    ),
-    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
 ) -> None:
-    """Start detached post-ship watcher and return immediately."""
-    from harness.commands.git_lifecycle import run_git_post_ship_watch_start
-
-    run_git_post_ship_watch_start(
-        task_key=task_key,
-        pr=pr,
-        branch=branch,
-        timeout_sec=timeout_sec,
-        poll_interval_sec=poll_interval_sec,
-        as_json=as_json,
-    )
-
-
-@app.command(name="git-post-ship-reconcile")
-def git_post_ship_reconcile(
-    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON result"),
-    max_items: int = typer.Option(20, "--max-items", help="Maximum pending items to process this run"),
-) -> None:
-    """Reconcile persisted post-ship pending queue."""
-    from harness.commands.git_lifecycle import run_git_post_ship_reconcile
-
-    run_git_post_ship_reconcile(as_json=as_json, max_items=max_items)
+    """Set up symlinks in a git worktree to share .harness-flow/ and .cursor/ from the main tree."""
+    from harness.commands.worktree_init import run_worktree_init
+    run_worktree_init(force=force)
 
 
 @app.command(name="save-eval")

@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- **Removed CLI commands**: `git-post-ship-watch`, `git-post-ship-reconcile`
+- **Removed `SessionState` persistence**: `state.json` is no longer created or read. All state is now exclusively managed through `workflow-state.json` per task directory.
+- **Removed `--wait-merge` / `--timeout-sec` / `--poll-interval-sec` options** from `git-post-ship`
+
+### Added
+
+- **`harness worktree-init`** — creates symlinks in a linked git worktree pointing to the main tree's `.harness-flow/`, `.cursor/skills/harness/`, `.cursor/agents/`, and `.cursor/rules/`. Enables sharing harness state across worktrees without runtime path changes.
+- **`resolve_main_worktree_root()`** in `worktree.py` — resolves the root of the main working tree from a linked worktree.
+
+### Changed
+
+- **`status` and `progress`** fully rewritten to use `WorkflowState` as the sole data source. SessionState-based dashboards removed.
+- **`harness init`** in a linked worktree now suggests `harness worktree-init` instead of `--force`.
+- **Preflight templates** (en/zh) updated to reference `harness worktree-init` instead of manual directory copying.
+- **Ship templates** (en/zh) removed Step 8.25 (post-ship watcher auto-trigger).
+
+### Removed
+
+- `SessionState`, `TaskRecord`, `CompletedTask`, `SessionStats`, `StopContext`, `TaskArtifacts` models from `state.py`
+- `post_ship_pending.py` and `post_ship_watcher.py` modules
+- `update_progress()` function (progress.md generation)
+- Status dashboard stats panel and recent-result panel (data source removed)
+
 ## 4.1.50
 
 ### Added

@@ -142,41 +142,6 @@ def test_review_gate_custom_thresholds(tmp_path: Path):
     assert "Score < 4" in content
 
 
-# ── status.py threshold ────────────────────────────────────────
 
-
-def test_render_recent_result_with_threshold():
-    """_render_recent_result uses configurable pass_threshold."""
-    import io
-    from rich.console import Console
-    from harness.commands.status import _render_recent_result
-    from harness.core.state import CompletedTask, SessionState
-    from harness.core.ui import CYBER_THEME
-
-    buf = io.StringIO()
-    console = Console(file=buf, force_terminal=True, width=100, theme=CYBER_THEME, highlight=False)
-    state = SessionState(completed=[
-        CompletedTask(id="t1", requirement="above", score=8.0, verdict="PASS", iterations=1),
-    ])
-    _render_recent_result(console, state, pass_threshold=7.0)
-    output = buf.getvalue()
-    assert "above" in output
-    assert "8.0" in output
-
-
-def test_render_recent_result_custom_threshold():
-    """_render_recent_result works with a custom pass_threshold."""
-    import io
-    from rich.console import Console
-    from harness.commands.status import _render_recent_result
-    from harness.core.state import CompletedTask, SessionState
-    from harness.core.ui import CYBER_THEME
-
-    buf = io.StringIO()
-    console = Console(file=buf, force_terminal=True, width=100, theme=CYBER_THEME, highlight=False)
-    state = SessionState(completed=[
-        CompletedTask(id="t1", requirement="custom", score=4.0, verdict="PASS", iterations=1),
-    ])
-    _render_recent_result(console, state, pass_threshold=3.5)
-    output = buf.getvalue()
-    assert "custom" in output
+# Note: status.py threshold tests removed — _render_recent_result and
+# SessionState were removed in task-045 (worktree-share-cleanup).
