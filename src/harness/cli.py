@@ -76,6 +76,47 @@ def workflow_next_cmd(
 
 app.add_typer(workflow_cli, name="workflow")
 
+task_cli = typer.Typer(help="Task directory queries (next-id, resolve)")
+
+
+@task_cli.command("next-id")
+def task_next_id_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Print the next available task-NNN identifier."""
+    from harness.commands.task_info import run_task_next_id
+
+    run_task_next_id(as_json=as_json)
+
+
+@task_cli.command("resolve")
+def task_resolve_cmd(
+    task: str = typer.Option(
+        "",
+        "--task",
+        "-t",
+        help="Explicit task ID (e.g. task-001). Auto-detects if omitted.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Print the currently active task directory and its state."""
+    from harness.commands.task_info import run_task_resolve
+
+    run_task_resolve(task=task or None, as_json=as_json)
+
+
+app.add_typer(task_cli, name="task")
+
+
+@app.command(name="diff-stat")
+def diff_stat_cmd(
+    as_json: bool = typer.Option(True, "--json/--no-json", help="JSON output (default: on)"),
+) -> None:
+    """Print branch diff statistics relative to trunk."""
+    from harness.commands.diff_stat import run_diff_stat
+
+    run_diff_stat(as_json=as_json)
+
 
 
 @app.command()
