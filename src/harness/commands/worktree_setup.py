@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -76,9 +77,21 @@ def run_worktree_setup(*, cwd: Path | None = None) -> None:
             target.unlink()
 
         if target.exists():
-            typer.echo(f"  ✗ {rel_path} — exists and is not a symlink, skipping")
-            skipped += 1
-            continue
+            if target.is_dir() and source.is_dir():
+                try:
+                    shutil.copytree(target, source, dirs_exist_ok=True)
+                    shutil.rmtree(target)
+                except OSError as exc:
+                    typer.echo(
+                        f"  ⚠ {rel_path} — failed to migrate directory: {exc}, skipping"
+                    )
+                    skipped += 1
+                    continue
+                typer.echo(f"  ↻ {rel_path} — migrated directory contents to main worktree")
+            else:
+                typer.echo(f"  ✗ {rel_path} — exists and is not a symlink, skipping")
+                skipped += 1
+                continue
 
         target.parent.mkdir(parents=True, exist_ok=True)
         target.symlink_to(source, target_is_directory=source.is_dir())

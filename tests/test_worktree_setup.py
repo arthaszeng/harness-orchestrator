@@ -167,3 +167,135 @@ class TestRunWorktreeSetup:
 
         for target in WORKTREE_SYMLINK_TARGETS:
             assert not (wt_root / target).exists()
+
+    def test_replaces_real_dir_with_symlink_and_merges(self, tmp_path, monkeypatch):
+        """When target is a real dir, its contents are merged into source
+        and then replaced with a symlink."""
+        main_root = tmp_path / "main"
+        wt_root = tmp_path / "wt"
+        wt_root.mkdir()
+
+        for target in WORKTREE_SYMLINK_TARGETS:
+            (main_root / target).mkdir(parents=True, exist_ok=True)
+
+        main_tasks = main_root / ".harness-flow" / "tasks" / "task-001"
+        main_tasks.mkdir(parents=True)
+        (main_tasks / "plan.md").write_text("main plan")
+
+        wt_hf = wt_root / ".harness-flow"
+        wt_tasks = wt_hf / "tasks" / "task-022"
+        wt_tasks.mkdir(parents=True)
+        (wt_tasks / "plan.md").write_text("worktree plan")
+
+        common_dir = main_root / ".git"
+        common_dir.mkdir(parents=True)
+        wt_git = wt_root / ".git"
+        wt_git.mkdir()
+
+        monkeypatch.setattr(
+            "harness.commands.worktree_setup.run_git",
+            _fake_run_git(str(common_dir), str(wt_git)),
+        )
+
+        run_worktree_setup(cwd=wt_root)
+
+        link = wt_root / ".harness-flow"
+        assert link.is_symlink(), ".harness-flow should be a symlink after migration"
+        assert link.resolve() == (main_root / ".harness-flow").resolve()
+
+        assert (main_root / ".harness-flow" / "tasks" / "task-001" / "plan.md").read_text() == "main plan"
+        assert (main_root / ".harness-flow" / "tasks" / "task-022" / "plan.md").read_text() == "worktree plan"
+
+    def test_dir_merge_overwrites_conflicting_files(self, tmp_path, monkeypatch):
+        """When worktree and source have the same file, worktree version wins."""
+        main_root = tmp_path / "main"
+        wt_root = tmp_path / "wt"
+        wt_root.mkdir()
+
+        for target in WORKTREE_SYMLINK_TARGETS:
+            (main_root / target).mkdir(parents=True, exist_ok=True)
+
+        conflict_dir = main_root / ".harness-flow" / "tasks" / "task-001"
+        conflict_dir.mkdir(parents=True)
+        (conflict_dir / "plan.md").write_text("original in main")
+
+        wt_conflict = wt_root / ".harness-flow" / "tasks" / "task-001"
+        wt_conflict.mkdir(parents=True)
+        (wt_conflict / "plan.md").write_text("updated in worktree")
+
+        common_dir = main_root / ".git"
+        common_dir.mkdir(parents=True)
+        wt_git = wt_root / ".git"
+        wt_git.mkdir()
+
+        monkeypatch.setattr(
+            "harness.commands.worktree_setup.run_git",
+            _fake_run_git(str(common_dir), str(wt_git)),
+        )
+
+        run_worktree_setup(cwd=wt_root)
+
+        link = wt_root / ".harness-flow"
+        assert link.is_symlink()
+        assert (main_root / ".harness-flow" / "tasks" / "task-001" / "plan.md").read_text() == "updated in worktree"
+
+    def test_dir_migration_failure_skips_gracefully(self, tmp_path, monkeypatch):
+        """When copytree/rmtree fails, the original directory is preserved."""
+        main_root = tmp_path / "main"
+        wt_root = tmp_path / "wt"
+        wt_root.mkdir()
+
+        for target in WORKTREE_SYMLINK_TARGETS:
+            (main_root / target).mkdir(parents=True, exist_ok=True)
+
+        wt_hf = wt_root / ".harness-flow"
+        wt_hf.mkdir(parents=True)
+        (wt_hf / "marker.txt").write_text("preserve me")
+
+        common_dir = main_root / ".git"
+        common_dir.mkdir(parents=True)
+        wt_git = wt_root / ".git"
+        wt_git.mkdir()
+
+        monkeypatch.setattr(
+            "harness.commands.worktree_setup.run_git",
+            _fake_run_git(str(common_dir), str(wt_git)),
+        )
+
+        def _failing_copytree(*args, **kwargs):
+            raise OSError("simulated disk error")
+
+        monkeypatch.setattr("shutil.copytree", _failing_copytree)
+
+        run_worktree_setup(cwd=wt_root)
+
+        assert wt_hf.is_dir() and not wt_hf.is_symlink(), \
+            ".harness-flow should remain a real dir on failure"
+        assert (wt_hf / "marker.txt").read_text() == "preserve me"
+
+    def test_existing_file_not_dir_still_skips(self, tmp_path, monkeypatch):
+        """When target is a plain file (not dir), it is skipped as before."""
+        main_root = tmp_path / "main"
+        wt_root = tmp_path / "wt"
+        wt_root.mkdir()
+
+        for target in WORKTREE_SYMLINK_TARGETS:
+            (main_root / target).mkdir(parents=True, exist_ok=True)
+
+        (wt_root / ".harness-flow").write_text("i am a file, not a dir")
+
+        common_dir = main_root / ".git"
+        common_dir.mkdir(parents=True)
+        wt_git = wt_root / ".git"
+        wt_git.mkdir()
+
+        monkeypatch.setattr(
+            "harness.commands.worktree_setup.run_git",
+            _fake_run_git(str(common_dir), str(wt_git)),
+        )
+
+        run_worktree_setup(cwd=wt_root)
+
+        hf = wt_root / ".harness-flow"
+        assert not hf.is_symlink(), "file target should not be replaced"
+        assert hf.read_text() == "i am a file, not a dir"
