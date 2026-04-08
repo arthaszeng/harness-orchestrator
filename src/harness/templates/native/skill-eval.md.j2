@@ -88,7 +88,21 @@ unless git diff is empty.
 
 ## Step 2: Capture Learnings
 
-After the evaluation is complete, capture non-obvious insights as learnings:
+After the evaluation is complete, capture non-obvious insights as learnings.
+
+### Admission Gate — what NOT to write
+
+**Never write** any of the following to Memverse (these are ephemeral work logs, not learnings):
+- Test counts, pass rates, CI status (e.g. "726 tests passed")
+- PR numbers, commit hashes, branch names (e.g. "PR #120, commit a40e0e7")
+- File change statistics (e.g. "19 files, 149 additions")
+- Review scores (e.g. "eval score 8.1/10")
+- Task ID + description parroting
+
+**Principle**: if the information already exists in git log / PR / workflow-state.json, do NOT
+duplicate it in Memverse. Only write **insights you would want to be reminded of in a future session**.
+
+### Capture Process
 
 1. Review all findings with confidence >= 7
 2. Parse merged findings for `[LEARNING]` items from each role's output.
