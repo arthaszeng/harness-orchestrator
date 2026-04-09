@@ -141,8 +141,9 @@ duplicate it in Memverse. Only write **insights you would want to be reminded of
      metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
    )
    ```
-   **Note**: metadata is write-only — `search_memory` cannot filter by metadata fields.
-   For precise metadata filtering, use `list_memories` + client-side parsing.
+   **Note**: `search_memory` supports `metadata_filter` for post-recall filtering (v5.28.0+).
+   For full-library exact matching by a metadata key, prefer `upsert_memory` with `upsert_key`.
+   If `upsert_memory` is not available, fall back to `add_memories` + `search_memory` dedup.
    Treat writes as non-blocking fire-and-forget: do not block gate on write outcome.
    **Parallel writes**: when multiple learnings are ready, dispatch all `add_memories` calls
    concurrently (do not serialize).

@@ -359,8 +359,9 @@ CRITICAL 发现被标记但交付继续。
      metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
    )
    ```
-   **注意**：metadata 只写不可搜索 — `search_memory` 不能按 metadata 字段过滤。
-   需要精确 metadata 过滤时，使用 `list_memories` + 调用方内存解析。
+   **注意**：`search_memory` 支持 `metadata_filter` 做召回后过滤（v5.28.0+）。
+   需要按 metadata key 精确匹配时，优先使用 `upsert_memory`（含 `upsert_key`）。
+   若 `upsert_memory` 不可用，回退到 `add_memories` + `search_memory` 去重。
    写入采用 non-blocking fire-and-forget，不以写入结果阻塞 gate。
    **并行写入**：当多条学习成果就绪时，并发 dispatch 所有 `add_memories` 调用（不要串行）。
 6. 记录计数：`LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`。

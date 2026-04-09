@@ -101,10 +101,11 @@ If Memverse MCP is available, call `search_memory` with:
 - "requirement changes"
 - "acceptance criteria"
 - Use multi-domain OR query: `domains: "{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-product-learning"`, limit 20
+- Optional: use `metadata_filter` to narrow results, e.g. `metadata_filter="{\"type\": \"preference\"}"` (post-recall filtering)
 
 Reference relevant memories in your findings.
 
-**Do not call `add_memories`** — learning capture is handled by the parent orchestrator.
+**Do not call `add_memories` or `upsert_memory`** — learning capture is handled by the parent orchestrator.
 Your `[LEARNING]` entries in the Output Contract will be collected and persisted by the parent.
 
 {% endif %}
