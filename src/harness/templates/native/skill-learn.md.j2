@@ -61,15 +61,17 @@ add_memories(
 )
 ```
 
-**Note**: metadata is write-only — `search_memory` cannot filter by metadata fields.
-For precise metadata filtering, use `list_memories` + client-side parsing.
+**Note**: `search_memory` supports `metadata_filter` for post-recall filtering (v5.28.0+):
+`search_memory(query=..., metadata_filter="{\"type\": \"pitfall\"}")`.
+For exact matching by a metadata key (e.g. dedup by `key`), prefer `upsert_memory` with `upsert_key`.
+If `upsert_memory` is not available, fall back to `add_memories` + `search_memory` dedup.
 
 ### `/harness-learn prune` — Check Staleness
 Review existing learnings for staleness.
 
 1. Fetch all learnings for this project via `list_memories(domain="{{ memverse_domain }}", limit=100)`
    (use `list_memories` for complete enumeration — `search_memory` may miss items with low semantic similarity).
-   If `has_more` is true, repeat with `offset` to paginate until all items are fetched.
+   Response includes `total` (domain-wide count) and `has_more`. If `has_more` is true, repeat with `offset` to paginate.
 2. For each learning that references specific files:
    - Check if the file still exists
    - If deleted: flag as potentially stale
@@ -88,8 +90,8 @@ LEARNING HEALTH CHECK
 ```
 
 5. For stale/contradicting learnings:
-   - If contradiction can be resolved by updating: use `update_memory(memory_id, new_content)` to merge/correct
-     (note: `update_memory` replaces only the searchable `text`; to change metadata, delete and re-add)
+   - If contradiction can be resolved by updating: use `update_memory(memory_id, new_content, metadata="{...}")` to merge/correct
+     (`update_memory` now supports an optional `metadata` parameter for shallow-merge metadata updates — new keys are added, existing keys are overwritten, unmentioned keys are preserved)
    - If truly obsolete: suggest deletion via `delete_memories`
 
 ### `/harness-learn export` — Export as Markdown
@@ -144,7 +146,7 @@ Each learning is stored via `add_memories` with two parts:
 **`text` parameter** (the searchable content):
 The learning insight in plain text (1-3 sentences). This is what `search_memory` matches against.
 
-**`metadata` parameter** (JSON string, write-only — not searchable):
+**`metadata` parameter** (JSON string):
 ```json
 {
   "type": "pattern | pitfall | preference | architecture | tool",
@@ -159,9 +161,18 @@ The learning insight in plain text (1-3 sentences). This is what `search_memory`
 }
 ```
 
-**Important**: `search_memory` cannot filter by metadata fields (Memverse constraint).
-To filter by `type`, `confidence`, etc., use `list_memories` for full enumeration and
-parse metadata client-side. The `metadata` field is returned by `list_memories` results.
+**Metadata filtering** (v5.28.0+): `search_memory` supports `metadata_filter` for post-recall filtering:
+`search_memory(query=..., metadata_filter="{\"type\": \"pitfall\", \"confidence\": {\"$gte\": 7}}")`.
+Scalar values use exact match; numeric comparisons support `$gte`, `$gt`, `$lte`, `$lt`, `$eq`.
+Note: `metadata_filter` is **post-recall** — items not in the vector recall candidate set may be missed.
+For complete enumeration, use `list_memories` + client-side parsing.
+
+**Upsert** (v5.33.0+): use `upsert_memory` to create-or-update by a metadata key:
+```
+upsert_memory(content=..., metadata="{\"key\": \"my-learning-key\", ...}", upsert_key="key", domain="{{ memverse_domain }}")
+```
+If no match → creates; if 1 match → updates (content replaced, metadata shallow-merged); if multiple → returns `UPSERT_CONFLICT`.
+If `upsert_memory` is not available, fall back to `add_memories` + `search_memory` dedup.
 
 ---
 
@@ -219,7 +230,10 @@ At the end of `/harness-eval` and `/harness-ship` workflows:
 - **Domain isolation** — always scope to "{{ memverse_domain }}" domain
 - **Deduplication** — before adding, search for existing learnings with similar keys
 - **Confidence decay** — learnings that are contradicted by new evidence should be updated
-  via `update_memory(memory_id, new_content)`, not just added alongside as duplicates
+  via `update_memory(memory_id, new_content, metadata="{...}")`, not just added alongside as duplicates
+  (metadata shallow-merge: new keys added, existing overwritten, unmentioned preserved)
+- **Upsert for recurring patterns** — when the same learning key recurs, prefer
+  `upsert_memory(content=..., metadata=..., upsert_key="key", domain=...)` over add+dedup
 - **Privacy** — never store secrets, credentials, or PII as learnings
 
 {% else %}

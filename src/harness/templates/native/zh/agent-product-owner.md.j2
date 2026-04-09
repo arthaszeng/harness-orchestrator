@@ -78,10 +78,11 @@ description: "计划和代码评审阶段的产品审查者。评估愿景对齐
 - "requirement changes"
 - "acceptance criteria"
 - 使用多域 OR 查询：`domains: "{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-product-learning"`，limit 20
+- 可选：使用 `metadata_filter` 收窄结果，如 `metadata_filter="{\"type\": \"preference\"}"`（召回后过滤）
 
 在你的发现中引用相关记忆。
 
-**不要调用 `add_memories`** — 学习捕获由父协调器统一处理。
+**不要调用 `add_memories` 或 `upsert_memory`** — 学习捕获由父协调器统一处理。
 你在输出契约中的 `[LEARNING]` 条目会被父代理收集并持久化。
 
 {% endif %}
