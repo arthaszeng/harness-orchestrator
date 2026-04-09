@@ -1961,10 +1961,10 @@ def test_ship_zh_has_ship_review_gate(tmp_path: Path):
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
     assert "Ship Review Gate" in content
-    assert "ship escalation score" in content or "Ship Escalation Score" in content
-    assert "FULL" in content
-    assert "LITE" in content
-    assert "FAST" in content
+    assert "Ship Escalation Score" in content
+    assert "FULL（完整评审）" in content
+    assert "LITE（轻量评审）" in content
+    assert "FAST（快速通过）" in content
 
 
 def test_ship_review_gate_renders_threshold_values(tmp_path: Path):

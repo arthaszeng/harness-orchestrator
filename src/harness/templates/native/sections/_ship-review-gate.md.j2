@@ -20,7 +20,8 @@ Compute each signal from `git diff {{ trunk_branch }}..HEAD` and `git log {{ tru
 
 **Default for missing signals:** If a signal cannot be determined (e.g., no plan review score
 exists, or diff stats are unavailable), treat the signal as **not triggered** (contribute 0).
-This ensures the gate degrades toward FULL (conservative) rather than FAST.
+This avoids inflating the score with speculative risk signals. In practice, real changes
+almost always trigger at least some positive signals (new files, feat commits, etc.).
 
 ### Review Intensity Levels
 
