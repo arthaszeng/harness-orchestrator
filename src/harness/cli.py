@@ -455,7 +455,8 @@ def search_failures(
     ),
     limit: int = typer.Option(
         20, "--limit", "-n",
-        help="Maximum number of results",
+        help="Maximum number of results (min 1)",
+        min=1,
     ),
 ) -> None:
     """Search failure patterns across all tasks."""

@@ -29,6 +29,8 @@ VALID_CATEGORIES = frozenset({
     "runtime-error",
     "other",
 })
+"""Known categories for documentation/validation. Free-text is accepted at save
+time — this set is used for CLI help and downstream aggregation, not enforcement."""
 
 
 class FailurePattern(BaseModel):
@@ -147,6 +149,8 @@ def search_failure_patterns(
     - ``category``: case-insensitive exact match
     - Empty query + empty category returns all patterns (up to *limit*)
     """
+    if limit < 1:
+        limit = 1
     from harness.core.workflow_state import iter_archive_dirs, iter_task_dirs
 
     normalized_query = normalize_finding_signature(query) if query else ""
