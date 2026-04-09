@@ -1,0 +1,64 @@
+## Ship Review Gate — 自适应代码评审强度
+
+在派遣代码审查者之前，计算 **ship escalation score** 来决定评审强度。
+此机制与 plan review gate 对称，但使用代码变更信号。
+
+### Ship Escalation Score
+
+从 `git diff {{ trunk_branch }}..HEAD` 和 `git log {{ trunk_branch }}..HEAD` 计算每个信号：
+
+| 信号 | 条件 | 评分 |
+|------|------|------|
+| 规模 | diff 行数（增 + 删）> 200 | +2 |
+| 规模 | 变更文件 > 10 | +2 |
+| 风险 | 变更触及 `core/`、`commands/` 或 `integrations/` 目录 | +1 |
+| 风险 | 变更触及认证/安全/配置文件（`config.toml`、`*.env`、`auth*`、`secret*`） | +3 |
+| 风险 | 有文件新增或删除（不仅是修改） | +1 |
+| 类型 | `{{ trunk_branch }}..HEAD` 中任一 commit subject 以 `feat` 开头 | +1 |
+| 类型 | **所有** commit subject 均以 `fix`/`docs`/`chore` 开头 | -1 |
+| 质量 | plan review aggregate < {{ pass_threshold }}/10（缺失时视为 0，不触发） | +2 |
+
+**缺失信号的默认行为：** 如果某信号无法确定（如无 plan review score 或 diff stat 不可用），
+视为**未触发**（贡献 0 分）。这避免基于推测性风险信号虚增评分。
+实践中，真实变更几乎总会触发一些正向信号（新文件、feat commit 等）。
+
+### 评审强度级别
+
+**评分 >= {{ gate_full_review_min }} → FULL（完整评审）**
+并行派遣全部 5 个角色审查者（Architect、Product Owner、Engineer、QA、Project Manager）。
+这是标准行为 — 继续到下方的代码评审派遣部分。
+记录：`SHIP_GATE: FULL (score N) — 派遣 5 角色评审`
+
+**评分 {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE（轻量评审）**
+仅派遣 **2 个角色审查者**：**Engineer** 和 **QA**。
+这两个角色是代码质量和回归安全最直接的守护者。
+本轮跳过 Architect、Product Owner 和 Project Manager。
+使用下方相同的代码评审派遣格式，但仅针对选定的 2 个角色。
+记录：`SHIP_GATE: LITE (score N) — 派遣 Engineer + QA 评审`
+
+**评分 < {{ gate_summary_confirm_min }} → FAST（快速通过）**
+完全跳过多角色代码评审。CI 测试和 `harness gate`（机器级检查）仍然执行 —
+这仅绕过 LLM 角色评审。
+写入一个最小的 eval 产物以便 `harness gate` 能找到：
+```bash
+harness save-eval --kind code --task TASK_ID --verdict PASS --score {{ pass_threshold }} --body "$(cat <<'FAST_EVAL_EOF'
+# Code Evaluation — Fast Pass
+
+Ship escalation score: N（低于 {{ gate_summary_confirm_min }}）
+评审强度：FAST — 根据自适应门禁策略跳过多角色评审。
+CI 测试：已通过。
+机器门禁：将单独检查。
+
+## Verdict: PASS
+FAST_EVAL_EOF
+)"
+```
+记录：`SHIP_GATE: FAST (score N) — 跳过多角色评审，仅 CI + gate`
+
+### 与现有步骤的交互
+
+- **FULL**：正常进入代码评审部分（全部 5 个角色）。
+- **LITE**：使用代码评审部分，但仅派遣 Engineer + QA。合成步骤应注明仅派遣了 2 个角色并相应调整预期。
+- **FAST**：完全跳过代码评审部分。直接跳到步骤 3.9（捕获学习成果）或步骤 4（范围漂移检测）。
+- **`harness gate`（步骤 5.9）** 无论强度级别都无条件运行。
+- **Memverse 学习捕获（步骤 3.9）**：LITE 模式下仅有 Engineer 和 QA 的学习成果可用。FAST 模式下不捕获角色特定的学习成果。

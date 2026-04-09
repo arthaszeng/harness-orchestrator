@@ -148,6 +148,20 @@ checks (build exists, eval freshness, workflow-state gate populated). Returns a
 structured `GateVerdict` with per-item results. `write_gate_snapshot` persists the
 verdict to `workflow-state.json` via load-merge-save. Used by `harness gate` CLI.
 
+**Adaptive Ship Gate (template-level):** The ship skill template includes
+`_ship-review-gate.md.j2` which computes an escalation score from code-change
+signals (diff size, file count, risk directories, commit types) and selects one
+of three review intensities:
+
+| Level | Trigger | Behavior |
+|-------|---------|----------|
+| FULL  | score ≥ `gate_full_review_min` (default 5) | 5-role parallel code review |
+| LITE  | score in `[gate_summary_confirm_min, gate_full_review_min)` | Engineer + QA only |
+| FAST  | score < `gate_summary_confirm_min` (default 3) | Skip multi-role review; CI + `harness gate` only |
+
+This is a **soft gate** (computed by the agent per template instructions). The
+Python-level `gates.py` machine gate remains unchanged and always runs.
+
 ### `progress.py`
 
 **`suggest_next_action`** and **`update_progress`** helpers for markdown progress narratives (e.g. `.harness-flow/progress.md`) aligned with native workflows.

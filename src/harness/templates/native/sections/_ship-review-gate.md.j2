@@ -1,0 +1,68 @@
+## Ship Review Gate — Adaptive Code Review Intensity
+
+Before dispatching code reviewers, calculate the **ship escalation score** to determine
+review intensity. This mirrors the plan review gate mechanism but uses code-change signals.
+
+### Ship Escalation Score
+
+Compute each signal from `git diff {{ trunk_branch }}..HEAD` and `git log {{ trunk_branch }}..HEAD`:
+
+| Signal | Condition | Score |
+|--------|-----------|-------|
+| Scale | diff lines (insertions + deletions) > 200 | +2 |
+| Scale | changed files > 10 | +2 |
+| Risk | changes touch `core/`, `commands/`, or `integrations/` directories | +1 |
+| Risk | changes touch auth/security/config files (`config.toml`, `*.env`, `auth*`, `secret*`) | +3 |
+| Risk | files added or deleted (not just modified) | +1 |
+| Type | any commit subject in `{{ trunk_branch }}..HEAD` starts with `feat` | +1 |
+| Type | **all** commit subjects start with `fix`, `docs`, or `chore` | -1 |
+| Quality | plan review aggregate score < {{ pass_threshold }}/10 (missing → 0, does not trigger) | +2 |
+
+**Default for missing signals:** If a signal cannot be determined (e.g., no plan review score
+exists, or diff stats are unavailable), treat the signal as **not triggered** (contribute 0).
+This avoids inflating the score with speculative risk signals. In practice, real changes
+almost always trigger at least some positive signals (new files, feat commits, etc.).
+
+### Review Intensity Levels
+
+**Score >= {{ gate_full_review_min }} → FULL REVIEW**
+Dispatch all 5 role reviewers in parallel (Architect, Product Owner, Engineer, QA, Project Manager).
+This is the standard behavior — proceed to the code review dispatch section below.
+Log: `SHIP_GATE: FULL (score N) — dispatching 5-role review`
+
+**Score {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE REVIEW**
+Dispatch only **2 role reviewers**: **Engineer** and **QA**.
+These two roles are the most direct guardians of code quality and regression safety.
+Skip Architect, Product Owner, and Project Manager for this review round.
+Use the same code review dispatch format below, but only for the 2 selected roles.
+Log: `SHIP_GATE: LITE (score N) — dispatching Engineer + QA review`
+
+**Score < {{ gate_summary_confirm_min }} → FAST PASS**
+Skip multi-role code review entirely. CI tests and `harness gate` (machine-level checks)
+still apply — this only bypasses the LLM-based role reviews.
+Write a minimal eval artifact so `harness gate` can find it:
+```bash
+harness save-eval --kind code --task TASK_ID --verdict PASS --score {{ pass_threshold }} --body "$(cat <<'FAST_EVAL_EOF'
+# Code Evaluation — Fast Pass
+
+Ship escalation score: N (below {{ gate_summary_confirm_min }})
+Review intensity: FAST — multi-role review skipped per adaptive gate policy.
+CI tests: passed.
+Machine gate: will be checked separately.
+
+## Verdict: PASS
+FAST_EVAL_EOF
+)"
+```
+Log: `SHIP_GATE: FAST (score N) — skipping multi-role review, CI + gate only`
+
+### Interaction with Existing Steps
+
+- **FULL**: Proceed to the code review section normally (all 5 roles).
+- **LITE**: Use the code review section but dispatch only Engineer + QA. The synthesis
+  step should note that only 2 roles were dispatched and adjust expectations accordingly.
+- **FAST**: Skip the code review section entirely. Jump to Step 3.9 (Capture Learnings)
+  or Step 4 (Scope Drift Detection) as appropriate.
+- **`harness gate` (Step 5.9)** runs unconditionally regardless of intensity level.
+- **Memverse learning capture (Step 3.9)**: In LITE mode, only Engineer and QA learnings
+  are available. In FAST mode, no role-specific learnings are captured.

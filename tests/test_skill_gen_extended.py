@@ -978,12 +978,12 @@ def test_eval_has_degradation_ladder(tmp_path: Path):
 
 
 def test_ship_step38_uses_five_role_review(tmp_path: Path):
-    """ship Step 3.8 dispatches 5 role reviewers, not old 3-pass system."""
+    """ship Step 3.8 dispatches code reviewers via adaptive gate, not old 3-pass system."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
-    assert "5-Role Code Evaluation" in content
+    assert "Adaptive Code Evaluation" in content
     assert "harness-architect" in content
     assert "harness-qa" in content
     assert "harness-evaluator" not in content
@@ -1936,3 +1936,106 @@ class TestRoadmapA2InstructionPrecision:
         content = eval_skill.read_text(encoding="utf-8")
         assert "禁止附加（按角色预算）" in content
         assert "归一化并聚类发现" in content
+
+
+# --- Ship Review Gate (Adaptive) ---
+
+
+def test_ship_en_has_ship_review_gate(tmp_path: Path):
+    """EN ship skill includes the ship review gate section with escalation score."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "Ship Review Gate" in content
+    assert "ship escalation score" in content
+    assert "FULL REVIEW" in content
+    assert "LITE REVIEW" in content
+    assert "FAST PASS" in content
+
+
+def test_ship_zh_has_ship_review_gate(tmp_path: Path):
+    """ZH ship skill includes the ship review gate section with escalation score."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "Ship Review Gate" in content
+    assert "Ship Escalation Score" in content
+    assert "FULL（完整评审）" in content
+    assert "LITE（轻量评审）" in content
+    assert "FAST（快速通过）" in content
+
+
+def test_ship_review_gate_renders_threshold_values(tmp_path: Path):
+    """Ship review gate renders gate_full_review_min and gate_summary_confirm_min."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "Score >= 5" in content
+    assert "Score 3" in content
+
+
+def test_ship_review_gate_custom_thresholds(tmp_path: Path):
+    """Custom gate thresholds are rendered in ship review gate."""
+    cfg = _make_cfg(tmp_path)
+    cfg.native.gate_full_review_min = 7
+    cfg.native.gate_summary_confirm_min = 4
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "Score >= 7" in content
+    assert "Score 4" in content
+
+
+def test_ship_review_gate_pass_threshold_rendered(tmp_path: Path):
+    """Ship review gate renders pass_threshold in quality signal row."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "7.0/10" in content
+
+
+def test_ship_no_contradictory_always_5_role(tmp_path: Path):
+    """Ship skill no longer says 'Never skip the 5-role code review'."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "Never skip the 5-role code review" not in content
+    assert "Never skip the code review gate" in content
+
+
+def test_ship_zh_no_contradictory_always_5_role(tmp_path: Path):
+    """ZH ship skill no longer says '绝不跳过 5 角色代码评审'."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "绝不跳过 5 角色代码评审" not in content
+    assert "绝不跳过代码评审门禁" in content
+
+
+def test_ship_review_gate_context_injection(tmp_path: Path):
+    """Ship skill context includes gate threshold keys needed by _ship-review-gate."""
+    from harness.native.skill_gen import _build_layered_context
+
+    cfg = _make_cfg(tmp_path)
+    ctx = _build_layered_context(cfg, "skill", "harness-ship", lang="en")
+    assert "gate_full_review_min" in ctx
+    assert "gate_summary_confirm_min" in ctx
+    assert "pass_threshold" in ctx
+    assert ctx["gate_full_review_min"] == "5"
+    assert ctx["gate_summary_confirm_min"] == "3"
+    assert ctx["pass_threshold"] == "7.0"
+
+
+def test_ship_adaptive_description(tmp_path: Path):
+    """Ship skill description mentions adaptive review."""
+    cfg = _make_cfg(tmp_path)
+    generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
+    ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
+    content = ship.read_text(encoding="utf-8")
+    assert "adaptive" in content.lower() or "FULL/LITE/FAST" in content

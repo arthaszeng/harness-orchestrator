@@ -1,6 +1,6 @@
 ---
 name: harness-ship
-description: "最少交互的交付管线：合并基准、测试、5 角色代码评审、修复循环、可二分提交、推送、PR。一个命令 — 你看到的下一个东西就是 PR URL。当用户说 ship this、harness ship、push 或 create a PR 时使用。当用户说代码已完成或要求部署时主动调用。(harness)"
+description: "最少交互的交付管线：合并基准、测试、自适应代码评审（基于 escalation score 的 FULL/LITE/FAST）、修复循环、可二分提交、推送、PR。一个命令 — 你看到的下一个东西就是 PR URL。当用户说 ship this、harness ship、push 或 create a PR 时使用。当用户说代码已完成或要求部署时主动调用。(harness)"
 ---
 
 {% include 'sections/_language-directive.md.j2' %}
@@ -279,10 +279,16 @@ COMPLETION: X/Y DONE, M PARTIAL, K NOT DONE
 
 ---
 
-## 步骤 3.8：预着陆评审 — 5 角色代码评估（始终开启）
+## 步骤 3.8：预着陆评审 — 自适应代码评估
 
-内联运行代码评估。使用 Task 工具并行派遣所有 5 个角色审查者 —
+{% include 'sections/_ship-review-gate.md.j2' %}
+
+### 代码评审派遣（适用于 FULL 和 LITE 强度）
+
+如果 ship review gate 确定了 **FULL** 或 **LITE** 强度，使用 Task 工具派遣代码审查者 —
 主代理协调但不自行执行评审。
+**FULL** 派遣全部 5 个角色。**LITE** 仅派遣 Engineer 和 QA。
+**FAST** 完全跳过本节（eval 产物已由 gate 写入）。
 
 {% include 'sections/_code-review.md.j2' %}
 
@@ -792,7 +798,7 @@ PR URL、提交数、评审分数、处理的关键发现、遗留的 open items
 - **绝不跳过 eval。** Step 3.8 必须运行。Step 5.9 验证它确实执行了。没有例外。
   "测试通过"是不够的 — eval 捕获测试无法发现的问题（安全、设计、范围）。
 - **绝不跳过测试。** 如果测试在分类后仍然失败，停止。
-- **绝不跳过 5 角色代码评审。** 所有 5 个审查者都必须被派遣（如果部分失败则按阶梯降级）。
+- **绝不跳过代码评审门禁。** Ship review gate（步骤 3.8）决定强度（FULL/LITE/FAST）。FULL 派遣全部 5 个角色，LITE 派遣 Engineer + QA，FAST 仅依赖 CI + 机器门禁。无论强度如何，`harness gate`（步骤 5.9）必须运行。如果个别角色派遣失败，按代码评审部分的阶梯降级。
 - **绝不 force push。** 只使用常规 `git push`。
 - **绝不请求琐碎的确认。** 自动提交、自动推送、自动 PR。
 - **为可二分性拆分提交** — 每个提交 = 一个逻辑变更。
