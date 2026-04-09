@@ -1,6 +1,6 @@
 ---
 name: harness-ship
-description: "Minimal-interaction shipping pipeline: merge base, test, 5-role code review, fix loop, bisectable commits, push, PR. One command — next thing you see is the PR URL. Use when saying ship this, harness ship, push, or create a PR. Proactively invoke when user says code is ready or asks to deploy. (harness)"
+description: "Minimal-interaction shipping pipeline: merge base, test, adaptive code review (FULL/LITE/FAST based on escalation score), fix loop, bisectable commits, push, PR. One command — next thing you see is the PR URL. Use when saying ship this, harness ship, push, or create a PR. Proactively invoke when user says code is ready or asks to deploy. (harness)"
 ---
 
 {% include 'sections/_language-directive.md.j2' %}
@@ -280,10 +280,16 @@ If any NOT DONE items: note them in the PR body. Continue — this is informatio
 
 ---
 
-## Step 3.8: Pre-Landing Review — 5-Role Code Evaluation (always-on)
+## Step 3.8: Pre-Landing Review — Adaptive Code Evaluation
 
-Run code evaluation inline. Dispatch all 5 role reviewers in parallel using
-Task tool — the main agent orchestrates but does NOT perform reviews itself.
+{% include 'sections/_ship-review-gate.md.j2' %}
+
+### Code Review Dispatch (for FULL and LITE intensity)
+
+If the ship review gate determined **FULL** or **LITE** intensity, dispatch code reviewers
+using the Task tool — the main agent orchestrates but does NOT perform reviews itself.
+For **FULL**, dispatch all 5 roles. For **LITE**, dispatch only Engineer and QA.
+For **FAST**, skip this section entirely (eval artifact was already written by the gate).
 
 {% include 'sections/_code-review.md.j2' %}
 
@@ -801,7 +807,7 @@ where to continue** instead of starting from scratch:
 - **Never skip eval.** Step 3.8 MUST run. Step 5.9 verifies it did. No exceptions.
   "Tests pass" is NOT sufficient — eval catches what tests cannot (security, design, scope).
 - **Never skip tests.** If tests fail after triage, stop.
-- **Never skip the 5-role code review.** All 5 reviewers must be dispatched (degrade per ladder if some fail).
+- **Never skip the code review gate.** The ship review gate (Step 3.8) determines intensity (FULL/LITE/FAST). FULL dispatches all 5 roles, LITE dispatches Engineer + QA, FAST relies on CI + machine gate only. Regardless of intensity, `harness gate` (Step 5.9) must run. If individual role dispatches fail, degrade per the ladder in the code review section.
 - **Never force push.** Use regular `git push` only.
 - **Never ask for trivial confirmations.** Auto-commit, auto-push, auto-PR.
 - **Split commits for bisectability** — each commit = one logical change.
