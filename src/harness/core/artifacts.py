@@ -238,23 +238,37 @@ def _parse_aggregate_from_table(content: str) -> float | None:
     return val
 
 
-_DIM_SCORE_RE = re.compile(
+_DIM_SCORE_COL2_RE = re.compile(
+    r"^\|\s*([^|*]+?)\s*\|\s*(\d+(?:\.\d+)?)\s*/\s*10\s*\|",
+    re.MULTILINE,
+)
+_DIM_SCORE_COL3_RE = re.compile(
     r"^\|\s*([^|*]+?)\s*\|\s*[^|]*\|\s*(\d+(?:\.\d+)?)\s*/\s*10\s*\|",
     re.MULTILINE,
 )
 
+_DIM_SKIP_LABELS = frozenset({
+    "average", "**average**", "weighted avg", "weighted average",
+    "role", "dimension", "category",
+})
+
 
 def _parse_dimension_scores(content: str) -> dict[str, float]:
-    """Extract per-dimension scores from markdown table."""
+    """Extract per-dimension scores from markdown table.
+
+    Handles both ``| Dim | X/10 | Verdict |`` (score in column 2) and
+    ``| Dim | PASS | X/10 |`` (score in column 3) layouts.
+    """
     results: dict[str, float] = {}
-    for m in _DIM_SCORE_RE.finditer(content):
-        dim = m.group(1).strip()
-        if dim.lower() in ("average", "**average**", "weighted avg", "weighted average"):
-            continue
-        try:
-            results[dim] = float(m.group(2))
-        except ValueError:
-            continue
+    for pat in (_DIM_SCORE_COL2_RE, _DIM_SCORE_COL3_RE):
+        for m in pat.finditer(content):
+            dim = m.group(1).strip()
+            if dim.lower() in _DIM_SKIP_LABELS or "---" in dim:
+                continue
+            try:
+                results.setdefault(dim, float(m.group(2)))
+            except ValueError:
+                continue
     return results
 
 
