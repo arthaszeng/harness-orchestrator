@@ -89,6 +89,14 @@ def _is_memverse_enabled(task_dir: Path) -> bool:
     return _memverse_enabled_cached(str(project_root))
 
 
+def _memverse_domain(task_dir: Path) -> str:
+    """Return the configured Memverse domain for failure patterns."""
+    project_root = _find_project_root(task_dir)
+    if project_root is None:
+        return "harness-flow"
+    return _memverse_domain_cached(str(project_root))
+
+
 def _find_project_root(start: Path) -> Path | None:
     cur = start
     for _ in range(6):
@@ -109,7 +117,25 @@ def _memverse_enabled_cached(project_root_str: str) -> bool:
         cfg = HarnessConfig.load(Path(project_root_str))
         return cfg.integrations.memverse.enabled
     except Exception:
+        import logging
+
+        logging.getLogger(__name__).debug("Failed to load memverse config", exc_info=True)
         return False
+
+
+@lru_cache(maxsize=4)
+def _memverse_domain_cached(project_root_str: str) -> str:
+    try:
+        from harness.core.config import HarnessConfig
+
+        cfg = HarnessConfig.load(Path(project_root_str))
+        return (
+            cfg.integrations.memverse.domain_prefix.strip()
+            or cfg.project.name
+            or "harness-flow"
+        )
+    except Exception:
+        return "harness-flow"
 
 
 def save_failure_pattern(
@@ -161,6 +187,7 @@ def save_failure_pattern(
     if memverse_enabled:
         from harness.integrations.memverse import build_upsert_payload
 
+        domain = _memverse_domain(task_dir)
         sync = build_upsert_payload(
             summary=summary,
             category=category,
@@ -172,6 +199,7 @@ def save_failure_pattern(
             error_output=error_output,
             root_cause=root_cause,
             fix_applied=fix_applied,
+            domain=domain,
         )
         pattern.memverse_sync = sync.payload.as_dict()
 

@@ -513,7 +513,7 @@ class TestCLIJsonOutput:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output.strip())
         assert data["memverse_sync"] is not None
-        assert data["memverse_sync"]["domain"] == "harness-flow"
+        assert data["memverse_sync"]["domain"] == "test-domain"
         assert data["memverse_sync"]["upsert_key"] == "signature"
         _memverse_enabled_cached.cache_clear()
 
@@ -574,20 +574,42 @@ class TestMemverseCachePerformance:
         )
 
         result1 = _is_memverse_enabled(project_root / "some-task")
+        info_after_first = _memverse_enabled_cached.cache_info()
+        assert info_after_first.misses == 1
+        assert info_after_first.hits == 0
+
         result2 = _is_memverse_enabled(project_root / "another-task")
+        info_after_second = _memverse_enabled_cached.cache_info()
+        assert info_after_second.misses == 1
+        assert info_after_second.hits == 1
 
         assert result1 is True
         assert result2 is True
-        assert _memverse_enabled_cached.cache_info().hits >= 1
 
         _memverse_enabled_cached.cache_clear()
 
     def test_cache_clear_resets(self, tmp_path: Path):
-        from harness.core.failure_patterns import _memverse_enabled_cached
+        from harness.core.failure_patterns import _is_memverse_enabled, _memverse_enabled_cached
 
         _memverse_enabled_cached.cache_clear()
-        info_before = _memverse_enabled_cached.cache_info()
-        assert info_before.currsize == 0
+
+        project_root = tmp_path
+        (project_root / ".harness-flow").mkdir(parents=True)
+        (project_root / ".harness-flow" / "config.toml").write_text(
+            '[project]\nname = "test"\n[ci]\ncommand = ""\n'
+            '[models]\ndefault = ""\n[workflow]\n[native]\n'
+            '[integrations.memverse]\nenabled = false\n',
+            encoding="utf-8",
+        )
+
+        assert _is_memverse_enabled(project_root / "task") is False
+        assert _memverse_enabled_cached.cache_info().currsize == 1
+
+        _memverse_enabled_cached.cache_clear()
+        assert _memverse_enabled_cached.cache_info().currsize == 0
+
+        assert _is_memverse_enabled(project_root / "task") is False
+        assert _memverse_enabled_cached.cache_info().misses == 1
 
 
 class TestTemplateRendering:
