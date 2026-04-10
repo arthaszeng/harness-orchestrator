@@ -22,6 +22,14 @@ task_id_custom_pattern = ""
 # Estimated token budget for task artifacts (chars/4 approximation)
 # context_budget_tokens = 50000
 
+# Progressive trust thresholds (review gate adjustment advisory)
+# [workflow.trust]
+# accuracy_high = 0.85
+# accuracy_medium = 0.70
+# min_samples_high = 10
+# min_samples_medium = 5
+# probation_revert_window = 3
+
 [native]
 evaluator_model = "{{ evaluator_model }}"
 adversarial_mechanism = "auto"

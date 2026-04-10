@@ -105,4 +105,16 @@ def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
         band_text = t(band_key, score=f"{verdict.aggregate_score:.1f}")
         console.print(f"\n  {band_text}")
 
+    if verdict.trust_level is not None:
+        from harness.core.trust_engine import _LEVEL_META
+
+        meta = _LEVEL_META.get(verdict.trust_level, {})
+        desc = meta.get("description", "")
+        adj = meta.get("escalation_adjustment", 0)
+        sign = "+" if adj >= 0 else ""
+        console.print(
+            f"\n  [cyber.dim]Trust: {verdict.trust_level.value} — "
+            f"escalation adjustment {sign}{adj} ({desc})[/]"
+        )
+
     console.print()

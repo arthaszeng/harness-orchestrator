@@ -12,12 +12,17 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from harness.core.trust_engine import TrustProfile
 
 from harness.core.workflow_state import (
     GateStatus,
     load_workflow_state,
 )
 from harness.core.score_calibration import ScoreBand, classify_score
+from harness.core.trust_engine import TrustLevel
 from harness.integrations.git_ops import get_head_commit_epoch
 
 
@@ -56,6 +61,7 @@ class GateVerdict:
     summary: str = ""
     aggregate_score: float | None = None
     score_band: "ScoreBand | None" = None
+    trust_level: "TrustLevel | None" = None
 
     @property
     def hard_blocked(self) -> list[CheckItem]:
@@ -138,8 +144,12 @@ def check_ship_readiness(
     task_dir: Path,
     *,
     review_gate_mode: str = "eng",
+    trust_profile: "TrustProfile | None" = None,
 ) -> GateVerdict:
     """Run all ship-readiness checks against *task_dir*.
+
+    *trust_profile* is advisory only — it never changes pass/block semantics.
+    When provided, ``GateVerdict.trust_level`` is set for display purposes.
 
     Returns a :class:`GateVerdict` with per-item results.
     """
@@ -290,6 +300,7 @@ def check_ship_readiness(
         summary=summary,
         aggregate_score=agg_score,
         score_band=band,
+        trust_level=trust_profile.level if trust_profile is not None else None,
     )
 
 

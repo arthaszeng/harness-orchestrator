@@ -37,16 +37,16 @@ For module-level behavior, read the code and docstrings. For day-to-day usage, s
 Built with **Typer**. Core commands:
 
 
-| Command              | Purpose                                                                                                          |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `init`               | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts.                         |
-| `gate`               | Check ship-readiness gates for the current task (hard + soft checks).                                            |
-| `status`             | Load workflow state and render a Rich dashboard.                                                                 |
-| `git-preflight`      | Structured git preflight checks with deterministic result codes.                                                 |
-| `git-prepare-branch` | Create/resume task branch on top of configured trunk.                                                            |
-| `git-sync-trunk`     | Sync the current feature branch against configured trunk.                                                        |
-| `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup.                                |
-| `update`             | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes.                            |
+| Command              | Purpose                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `init`               | Project bootstrap wizard; when config already exists, reinit mode regenerates artifacts. |
+| `gate`               | Check ship-readiness gates for the current task (hard + soft checks).                    |
+| `status`             | Load workflow state and render a Rich dashboard.                                         |
+| `git-preflight`      | Structured git preflight checks with deterministic result codes.                         |
+| `git-prepare-branch` | Create/resume task branch on top of configured trunk.                                    |
+| `git-sync-trunk`     | Sync the current feature branch against configured trunk.                                |
+| `git-post-ship`      | Post-ship lifecycle automation: PR merge check, trunk sync, local branch cleanup.        |
+| `update`             | Check PyPI, optional pip upgrade, config migration hints; no project artifact writes.    |
 
 
 ---
@@ -64,7 +64,7 @@ Two modes:
 
 ### `status.py`
 
-Loads task-level **`workflow-state.json`** under `.harness-flow/tasks/task-NNN/` and
+Loads task-level `**workflow-state.json`** under `.harness-flow/tasks/task-NNN/` and
 renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` patterns).
 
 ### `calibrate_cmd.py`
@@ -73,9 +73,15 @@ renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` 
 directories for `review-outcome.json`, generates aggregated statistics
 (Rich terminal or `--json`), and supports single-task view via `--task`.
 
+### `trust_cmd.py`
+
+`harness trust` — display progressive trust profile. Collects review outcomes,
+generates `CalibrationReport`, computes `TrustProfile` via `trust_engine.py`.
+Supports Rich terminal and `--json` output. Exit 0 always (including no-data case).
+
 ### `update.py`
 
-Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run **`harness init --force`** in the target repository when regeneration is needed.
+Queries PyPI for newer versions, runs `**pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run `**harness init --force`** in the target repository when regeneration is needed.
 
 ---
 
@@ -85,11 +91,11 @@ Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** w
 
 **Pydantic** models: `ProjectConfig`, `CIConfig`, `ModelsConfig`, `NativeModeConfig`, `WorkflowConfig`, `HarnessConfig`, plus nested integration config (e.g. Memverse).
 
-- **`HarnessConfig` uses `ConfigDict(extra="ignore")`** so older TOML keys do not break loading.
-- **`HarnessConfig.load()`** builds the effective config by deep-merging, then validates:
+- `**HarnessConfig` uses `ConfigDict(extra="ignore")`** so older TOML keys do not break loading.
+- `**HarnessConfig.load()**` builds the effective config by deep-merging, then validates:
   - Start from **project** `.harness-flow/config.toml` (if present).
-  - Merge **`~/.harness/config.toml`** under it so **project wins** on conflicts.
-  - Merge **`HARNESS_*` environment variables** on top (highest precedence).
+  - Merge `**~/.harness/config.toml`** under it so **project wins** on conflicts.
+  - Merge `**HARNESS_*` environment variables** on top (highest precedence).
   - Missing keys fall back to **model defaults**.
 
 `ModelsConfig` carries `default`, `role_overrides`, and `role_configs`; unknown keys under `[models]` are ignored. Native workflows primarily use `native.*` and project/CI/workflow fields.
@@ -98,14 +104,14 @@ Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** w
 
 Minimal constants only:
 
-- **`ALL_ROLES`** — empty `frozenset` (no routed roles in native-only mode).
-- **`NATIVE_REVIEW_ROLES`** — the five native review roles: `architect`, `product_owner`, `engineer`, `qa`, `project_manager`.
-- **`SCORING_DIMENSIONS`** — evaluation dimension labels (used by tests for validation).
-- **`DEFAULT_RUNTIME`** — default runtime label (`"cursor"`) for registry/events/tracker.
+- `**ALL_ROLES`** — empty `frozenset` (no routed roles in native-only mode).
+- `**NATIVE_REVIEW_ROLES**` — the five native review roles: `architect`, `product_owner`, `engineer`, `qa`, `project_manager`.
+- `**SCORING_DIMENSIONS**` — evaluation dimension labels (used by tests for validation).
+- `**DEFAULT_RUNTIME**` — default runtime label (`"cursor"`) for registry/events/tracker.
 
 ### `state.py`
 
-**`TaskState`** enumeration for workflow phases (idle, planning, contracted, building, evaluating, shipping, done, blocked).
+`**TaskState**` enumeration for workflow phases (idle, planning, contracted, building, evaluating, shipping, done, blocked).
 
 ### `workflow_state.py`
 
@@ -159,11 +165,13 @@ verdict to `workflow-state.json` via load-merge-save. Used by `harness gate` CLI
 signals (diff size, file count, risk directories, commit types) and selects one
 of three review intensities:
 
-| Level | Trigger | Behavior |
-|-------|---------|----------|
-| FULL  | score ≥ `gate_full_review_min` (default 5) | 5-role parallel code review |
-| LITE  | score in `[gate_summary_confirm_min, gate_full_review_min)` | Engineer + QA only |
-| FAST  | score < `gate_summary_confirm_min` (default 3) | Skip multi-role review; CI + `harness gate` only |
+
+| Level | Trigger                                                     | Behavior                                         |
+| ----- | ----------------------------------------------------------- | ------------------------------------------------ |
+| FULL  | score ≥ `gate_full_review_min` (default 5)                  | 5-role parallel code review                      |
+| LITE  | score in `[gate_summary_confirm_min, gate_full_review_min)` | Engineer + QA only                               |
+| FAST  | score < `gate_summary_confirm_min` (default 3)              | Skip multi-role review; CI + `harness gate` only |
+
 
 This is a **soft gate** (computed by the agent per template instructions). The
 Python-level `gates.py` machine gate remains unchanged and always runs.
@@ -194,19 +202,45 @@ aggregate), and score-outcome correlation (point-biserial). Requires ≥5
 paired samples for full statistics; degrades gracefully with fewer.
 
 **Integration points:**
+
 - `artifacts.save_evaluation(kind="code")` writes prediction sidecar
-  automatically (both structured and `raw_body` paths)
+automatically (both structured and `raw_body` paths)
 - `post_ship.PostShipManager.record_outcome()` collects actual outcomes
-  (best-effort, failure-isolated from core cleanup path)
+(best-effort, failure-isolated from core cleanup path)
 - `harness calibrate` CLI exposes Rich and JSON reports
 
 The calibration pipeline reads only `review-outcome.json` files and does
 **not** consume `events.jsonl` to avoid dual truth-source conflicts with
 the session-level event stream.
 
+### `trust_engine.py`
+
+Progressive trust engine — computes trust level from historical calibration data.
+
+**Pure-function module:** no I/O, no side effects. Inputs (`CalibrationReport`,
+`list[ReviewOutcome]`, `TrustConfig`) provided by caller (CLI or gate command).
+
+**Trust levels** (discrete, ordered most-to-least trusted):
+
+- `HIGH` — prediction accuracy ≥ 85%, ≥ 10 paired samples, no recent reverts → escalation -2
+- `MEDIUM` — accuracy ≥ 70%, ≥ 5 paired samples, no recent reverts → escalation -1
+- `LOW` — insufficient data or accuracy below threshold → escalation +0
+- `PROBATION` — revert detected in recent N tasks → escalation +3
+
+**Priority rule:** PROBATION > HIGH > MEDIUM > LOW (revert always overrides
+positive accuracy signals).
+
+**Advisory only:** trust level is displayed in `harness gate` and `harness trust`
+output but never changes hard gate pass/block semantics. `GateVerdict.trust_level`
+is not persisted to `workflow-state.json`.
+
+**Configuration:** `[workflow.trust]` in `config.toml` exposes `accuracy_high`,
+`accuracy_medium`, `min_samples_high`, `min_samples_medium`,
+`probation_revert_window` — all with sensible defaults.
+
 ### `progress.py`
 
-**`suggest_next_action`** and **`update_progress`** helpers for markdown progress narratives (e.g. `.harness-flow/progress.md`) aligned with native workflows.
+`**suggest_next_action`** and `**update_progress**` helpers for markdown progress narratives (e.g. `.harness-flow/progress.md`) aligned with native workflows.
 
 ### `scanner.py`
 
@@ -245,7 +279,7 @@ Context is organized into three layers:
   layers because it references evaluator model info. Mapping is defined in `_ARTIFACT_LAYERS`.
 - **Selective rule activation**: `NativeModeConfig.rule_activation` controls per-rule generation:
 `"always"` (default), `"phase_match"` (adds marker comment), `"disabled"` (skips file).
-- **`generate_native_artifacts()`** writes:
+- `**generate_native_artifacts()`** writes:
   - **9 skills** under `.cursor/skills/harness/<skill-name>/SKILL.md`
   - **5 agents** under `.cursor/agents/*.md` (with `<!-- context: layers ... -->` metadata)
   - **Up to 4 rules** under `.cursor/rules/*.mdc` (count depends on `rule_activation`)
@@ -253,15 +287,15 @@ Context is organized into three layers:
 
 Skills/agents/rules are regenerated according to `init --force` behavior.
 
-**`harness worktree-setup`** — CLI command that creates symlinks in linked git worktrees, pointing `.harness-flow`, `.cursor/skills/harness`, `.cursor/agents`, and `.cursor/rules` back to the main working tree. Preflight templates guide agents to run this command automatically when `.harness-flow` is missing.
+`**harness worktree-setup`** — CLI command that creates symlinks in linked git worktrees, pointing `.harness-flow`, `.cursor/skills/harness`, `.cursor/agents`, and `.cursor/rules` back to the main working tree. Preflight templates guide agents to run this command automatically when `.harness-flow` is missing.
 
 ---
 
 ## Templates (`src/harness/templates/`)
 
-- **`config.toml.j2`** — project config emitted by `init`.
-- **`native/`** — Jinja2 sources for skills, agents, rules, and shared **sections** (e.g. plan/review gates, trust boundary, CI verification).
-- **`vision.md.j2` / `vision.zh.md.j2`** — initial vision stubs.
+- `**config.toml.j2**` — project config emitted by `init`.
+- `**native/**` — Jinja2 sources for skills, agents, rules, and shared **sections** (e.g. plan/review gates, trust boundary, CI verification).
+- `**vision.md.j2` / `vision.zh.md.j2`** — initial vision stubs.
 
 All user-visible harness **behavior** in the IDE is intended to flow from these templates plus `HarnessConfig`, so upgrades can refresh prompts without forking business logic across Python files.
 
@@ -269,8 +303,8 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 
 ## Integrations (`src/harness/integrations/`)
 
-- **`git_ops.py`** — git helpers (rebase, merge, cleanup) plus structured command results (`GitOperationResult`) for deterministic error handling.
-- **`memverse.py`** — Memverse integration anchor. Actual search/add runs via Cursor MCP tools in the IDE; Python only provides the `integrations.memverse` config which is projected into templates as `memverse_enabled` and `memverse_domain` (Layer 0).
+- `**git_ops.py`** — git helpers (rebase, merge, cleanup) plus structured command results (`GitOperationResult`) for deterministic error handling.
+- `**memverse.py**` — Memverse integration anchor. Actual search/add runs via Cursor MCP tools in the IDE; Python only provides the `integrations.memverse` config which is projected into templates as `memverse_enabled` and `memverse_domain` (Layer 0).
 
 ---
 
@@ -279,8 +313,8 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 1. **Cursor IDE is the execution engine** — Harness generates **skills, agents, and rules** that Cursor’s agent runtime executes. No in-package external CLI orchestration of other IDEs.
 2. **Five-role adversarial review** — The five native roles review **plans and code** in parallel; templates encode how dispatch and aggregation behave.
 3. **Fix-First auto-remediation** — Review output is classified into **AUTO-FIX** vs **ASK** before presentation (encoded in generated rules/skills, not in a Python state machine).
-4. **Config cascade** — **Project** and **global** TOML merge with **project overriding global**; **`HARNESS_*` env vars** override both; Pydantic validates the result.
-5. **Backward compatibility** — **`extra="ignore"`** on `HarnessConfig` allows stale keys from older installs to load safely.
+4. **Config cascade** — **Project** and **global** TOML merge with **project overriding global**; `**HARNESS_*` env vars** override both; Pydantic validates the result.
+5. **Backward compatibility** — `**extra="ignore"`** on `HarnessConfig` allows stale keys from older installs to load safely.
 6. **Template-driven generation** — Native artifacts are rendered from **Jinja2**; Python supplies context and file placement only.
 7. **Local-first** — State, config, registry, and logs are **on disk**; PyPI is only needed for **package updates**, not for routine development.
 
@@ -298,7 +332,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 
 **Generated IDE (`.cursor/`)**
 
-- `skills/harness/**` — generated skills and eval resources.
+- `skills/harness/`** — generated skills and eval resources.
 - `agents/*.md` — five review agents plus any future template outputs.
 - `rules/*.mdc` — always-on rules (workflow, trust boundary, Fix-First, safety).
 - ~~`worktrees.json`~~ — Removed. Worktree symlink setup is now handled by `harness worktree-setup` CLI command.
@@ -325,7 +359,7 @@ Project-specific **CI command**, **trunk branch**, **review gates**, and **hooks
 
 ### Why keep `ALL_ROLES` empty?
 
-Older configs and code paths referenced a unified role set for model validation. An empty `ALL_ROLES` preserves **compatibility** while native mode keys off **`NATIVE_REVIEW_ROLES`** only.
+Older configs and code paths referenced a unified role set for model validation. An empty `ALL_ROLES` preserves **compatibility** while native mode keys off `**NATIVE_REVIEW_ROLES`** only.
 
 ### Why SQLite for the registry?
 
