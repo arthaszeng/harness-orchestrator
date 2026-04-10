@@ -41,18 +41,27 @@ which means DO IT. Implement everything and output the build result.
    ```
    This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
    Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the most recent `task-NNN` directory.
-2. **Check stage summary:** If `has_handoff_summary` is `true` (or `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field),
-   read the handoff summary first — it provides a compact summary of the plan (decisions, risks, open items).
-   Use this as your primary context; only read the full `plan.md` for details not covered.
-   (Backward compat: if `handoff-plan.json` exists but `handoff_summary` is empty, read that instead.)
-3. **Structured plan handoff:** If `TASK_DIR/handoff-plan.json` exists, read it **before** broad repo search.
-   Use `decisions`, `risks`, `open_items`, and `context_footprint` (`explored_paths`, `primary_read_files`)
-   to avoid re-discovering what plan already captured.
-4. Read `.harness-flow/tasks/task-NNN/plan.md` — extract the deliverables checklist
+2. **Read handoff context** (preferred over re-reading full plan):
+   ```bash
+   harness handoff read --task task-NNN --json
+   ```
+   This provides the compact plan summary including decisions, risks, and open items.
+   Only read full `plan.md` for details not covered by the handoff.
+3. **Read session context** (if resuming mid-phase):
+   ```bash
+   harness session read --task task-NNN --json
+   ```
+   If session context exists, resume from the recorded step — do not restart from scratch.
+4. **Context budget check** (preflight):
+   ```bash
+   harness context-budget --task task-NNN
+   ```
+   If over budget (exit 1), consider trimming old artifacts before proceeding.
+5. Read `.harness-flow/tasks/task-NNN/plan.md` — extract the deliverables checklist
    from the Contract section
-5. If this is a subsequent round (feedback exists from evaluation), also read
+6. If this is a subsequent round (feedback exists from evaluation), also read
    `.harness-flow/tasks/task-NNN/code-eval-rN.md` for the fix suggestions
-6. If `.harness-flow/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
+7. If `.harness-flow/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
    source for phase / gate / blocker / artifact refs. Update it when you write
    new build artifacts; do not treat session summaries as a parallel gate source.
 
@@ -71,6 +80,11 @@ Before writing any code:
 This prevents reinventing what already exists and ensures consistency.
 
 {% include 'sections/_failure-pattern-prereview.md.j2' %}
+
+**Session boundary:** After completing Step 2, update session context:
+```bash
+echo '{"task_id":"task-NNN","current_phase":"build","current_step":"2/7","current_state":"Pre-build search complete","next_step":"Implement deliverables"}' | harness session write --task task-NNN
+```
 
 ---
 
@@ -116,6 +130,8 @@ For each deliverable in the contract:
 - Run `cargo clippy` before commit
 - Run `cargo fmt --check` for formatting
 {% endif %}
+
+**Session boundary:** After completing implementation, update session context with deliverable status and working set.
 
 ---
 
@@ -205,7 +221,7 @@ what was built, CI result, key decisions, deviations from plan, open items.
 
 If `workflow-state.json` does not exist, skip.
 
-## Step 5.6: Write `handoff-build.json` (schema v2) — mandatory
+## Step 5.6: Write `handoff-build.json` (schema v3) — mandatory
 
 Write **`TASK_DIR/handoff-build.json`** before commit. Same schema family as plan handoff:
 

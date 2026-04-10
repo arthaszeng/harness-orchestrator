@@ -8,71 +8,42 @@ description: "Multi-role code review with 5 specialized reviewers and Fix-First 
 
 # Harness Eval
 
-You are running the `/harness-eval` workflow. This is a **minimal-interaction** review
-pipeline. Run straight through and output the evaluation result at the end.
+You are running `/harness-eval`. **minimal-interaction** pipeline: run through and output the evaluation result.
 
-**Only stop for:**
-- ASK-classified findings that need user judgment (see Fix-First below)
-- All review subagents failed (no results at all)
+**Stop for:** ASK-class findings (Fix-First); all review subagents failed with no results.
 
-**Never stop for:**
-- AUTO-FIX findings (fix them, commit, continue)
-- Subagent failures (degrade gracefully per degradation ladder)
-- Minor issues or informational findings
+**Do not stop for:** AUTO-FIX (fix, commit, continue); partial subagent failure (degrade); minor / INFO-only noise.
 
 ---
 
 {% include 'sections/_workflow-progress-envelope.md.j2' %}
 
+**Session boundary:** After each numbered step, resolve `TASK_ID` via `harness task resolve --json`. Persist `SessionContext` JSON (`current_phase`: `"eval"`):
+
+```bash
+echo '{"task_id":"TASK_ID","current_phase":"eval","current_step":"N","current_state":"<brief>","next_step":"<next>"}' | harness session write --task TASK_ID
+```
+
 ## Step 0: Context Gathering
 
-1. Resolve the current task:
-   ```bash
-   harness task resolve --json
-   ```
-   This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
-   Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the most recent `task-NNN` directory.
-2. **Check stage summary:** If `has_handoff_summary` is `true` (or `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field),
-   read the handoff summary first — it provides a compact summary of the build (what was built, CI result,
-   decisions, risks, open items). Use this as your primary context for understanding what changed.
-   (Backward compat: if `handoff-build.json` exists but `handoff_summary` is empty, read that instead.)
-3. **Structured handoffs:** Read `TASK_DIR/handoff-plan.json` and `TASK_DIR/handoff-build.json` when present
-   (schema v2). Merge `context_footprint` and narrative fields **before** inferring scope from scratch —
-   they list paths and decisions already vetted upstream.
-4. Read `.harness-flow/tasks/task-NNN/plan.md` (the contract)
-5. Read `.harness-flow/tasks/task-NNN/build-rN.md` (the latest build log)
-6. Run `git diff {{ trunk_branch }}..HEAD --stat` to understand the scope
+1. `harness task resolve --json` → `TASK_DIR` / `task_id`.
+2. If `has_handoff_summary` or `workflow-state.json` → read `handoff_summary` / `handoff-build.json` (compat).
+3. Read `handoff-plan.json` / `handoff-build.json` when present (v2 `context_footprint`).
+4. `plan.md`, latest `build-rN.md`, `git diff {{ trunk_branch }}..HEAD --stat`.
 {% if memverse_enabled == "true" %}
-7. **Prior Learnings**: Search Memverse for learnings relevant to the changed files/modules.
-   If Memverse MCP is available, call `search_memory` with key topics from the diff.
-   Use multi-domain OR query (single call replaces dual windows).
-   Include the project domain plus all five role-learning domains:
-   ```
-   search_memory(query=<key topics from diff>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning,{{ project_name or memverse_domain }}-engineer-learning,{{ project_name or memverse_domain }}-qa-learning,{{ project_name or memverse_domain }}-product-learning,{{ project_name or memverse_domain }}-project-manager-learning", limit=20)
-   ```
-   Display any relevant prior learnings (especially pitfalls) before starting the review.
+5. Memverse: one `search_memory` with project + five `*-learning` domains (same shape as ship Step 1).
 {% endif %}
-{% if memverse_enabled == "true" %}8.{% else %}7.{% endif %} If `.harness-flow/tasks/task-NNN/workflow-state.json` exists, treat it as the canonical
-   task state file. Evaluation may append or update gate/blocker snapshots there,
-   but registry/events must remain audit-only and must not become workflow gate sources.
+{% if memverse_enabled == "true" %}6.{% else %}5.{% endif %} `workflow-state.json` is canonical for gates; registry/events are audit-only.
 
 ### Context Degradation Ladder
 
-Check each context source in order. Skip what is missing — do NOT stop for missing context
-unless git diff is empty.
+| Source | If missing |
+|--------|------------|
+| task dir | fallback `.harness-flow/evals/` |
+| plan / build log | warn, continue |
+| git diff empty | **FATAL** — stop |
 
-| Context Source | If Missing | Impact |
-|----------------|------------|--------|
-| `task-NNN/` directory | Use branch name as audit ID; write eval artifacts to `.harness-flow/evals/` fallback | No task-level tracking |
-| `plan.md` | Warn: "No plan — evaluating raw diff" | Skip contract completeness; score Completeness as N/A |
-| `build-rN.md` | Warn: "No build log — skipping builder-claims verification" | Rely on git diff + CI only |
-| `handoff-plan.json` / `handoff-build.json` | Skip silently | Less prior-context reuse; do not fail |
-| `git diff` (empty) | **FATAL** — nothing to review. Stop and report error. | Cannot proceed |
-{% if memverse_enabled == "true" %}
-| Memverse MCP | Skip silently | No prior-learnings lookup |
-{% endif %}
-
-**Minimum viable eval = non-empty git diff.** Everything else degrades gracefully.
+**Minimum viable eval** = non-empty git diff. Full ladder + subagent degradation: see code-review-protocol.md.
 
 ---
 
@@ -82,76 +53,25 @@ unless git diff is empty.
 
 ## Step 1: 5-Role Code Review
 
-{% include 'sections/_code-review.md.j2' %}
+**MUST read** the protocol at `.cursor/skills/harness/harness-eval/code-review-protocol.md` before proceeding with this step.
+
+Dispatch `harness-architect`, `harness-product-owner`, `harness-engineer`, `harness-qa`, `harness-project-manager` via Task tool. Each role emits **Value recommendation** or **Delivery recommendation** plus scores per the protocol. Include `response_language: {{ artifact_lang }}` in subagent prompt facts blocks.
+
 
 {% include 'sections/_failure-pattern-save.md.j2' %}
+
+{% include 'sections/_error-recovery.md.j2' %}
 
 ---
 
 ## Step 2: Capture Learnings
 
-After the evaluation is complete, capture non-obvious insights as learnings.
+After evaluation: only durable cross-session `[LEARNING]` items (confidence ≥7). **Never** log counts, PR#, hashes, scores, or task parroting.
 
-### Admission Gate — what NOT to write
-
-**Never write** any of the following to Memverse (these are ephemeral work logs, not learnings):
-- Test counts, pass rates, CI status (e.g. "726 tests passed")
-- PR numbers, commit hashes, branch names (e.g. "PR #120, commit a40e0e7")
-- File change statistics (e.g. "19 files, 149 additions")
-- Review scores (e.g. "eval score 8.1/10")
-- Task ID + description parroting
-
-**Principle**: if the information already exists in git log / PR / workflow-state.json, do NOT
-duplicate it in Memverse. Only write **insights you would want to be reminded of in a future session**.
-
-### Capture Process
-
-1. Review all findings with confidence >= 7
-2. Parse merged findings for `[LEARNING]` items from each role's output.
-   Keep only entries that are:
-   - long-lived
-   - cross-project / cross-language reusable
-   - strongly role-relevant
 {% if memverse_enabled == "true" %}
-3. **Domain registration guard** (once per session, before the first write):
-   Call `manage_domain` for each role domain that will receive writes.
-   `manage_domain` is idempotent — registering an already-existing domain is a no-op,
-   so **skip `list_domains`** and just register directly:
-   ```
-   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
-   ```
-   Fire all 5 calls **in parallel**. If this session already registered domains
-   (e.g. eval ran before ship), skip entirely.
-4. **Dedup guard** (prevents double-write when ship runs after eval in the same session):
-   For each qualifying `[LEARNING]` item, before writing, call:
-   ```
-   search_memory(query=<learning key or short text>, domains="{{ project_name or memverse_domain }}-<role>-learning", limit=5)
-   ```
-   If a result with substantially the same insight already exists → **skip** (log as `skipped-dedup`).
-   Only write if no near-duplicate is found.
-5. For each non-duplicate `[LEARNING]` item, the **parent orchestrator** (you) calls `add_memories`
-   with structured metadata (JSON string). Sub-agents do NOT call `add_memories` themselves.
-   **Text must include a `[domain]` prefix** to reinforce Memverse domain inference:
-   ```
-   add_memories(
-     text="[{{ project_name or memverse_domain }}-<role>-learning] <learning insight text>",
-     domain="{{ project_name or memverse_domain }}-<role>-learning",
-     metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
-   )
-   ```
-   **Note**: `search_memory` supports `metadata_filter` for post-recall filtering (v5.28.0+).
-   For full-library exact matching by a metadata key, prefer `upsert_memory` with `upsert_key`.
-   If `upsert_memory` is not available, fall back to `add_memories` + `search_memory` dedup.
-   Treat writes as non-blocking fire-and-forget: do not block gate on write outcome.
-   **Parallel writes**: when multiple learnings are ready, dispatch all `add_memories` calls
-   concurrently (do not serialize).
-6. Log counters: `LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`.
-
-If Memverse MCP is not available: skip silently.
+Parallel `manage_domain` for five `*-learning` domains (idempotent). Dedup: `search_memory` per item. `add_memories` with `[domain]` text prefix + metadata JSON (`type`, `key`, `confidence`, `source`, `role`, `task`, `files`). Prefer `upsert_memory` when exact key match needed. Parallel writes; log `LEARNING_ADD` counters. Non-blocking if MCP missing.
+{% else %}
+Skip — Memverse disabled.
 {% endif %}
 
 ---

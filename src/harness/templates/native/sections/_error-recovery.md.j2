@@ -15,3 +15,12 @@ This matrix covers non-test errors.
 
 If the same error type persists after 2 retries of the same fix strategy,
 write the finding to `.harness-flow/tasks/<task-id>/build-notes.md` and proceed to the next deliverable.
+
+## Recovery after interruption
+
+If your output was truncated or the session was interrupted:
+1. Read `harness session read --task <task-id>` for current state
+2. Read `harness handoff read --task <task-id>` for stage context
+3. Resume from the exact step recorded — do not recap or apologize
+4. If remaining work is large, break it into smaller steps
+5. Do not re-run steps that already succeeded (check git log)

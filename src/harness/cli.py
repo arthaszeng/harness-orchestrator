@@ -505,6 +505,89 @@ def worktree_setup() -> None:
     run_worktree_setup()
 
 
+handoff_cli = typer.Typer(help="Structured cross-stage handoff read/write")
+
+
+@handoff_cli.command("write")
+def handoff_write_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+) -> None:
+    """Write handoff from stdin JSON → validate → save."""
+    from harness.commands.handoff_cmd import run_handoff_write
+
+    run_handoff_write(task=task)
+
+
+@handoff_cli.command("read")
+def handoff_read_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    phase: str = typer.Option(
+        "", "--phase",
+        help="Specific phase to read (plan/build/eval/ship). Latest if omitted.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Read the latest (or phase-specific) handoff for a task."""
+    from harness.commands.handoff_cmd import run_handoff_read
+
+    run_handoff_read(task=task, phase=phase or None, as_json=as_json)
+
+
+app.add_typer(handoff_cli, name="handoff")
+
+session_cli = typer.Typer(help="Intra-phase session context read/write")
+
+
+@session_cli.command("write")
+def session_write_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+) -> None:
+    """Write session context from stdin JSON → validate → save."""
+    from harness.commands.session_cmd import run_session_write
+
+    run_session_write(task=task)
+
+
+@session_cli.command("read")
+def session_read_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Read the current session context for a task."""
+    from harness.commands.session_cmd import run_session_read
+
+    run_session_read(task=task, as_json=as_json)
+
+
+app.add_typer(session_cli, name="session")
+
+
+@app.command(name="context-budget")
+def context_budget_cmd(
+    task: str = typer.Option(
+        ..., "--task", "-t",
+        help="Task ID (e.g. task-001)",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Scan task artifacts and estimate token usage vs budget."""
+    from harness.commands.context_budget_cmd import run_context_budget
+
+    run_context_budget(task=task, as_json=as_json)
+
+
 @app.command()
 def update(
     check: bool = typer.Option(

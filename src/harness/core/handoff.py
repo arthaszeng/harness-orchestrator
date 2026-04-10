@@ -6,8 +6,10 @@ the full upstream artifact, keeping context windows focused and enabling
 reliable resume after interruption.
 
 Schema v2 adds :class:`ContextFootprint` (bounded ``explored_paths``,
-``primary_read_files``, ``primary_touched_files``).  :func:`load_handoff` accepts
-schema versions **1** and **2** without emitting a version-mismatch warning.
+``primary_read_files``, ``primary_touched_files``).  Schema v3 adds
+``working_set``, ``active_constraints``, and ``resume_prompt`` on
+:class:`StageHandoff`.  :func:`load_handoff` accepts schema versions **1**,
+**2**, and **3** without emitting a version-mismatch warning.
 
 Handoff files live alongside other task artifacts in
 ``.harness-flow/tasks/task-NNN/handoff-<phase>.json``.
@@ -33,10 +35,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from harness.core.task_identity import TASK_ID_STORAGE_PATTERN
 
-# Written by ``save_handoff``; ``load_handoff`` accepts v1 and v2 payloads.
-HANDOFF_SCHEMA_VERSION = 2
+# Written by ``save_handoff``; ``load_handoff`` accepts v1–v3 payloads.
+HANDOFF_SCHEMA_VERSION = 3
 
-_SUPPORTED_HANDOFF_SCHEMA_VERSIONS: frozenset[int] = frozenset({1, 2})
+_SUPPORTED_HANDOFF_SCHEMA_VERSIONS: frozenset[int] = frozenset({1, 2, 3})
 
 _CONTEXT_PATH_LIST_MAX_ITEMS = 40
 _CONTEXT_PATH_MAX_CHARS = 240
@@ -113,6 +115,9 @@ class StageHandoff(BaseModel):
     artifacts_produced: list[str] = Field(default_factory=list)
     scope_changes: list[str] = Field(default_factory=list)
     context_footprint: ContextFootprint = Field(default_factory=ContextFootprint)
+    working_set: list[str] = Field(default_factory=list)
+    active_constraints: list[str] = Field(default_factory=list)
+    resume_prompt: str = Field(default="", max_length=500)
     created_at: str = Field(default="", max_length=64)
 
 

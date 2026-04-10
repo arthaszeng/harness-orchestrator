@@ -152,6 +152,11 @@ class WorkflowConfig(BaseModel):
     trunk_branch: str = "main"
     task_id_strategy: Literal["numeric", "jira", "custom", "hybrid"] = "hybrid"
     task_id_custom_pattern: str = ""
+    context_budget_tokens: int = Field(
+        default=50000,
+        ge=1000,
+        description="Estimated token budget for task artifacts.",
+    )
 
 
 class MemverseConfig(BaseModel):

@@ -109,9 +109,9 @@ def test_synthesis_has_out_of_scope_filtering(tmp_path: Path):
     assert "CROSS-ROLE" in plan_skill
     assert "Must NOT report" in plan_skill
 
-    ship_skill = (skills_base / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
-    assert "OUT-OF-SCOPE" in ship_skill
-    assert "CROSS-ROLE" in ship_skill
+    review_protocol = (skills_base / "harness-eval" / "code-review-protocol.md").read_text(encoding="utf-8")
+    assert "OUT-OF-SCOPE" in review_protocol
+    assert "CROSS-ROLE" in review_protocol
 
 
 def test_review_gate_uses_config_thresholds(tmp_path: Path):

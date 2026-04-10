@@ -9,21 +9,11 @@ description: "最少交互的交付管线：合并基准、测试、自适应代
 
 # Harness Ship — 自动化管线
 
-你正在运行 `/harness-ship` 工作流。这是一个**最少交互**的管线。
-直接运行到底并在最后输出 PR URL。
+你正在运行 `/harness-ship`。**最少交互**：一路执行到底并输出 PR URL。
 
-**仅在以下情况停止：**
-- 在主干分支上（中止）
-- 无法自动解决的合并冲突（停止，显示冲突）
-- 分类后仍存在的分支内测试失败（预存在的已分类，不阻塞）
-- 需要用户判断的 ASK 类评审发现
-- 评审分数在 {{ max_iterations }} 次迭代后仍低于 {{ pass_threshold }}
+**仅在以下情况停止：** 位于 `{{ trunk_branch }}`；rebase 冲突无法解决；分类后仍有分支内测试失败；ASK 类发现；在 {{ max_iterations }} 轮评审后分数仍低于 {{ pass_threshold }}。
 
-**绝不因以下原因停止：**
-- 未提交的变更（始终包含它们）
-- 提交消息审批（自动提交）
-- PR 内容（自动生成）
-- AUTO-FIX 评审发现（修复并继续）
+**不要因以下情况停止：** 未提交变更；提交消息或 PR 审批；AUTO-FIX 发现。
 
 ---
 
@@ -33,139 +23,43 @@ description: "最少交互的交付管线：合并基准、测试、自适应代
 {% include 'sections/_workspace-preflight.md.j2' %}
 {% endwith %}
 
+**会话边界：** 每完成一个编号步骤后持久化上下文。用 `harness task resolve --json` 取 `TASK_ID`。stdin 传入符合 `SessionContext` 的 JSON（如 `task_id`、`current_phase` 为 `"ship"`、`current_step`、`current_state`、`next_step`）：
+
+```bash
+echo '{"task_id":"TASK_ID","current_phase":"ship","current_step":"N","current_state":"<简要>","next_step":"<下一步>"}' | harness session write --task TASK_ID
+```
+
 ## 步骤 1：预检
 
-### 快速路径（同会话衔接）
+**快速路径：** `harness task resolve --json` → `TASK_DIR`。若 `workflow-state.json` 有效、`phase` ∈ {contracted, building, evaluating, shipping}、`has_handoff_summary`、分支匹配 `{{ branch_prefix }}/` → 复用 `TASK_DIR`、读 handoff/plan/state，**仍须** `git fetch origin {{ trunk_branch }}`，再进步骤 2。
 
-在执行完整预检之前，先检查是否可以跳过——如果 plan 阶段已经在本会话中完成，
-大部分预检工作都是重复的。
-
-1. 解析当前任务：
-   ```bash
-   harness task resolve --json
-   ```
-   输出：`{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`。
-   使用 `task_dir` 值作为 `TASK_DIR`。如命令失败，回退到扫描 `.harness-flow/tasks/` 中最新的 `task-NNN` 目录。
-2. 读取 `TASK_DIR/workflow-state.json`（或使用 `task resolve` 已返回的字段）。
-3. **如果满足以下全部条件，进入快速路径**：
-   - `workflow-state.json` 存在且有效
-   - `phase` 为 `contracted`、`building`、`evaluating` 或 `shipping`（说明已过 plan 阶段）
-   - `has_handoff_summary` 为 `true`（说明前序阶段已写入交接摘要）
-   - 当前分支以 `{{ branch_prefix }}/` 开头（说明已在 feature branch 上）
-
-4. **快速路径行为**：
-   - ✅ 复用已有 `TASK_DIR`，不重新扫描或创建
-   - ✅ 读取 `handoff_summary` 作为上下文，不重新收集
-   - ✅ 跳过分支检查、config 检查（已在 plan 阶段验证）
-   - ✅ 直接进入 Step 2（Rebase）
-   - ❌ 不跳过 `git fetch origin {{ trunk_branch }}`（仍需确保 rebase 基准最新）
-
-5. **如果不满足快速路径条件，执行完整预检**（下方）
-
-### 完整预检
-
-1. 检查当前分支。如果在 `{{ trunk_branch }}` 上，**中止**："你在主干分支上。请从 feature branch 交付。"
-
-2. 运行 `git status`。未提交的变更始终包含 — 无需询问。
-
-3. 运行 `git diff {{ trunk_branch }}...HEAD --stat` 和 `git log {{ trunk_branch }}..HEAD --oneline` 了解正在交付的内容。
-
-4. 检查 `.harness-flow/config.toml` 是否存在。
-
-5. **检测或创建任务目录**（确定性算法）：
-   1. 扫描 `.harness-flow/tasks/` 中所有 `task-NNN` 目录
-   2. 设 `L` = 数字最大的 NNN 对应的目录（按数字排序）
-   3. 如果 `L` 存在且 `L/plan.md` 存在 → 复用 `L` 作为 `TASK_DIR`
-   4. 否则 → 创建 `task-{max(NNN)+1}`（如果没有则 `task-001`）作为 `TASK_DIR`
-   5. 所有评审产物、ship-metrics 和构建日志都放入 `TASK_DIR`
-
-   ```bash
-   mkdir -p .harness-flow/tasks/task-NNN
-   ```
-
-   如果 `TASK_DIR/workflow-state.json` 的 `handoff_summary` 字段非空，
-   优先阅读以获得前序阶段结果的紧凑摘要。
-   （向后兼容：如果 `handoff-*.json` 存在但 `handoff_summary` 为空，也可读取。）
-   **同时读取**（若存在）`TASK_DIR/handoff-plan.json` 与 `TASK_DIR/handoff-build.json`（schema v2），
-   获取结构化 `context_footprint` 与决策/风险 —— 在重新推导范围前先复用这些足迹。
-   然后读取 `TASK_DIR/plan.md` 获取完整上下文。
-   如果 `TASK_DIR/workflow-state.json` 存在，把它视为 canonical task-level
-   phase / gate / blocker / artifact refs 来源。更新它，而不是另外发明一套平行 gate 记录。
-
+**完整：** 不得在 `{{ trunk_branch }}`（否则中止）。`git status`；`git diff {{ trunk_branch }}...HEAD --stat` 与 `git log {{ trunk_branch }}..HEAD --oneline`。存在 `.harness-flow/config.toml`。任务目录：有 `plan.md` 的最大 `task-NNN` 否则新建；读 `handoff_summary` / `handoff-*.json` / `handoff-plan.json` / `handoff-build.json` / `plan.md`；以 `workflow-state.json` 为准。
 {% if memverse_enabled == "true" %}
-6. **先验学习**：如果 Memverse MCP 可用，搜索与变更文件/模块相关的学习成果。
-   使用多域 OR 查询（与 eval 步骤 0.7 对齐）。
-   包含项目域及全部五个角色学习域：
-   ```
-   search_memory(query=<diff 中的关键主题>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning,{{ project_name or memverse_domain }}-engineer-learning,{{ project_name or memverse_domain }}-qa-learning,{{ project_name or memverse_domain }}-product-learning,{{ project_name or memverse_domain }}-project-manager-learning", limit=20)
-   ```
-   展示适用于此 diff 的先验陷阱或模式。
-
+Memverse：对项目域与五个 `*-learning` 域执行 `search_memory`（查询形状同 eval）。
 {% endif %}
-{% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} **评审就绪提醒**：此工作流将在 Step 3.8 运行强制评审。
-   测试通过后，下一步是评审 — 不是提交，不是发布。
-   现在创建一个 TODO 列表，其中 EVAL 显式标记：
-
-   ```
-   - [ ] 预检 (Step 1)
-   - [ ] Rebase (Step 2)
-   - [ ] 测试 (Step 3)
-   - [ ] 覆盖率审计 (Step 3.4)
-   - [ ] 计划完成度审计 (Step 3.5)
-   - [ ] **EVAL — 强制** (Step 3.8)
-   - [ ] 范围漂移检测 (Step 4)
-   - [ ] 如果 ITERATE 则修复循环 (Step 5)
-   - [ ] Eval 产物门禁 (Step 5.9)
-   - [ ] 提交 (Step 6)
-   - [ ] 验证门禁 (Step 7)
-   - [ ] 推送前 Rebase (Step 7.5)
-   - [ ] 推送 + PR (Step 8)
-   ```
+**评审就绪提醒** — Todo 清单须含 **EVAL — 强制**（步骤 3.8）再提交。
 
 ---
 
-## 步骤 2：Rebase 到基础分支（在测试之前）
-
-拉取并 rebase 到基础分支，使测试在最新状态上运行：
+## 步骤 2：Rebase（测试前）
 
 ```bash
 git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-**如果 rebase 冲突：** 尝试自动解决简单冲突（如 CHANGELOG 排序）。
-如果冲突复杂或有歧义，运行 `git rebase --abort`，**停止**并显示冲突。
-
-**如果已是最新：** 静默继续。
+冲突：简单可自解，否则 `git rebase --abort` 并 **停止**。
 
 ---
 
-## 步骤 3：运行测试（在合并后的代码上）
-
-运行完整的测试套件：
+## 步骤 3：运行测试
 
 ```bash
 {{ ci_command }}
 ```
 
-**如果任何测试失败：** 不要立即停止。应用测试失败归属分类：
+失败时：**必须先阅读** `.cursor/skills/harness/harness-ship/ship-test-triage.md` **中的协议再继续此步骤。** 基线也失败 → 记录并继续；仅分支失败 → 修复（步骤 5）。全过 → 继续。
 
-### 测试失败分类
-
-对每个失败的测试，确定归属：
-
-1. 在基础分支上运行同一测试（使用 detached HEAD 而非分支切换）：
-   ```bash
-   CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
-   ```
-   （或使用 `git diff origin/{{ trunk_branch }}...HEAD` 检查失败的测试文件是否在本分支被修改）
-
-2. **预存在的失败**（在基础分支上也失败）：记录并继续。不是你的问题。
-3. **分支内失败**（在基础分支通过，在 HEAD 失败）：这是你的问题。必须修复。
-
-**分类后：** 如果分支内失败仍存在，进入修复循环（Step 5）。
-如果所有失败都是预存在的，继续到 Step 3.5。
-
-**如果全部通过：** 静默继续 — 简要记录计数。
+{% include 'sections/_error-recovery.md.j2' %}
 
 {% include 'sections/_failure-pattern-save.md.j2' %}
 
@@ -173,135 +67,32 @@ git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 
 ## 步骤 3.4：测试覆盖率审计
 
-分析 diff 以确保变更的代码路径有充分的测试覆盖。
+分析 diff，确保变更代码路径有足够测试覆盖。
 
-### 快速路径（小变更优化）
-
-使用 diff-stat CLI 统计变更代码文件数量：
-```bash
-harness diff-stat --json
-```
-输出：`{"total": N, "code": N, "test": N, "doc": N, "other": N, "has_md_changes": bool, "files": [...]}`。
-使用 `code` 字段进行下方阈值判断。
-
-回退（如 CLI 不可用）：
-```bash
-git diff {{ trunk_branch }}..HEAD --name-only | grep -E '\.(py|ts|js|tsx|jsx|mjs)$' | wc -l
-```
-
-- **< 5 个代码文件**：使用轻量检查 — 仅统计每个文件的 GAP 数量和已测路径数量，
-  输出 `COVERAGE SUMMARY: N files, M tested paths, K gaps`。跳过 ASCII 覆盖率图和详细追踪。
-- **≥ 5 个代码文件**：使用下面的完整分析流程。
-
-### 1. 检测测试框架
-扫描：`pytest.ini`、`pyproject.toml [tool.pytest]`、`jest.config.*`、`vitest.config.*`、
-`Makefile` 测试目标、`tox.ini`、`setup.cfg [tool:pytest]`。记录框架以备后用。
-
-### 2. 追踪代码路径
-对 `git diff {{ trunk_branch }}..HEAD` 中的每个文件：
-1. 读取变更的文件，识别所有修改/新增的函数和方法
-2. 对每个函数，追踪：
-   - 正常路径（正常执行）
-   - 每个条件分支（if/else、match/case）
-   - 每个错误路径（try/except、error returns）
-   - 每个循环边界（空集合、单项、多项）
-3. 绘制 ASCII 覆盖率图：
-
-```
-COVERAGE: src/harness/workflow.py
-├─ single_task_pass()
-│  ├─ [TESTED ★★★] happy path — tested in test_single_task_pass
-│  ├─ [TESTED ★★]  max iterations — tested in test_blocked_after_max
-│  ├─ [GAP]        empty spec input — no test
-│  └─ [TESTED ★]   dual eval failure — tested but shallow
-├─ split_spec_contract()
-│  ├─ [TESTED ★★★] with marker
-│  ├─ [TESTED ★★★] without marker
-│  └─ [TESTED ★★★] case insensitive
-```
-
-图例：★★★ = 充分（多个断言）、★★ = 基本（单个断言）、★ = 存在但浅层、GAP = 无测试
-
-### 3. 用户流覆盖
-检查变更代码的以下场景是否被覆盖：
-- 并发/并行执行（如适用）
-- 空/null 状态
-- 边界值（0、最大值、负数）
-- 错误恢复路径
-
-### 4. E2E 决策矩阵
-对变更的代码路径，推荐测试类型：
-- 无 I/O 的纯函数 → **单元测试**
-- 带 mock 依赖的单组件 → **单元测试**
-- 2 个组件交互 → **集成测试**
-- 3+ 个组件或完整用户流 → **E2E 测试**
-- LLM/AI 行为验证 → **eval 测试**
-
-### 5. 回归规则（铁律）
-如果 diff 修改了已有行为（对已有函数的变更，不仅是新代码）：
-- 必须有回归测试验证旧行为仍然有效
-- 这是不可商量的 — 如果缺失则生成测试，不要询问
-
-### 6. 覆盖率门禁
-从图表计算预估覆盖率：
-- 统计总代码路径和已测试路径
-- **>= 80%**：PASS — 继续
-- **>= 60%**：WARNING — 输出："覆盖率约 ~X%。建议为以下路径添加测试：[列出 GAP 路径]"
-- **< 60%**：GATE — 为 GAP 路径自动生成测试（最多 20 个），运行后重新评估
-
-### 7. 自动生成缺失测试（覆盖率 < 60% 时）
-对每个 GAP 路径：
-1. 按照项目已有的测试模式生成测试
-2. 运行测试验证通过
-3. 每次审计最多生成 20 个测试
-4. 提交生成的测试：`git add tests/ && git commit -m "test: auto-generate coverage for gaps"`
+**必须先阅读** `.cursor/skills/harness/harness-ship/ship-coverage-audit.md` **中的协议再继续此步骤。**
 
 ---
 
 ## 步骤 3.5：计划完成度审计
 
-如果 `.harness-flow/tasks/task-NNN/plan.md` 存在计划文件：
-
-1. 提取每个可操作项（复选框、编号步骤、命令式语句）
-2. 对照 `git diff {{ trunk_branch }}...HEAD` 交叉引用
-3. 分类：**DONE** / **PARTIAL** / **NOT DONE** / **CHANGED**
-4. 输出：
-
-```
-PLAN COMPLETION AUDIT
-═══════════════════════════════════
-  [DONE]      交付物 1 — 变更的文件
-  [DONE]      交付物 2 — 变更的文件
-  [NOT DONE]  交付物 3 — diff 中无证据
-═══════════════════════════════════
-COMPLETION: X/Y DONE, M PARTIAL, K NOT DONE
-```
-
-如果有 NOT DONE 项：在 PR body 中注明。继续 — 这是信息性的，不阻塞。
+若存在 `plan.md`：提取可执行项；对照 `git diff {{ trunk_branch }}...HEAD`；标 DONE/PARTIAL/NOT DONE/CHANGED；输出简短审计。NOT DONE → 写入 PR；不阻塞。
 
 ---
 
-## 步骤 3.8：预着陆评审 — 自适应代码评估
+## 步骤 3.8：预着陆评审 — 自适应代码评估（Adaptive Code Evaluation）
 
 {% include 'sections/_ship-review-gate.md.j2' %}
 
-### 代码评审派遣（适用于 FULL 和 LITE 强度）
+**派遣：** FULL → 5 角色（`harness-architect`、`harness-product-owner`、`harness-engineer`、`harness-qa`、`harness-project-manager`）；LITE → Engineer + QA；FAST → 不派子代理（gate 已写产物）。
 
-如果 ship review gate 确定了 **FULL** 或 **LITE** 强度，使用 Task 工具派遣代码审查者 —
-主代理协调但不自行执行评审。
-**FULL** 派遣全部 5 个角色。**LITE** 仅派遣 Engineer 和 QA。
-**FAST** 完全跳过本节（eval 产物已由 gate 写入）。
-
-{% include 'sections/_code-review.md.j2' %}
+**必须先阅读** `.cursor/skills/harness/harness-eval/code-review-protocol.md` **中的协议再继续此步骤。**
 
 {% if review_gate == 'eng' %}
 
-**Review Gate (eng)：** 评估是硬门禁 — ITERATE 裁定阻塞交付。
-所有 CRITICAL 发现必须在继续之前解决。
+**Review Gate (eng)：** 评审为硬门禁；ITERATE 阻塞；CRITICAL 须解决后再继续。
 {% elif review_gate == 'advisory' %}
 
-**Review Gate (advisory)：** 评估是建议性的 — ITERATE 裁定被记录但不阻塞。
-CRITICAL 发现被标记但交付继续。
+**Review Gate (advisory)：** ITERATE 仅记录；CRITICAL 标记；advisory 模式下 **does not block**（不因 ITERATE 单独阻塞交付）。
 {% endif %}
 
 ---
@@ -309,66 +100,7 @@ CRITICAL 发现被标记但交付继续。
 ## 步骤 3.9：捕获学习成果
 
 {% if memverse_enabled == "true" %}
-评审合成完成后，将非显而易见的见解捕获为学习成果
-（与 eval 步骤 2 对齐 — 相同逻辑、相同 metadata schema）。
-
-### 准入门禁 — 禁止写入的内容
-
-**绝不写入**以下内容到 Memverse（这些是临时工作日志，不是学习成果）：
-- 测试数量、通过率、CI 状态（如"726 个测试通过"）
-- PR 编号、commit hash、分支名（如"PR #120, commit a40e0e7"）
-- 文件变更统计（如"19 个文件, 149 行新增"）
-- 评审分数（如"评估分数 8.1/10"）
-- 任务编号与描述的简单重复
-
-**原则**：如果信息已存在于 git log / PR / workflow-state.json 中，不要重复写入 Memverse。
-只写入**你在未来会话中希望被提醒的洞见**。
-
-### 捕获流程
-
-1. 审查所有置信度 >= 7 的发现
-2. 解析每个角色输出中的 `[LEARNING]` 条目，仅保留同时满足：
-   - 可长期有效
-   - 可跨项目 / 跨语言复用
-   - 与对应角色高度相关
-3. **域注册守卫**（每个会话首次写入前运行一次）：
-   对每个将接收写入的角色域调用 `manage_domain`。
-   `manage_domain` 是幂等的 — 注册已存在的域是无操作，
-   因此**跳过 `list_domains`**，直接注册：
-   ```
-   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
-   ```
-   5 个调用**并行**发出。如果本会话已注册过域（如 eval 在 ship 之前已运行），
-   则完全跳过。
-4. **去重守卫**（防止同一会话中 eval 已捕获后 ship 重复写入）：
-   对每个合格的 `[LEARNING]` 条目，写入前先调用：
-   ```
-   search_memory(query=<learning key 或简短文本>, domains="{{ project_name or memverse_domain }}-<role>-learning", limit=5)
-   ```
-   如果已存在实质相同的见解 → **跳过**（记录为 `skipped-dedup`）。
-   仅在无近似重复时写入。
-5. 对每个非重复的 `[LEARNING]` 条目，由**父协调器**（你）调用 `add_memories`
-   并附带结构化 metadata（JSON 字符串）。子代理不得自行调用 `add_memories`。
-   **text 必须包含 `[domain]` 前缀**以强化 Memverse 域推断：
-   ```
-   add_memories(
-     text="[{{ project_name or memverse_domain }}-<role>-learning] <学习见解文本>",
-     domain="{{ project_name or memverse_domain }}-<role>-learning",
-     metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
-   )
-   ```
-   **注意**：`search_memory` 支持 `metadata_filter` 做召回后过滤（v5.28.0+）。
-   需要按 metadata key 精确匹配时，优先使用 `upsert_memory`（含 `upsert_key`）。
-   若 `upsert_memory` 不可用，回退到 `add_memories` + `search_memory` 去重。
-   写入采用 non-blocking fire-and-forget，不以写入结果阻塞 gate。
-   **并行写入**：当多条学习成果就绪时，并发 dispatch 所有 `add_memories` 调用（不要串行）。
-6. 记录计数：`LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`。
-
-如果 Memverse MCP 不可用：静默跳过。
+合成后：只写可长期复用的 `[LEARNING]`（置信度 ≥7），不写日志类（数量、PR#、hash、分数）。各角色域一次性并行 `manage_domain`；`search_memory` 去重；`add_memories` 带 `[domain]` 前缀与 metadata；并行写入；记 `LEARNING_ADD`。写入失败不阻塞门禁。
 {% else %}
 跳过 — Memverse 未启用。
 {% endif %}
@@ -377,116 +109,35 @@ CRITICAL 发现被标记但交付继续。
 
 ## 步骤 4：范围漂移检测
 
-检查：diff 是否交付了计划中承诺的内容 — 不多不少？
-
-1. 读取计划（如存在）、提交消息和 TODOS.md 了解声明的意图
-2. 运行 `git diff {{ trunk_branch }}...HEAD --stat` 并与意图对比
-3. 输出：
-
-```
-Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
-Intent: <一句话总结>
-Delivered: <一句话总结>
-[如果漂移：列出每个超范围的变更]
-[如果缺失：列出每个未完成的需求]
-```
-
-这是**信息性的** — 不阻塞交付。
+计划 + 提交 + TODOS 对照 `git diff {{ trunk_branch }}...HEAD --stat` → 一行 CLEAN/DRIFT/MISSING；仅供参考。
 
 ---
 
-## 步骤 5：修复循环（如果 ITERATE）
+## 步骤 5：修复循环（若 ITERATE）
 
-如果评估裁定为 ITERATE：
-
-1. 阅读评估反馈（具体的修复建议）
-2. 对代码应用修复
-3. 运行 `{{ ci_command }}` 验证
-4. 以递增的轮次编号重新运行评估（Step 3.8）
-5. 最多 {{ max_iterations }} 轮迭代
-
-如果 {{ max_iterations }} 轮后仍为 ITERATE：**停止**。报告分数和未解决的发现。
+按反馈改 → `{{ ci_command }}` → 重跑步骤 3.8；最多 {{ max_iterations }} 轮。否则 **停止** 并报告分数/发现。
 
 ---
 
-## 步骤 5.5：TODOS.md 管理
+## 步骤 5.5：TODOS.md
 
-如果项目根目录存在 `TODOS.md` 文件：
-
-1. 读取 `TODOS.md` 并解析所有 TODO 项
-2. 对照 `git diff {{ trunk_branch }}...HEAD` 检测已完成的项：
-   - 如果 TODO 引用了 diff 中修改/新增的文件/函数，检查工作是否已完成
-   - 如果 TODO 描述的功能现已实现，标记为已完成
-3. 将已完成项移到底部的 `## Completed` 部分
-4. 输出摘要："TODOS: N items marked complete, M remaining"
-5. 如果有项目被更新，提交：`git add TODOS.md && git commit -m "chore: update TODOS.md"`
-
-如果没有 `TODOS.md`：静默跳过。
+若存在：与 diff 对账；已完成移入 `## Completed`；有变更则 `git add TODOS.md && git commit -m "chore: update TODOS.md"`。
 
 ---
 
-## 步骤 5.9：Eval 产物门禁（强制 — 不可跳过）
-
-```
-╔══════════════════════════════════════════════════════════════╗
-║  EVAL GATE：提交前，验证 eval 确实已运行。                    ║
-║  这捕获 #1 工作流跳过 — 从"测试通过"直接跳到"提交"。          ║
-╚══════════════════════════════════════════════════════════════╝
-```
-
-运行**系统级门禁检查**，使用 Step 1 中建立的 `TASK_DIR`：
+## 步骤 5.9：Eval 产物门禁（强制）
 
 ```bash
 harness gate --task TASK_ID
 ```
 
-将 `TASK_ID` 替换为实际的任务目录名（如 `task-001`）。
-
-**解读结果：**
-- **退出码 0 (PASS)：** 所有硬检查通过。继续到 Step 6。
-- **退出码 1 (BLOCKED)：** 阅读输出 — 它列出了具体哪些检查失败。
-
-**如果 BLOCKED — 强制操作：**
-1. 阅读输出中每一行 `✗` 以了解原因。
-2. 如果 eval 缺失 → 你跳过了 Step 3.8。**回去运行 eval。**
-3. 如果 eval 裁定为 ITERATE → 完成修复循环 (Step 5) 后重新评审。
-4. 如果 eval 过期（warning） → 如果评审后代码有变更，考虑重新运行 eval。
-5. 不要合理化（"只是模板"、"测试通过所以没问题"）。
-   eval 捕获的是测试无法发现的问题：安全漏洞、设计缺陷、范围漂移。
-6. 修复后，重新运行 `harness gate --task TASK_ID` 以确认。
-
-{% if review_gate == 'advisory' %}
-**Advisory 模式：** ITERATE 裁定记录为 warning 但不阻塞。
-门禁仅在 eval 缺失、为空或没有可解析裁定时阻塞。
-{% else %}
-**Eng 模式：** 门禁是**硬阻断**。ITERATE 裁定阻塞交付。
-只有 **PASS** 才允许继续到 Step 6。
-（注：`harness gate` 验证 verdict 行，不检查数值分数。
-分数阈值（>= {{ pass_threshold }}）由 Step 3.8 评审步骤执行。）
-{% endif %}
+0 → 继续。1 → 处理（缺 eval → 步骤 3.8；ITERATE → 步骤 5；stale → 视情况重评）。{% if review_gate == 'advisory' %}Advisory：ITERATE 仅警告，除非 eval 缺失/空。{% else %}Eng：ITERATE 阻塞；仅 PASS 可进步骤 6。分数 ≥ {{ pass_threshold }} 在步骤 3.8 执行。{% endif %}
 
 ---
 
-## 步骤 6：提交（可二分的块）
+## 步骤 6：提交（可二分）
 
-{% if review_gate == 'advisory' %}
-评估完成后（advisory 模式 — ITERATE 裁定被记录但不阻塞）：
-{% else %}
-评估 PASS 后：
-{% endif %}
-
-1. **可二分提交**：分析 diff 并按逻辑提交分组：
-   - 基础设施/配置变更在前
-   - 核心逻辑 + 测试放在一起
-   - 每个提交必须独立有效
-
-2. **提交格式**：`<type>(scope): description`
-   Types: feat, fix, refactor, test, docs, chore
-
-3. 按文件组暂存并提交（不是 `git add -A`）：
-   ```bash
-   git add <specific-files> && git commit -m "<type>(scope): description"
-   ```
+{% if review_gate == 'advisory' %}评审完成后（advisory）。{% else %}PASS 后。{% endif %} 分组：基础设施 → 逻辑+测试；`feat|fix|refactor|test|docs|chore`；`git add <files> && git commit -m "<type>(scope): msg"`。
 
 ---
 
@@ -494,29 +145,9 @@ harness gate --task TASK_ID
 
 ---
 
-## 步骤 7：验证门禁 — 铁律
+## 步骤 7：验证门禁
 
-```
-铁律：没有新鲜的验证证据，不得声称完成。
-
-防止合理化：
-- "现在应该可以了" → 运行它。
-- "我有信心" → 信心不是证据。
-- "我之前已经测试过了" → 代码在那之后变了。再测一次。
-- "这是个微小的变更" → 微小的变更也能搞垮生产。
-- "只改了文档" → 文档可能有断开的链接、错误的路径。
-
-在没有验证的情况下声称工作完成是不诚实，不是效率。
-```
-
-**推送前验证：**
-
-1. 检查自最近一次完整 `{{ ci_command }}` 运行后是否有代码文件变更
-   （`.py`/`.ts`/`.js` 等；`.md`/`.json`/`.toml` 等非代码文件不计）。
-   - **有代码变更**：重新运行 `{{ ci_command }}`。粘贴新鲜的输出。
-   - **无代码变更**（仅文档/配置变化或评审修复已在 Step 5 通过测试）：跳过重复测试。
-2. 如果测试失败：停止。修复并返回 Step 3。
-3. 验证 git status 是干净的（没有游离的未跟踪文件）。
+若自上次完整 `{{ ci_command }}` 后有代码文件变更则重跑；否则仅文档/配置且已在步骤 5 验证则可跳过。失败 → 步骤 3。`git status` 须干净。
 
 {% if hooks_pre_build or hooks_post_eval or hooks_pre_ship %}
 ---
@@ -526,284 +157,74 @@ harness gate --task TASK_ID
 ---
 {% endif %}
 
-## 步骤 7.5：推送前 Rebase（追赶主干）
-
-在推送前**再次** rebase 到最新主干，以吸收自步骤 2 以来落入 `{{ trunk_branch }}` 的任何
-commit（如其他 PR 的 CD 版本号递增）：
+## 步骤 7.5：推送前 rebase
 
 ```bash
 git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-- **如果已是最新：** 静默继续。
-- **如果 rebase 冲突：** 尝试自动解决简单冲突（如版本文件排序）。
-  如果冲突复杂，运行 `git rebase --abort`，**停止**并显示冲突。
+冲突策略同步骤 2。
 
 ---
 
 ## 步骤 8：推送 + PR
 
-1. 带上游跟踪推送：
-   ```bash
-   git push -u origin HEAD
-   ```
+```bash
+git push -u origin HEAD
+```
 
-2. **PR 幂等性检查** — 创建新 PR 前检测已有 PR：
-   ```bash
-   EXISTING_PR=$(gh pr view --json url,number,state -q 'select(.state == "OPEN") | .number' 2>/dev/null || echo "")
-   ```
-   - 如果 `EXISTING_PR` 非空：使用 `gh pr edit $EXISTING_PR --body "..."` 更新已有 PR body
-   - 如果为空：创建新 PR
-
-3. 创建或更新 PR：
-   ```bash
-   gh pr create --base {{ trunk_branch }} --title "<type>: <summary>" --body "$(cat <<'EOF'
-   ## Summary
-   <总结所有变更 — 按逻辑部分分组>
-
-   ## Evaluation Scores
-   | Dimension | Score |
-   |-----------|-------|
-   | Design | architect | X/10 |
-   | Completeness | product-owner | X/10 |
-   | Quality | engineer | X/10 |
-   | Regression | qa | X/10 |
-   | Scope | project-manager | X/10 |
-   | **Weighted Average** | | **X.X/10** |
-
-   ## Review Findings
-   - High confidence: N findings
-   - Auto-fixed: M findings
-   - Roles dispatched: architect ✓/✗  product-owner ✓/✗  engineer ✓/✗  qa ✓/✗  project-manager ✓/✗
-
-   ## Plan Completion
-   <完成度清单摘要，或 "No plan file">
-
-   ## Scope Check
-   <CLEAN 或列出漂移/缺失项>
-
-   ## Test Coverage
-   <ASCII 覆盖率图摘要，或 "No coverage audit">
-
-   ## TODOS
-   <N completed, M remaining, 或 "No TODOS.md">
-
-   ## Test Results
-   - [x] All tests pass (N tests)
-
-   EOF
-   )"
-   ```
-
-   如果 `gh` 不可用：打印分支名和远程 URL 以供手动创建 PR。
-
-4. 输出 PR URL。
+**必须先阅读** `.cursor/skills/harness/harness-ship/ship-pr-protocol.md` **中的协议再继续此步骤。** 输出 PR URL（无 `gh` 则输出分支与远程）。
 
 ---
 
-## 步骤 8.5：Doc-Release（按需调用）
+## 步骤 8.5：Doc-Release
 
-**前置条件**：检查 diff 中是否涉及 `.md` 文件变更：
-```bash
-harness diff-stat --json
-```
-检查 `has_md_changes` 字段。回退：`git diff {{ trunk_branch }}..HEAD --name-only | grep '\.md$'`
-
-- **`has_md_changes` 为 `false`（无 `.md` 文件变更）**：静默跳过整个 doc-release 步骤。
-- **`has_md_changes` 为 `true`（有 `.md` 文件变更）**：运行 `/harness-doc-release` 工作流：
-
-1. 对比 diff 与项目中所有 `.md` 文件
-2. 自动修复事实性错误（文件路径、版本号、函数名）
-3. 标记叙述/观点变更供用户审查
-4. 如果有文档被更新，修改最后一个提交或创建新提交：
-   ```bash
-   git add '*.md' && git commit -m "docs: sync documentation with latest changes" && git push
-   ```
+`harness diff-stat --json` → `has_md_changes` 为真则跑 `/harness-doc-release`；有修正则提交。
 
 ---
 
-## 步骤 8.75：Ship 指标持久化
+## 步骤 8.75：Ship 指标
 
-将 ship 指标写入 `.harness-flow/tasks/task-NNN/ship-metrics.json` 供回顾消费：
-
-优先使用结构化命令写入（支持自动推断效率基线指标）：
-
-```bash
-harness save-ship-metrics --task TASK_ID --branch "$(git rev-parse --abbrev-ref HEAD)" --pr-quality-score 8.5 --test-count 285 --eval-rounds 1 --findings-critical 0 --findings-informational 2 --auto-fixed 1 --plan-total 5 --plan-done 5 --coverage-pct 85
-```
-
-```json
-{
-  "timestamp": "ISO-8601",
-  "branch": "agent/feature-name",
-  "coverage_pct": 85,
-  "plan_total": 5,
-  "plan_done": 5,
-  "pr_quality_score": 8.5,
-  "findings_critical": 0,
-  "findings_informational": 2,
-  "auto_fixed": 1,
-  "test_count": 285,
-  "eval_rounds": 1,
-  "models_used": ["architect", "product-owner", "engineer", "qa", "project-manager"]
-}
-```
-
-如果没有任务目录，写入 `.harness-flow/ship-metrics.jsonl`（每行追加一个 JSON 对象）。
-
-如果 `workflow-state.json` 已存在（或本分支引入了它），最终运行 `harness gate --task TASK_ID`
-以持久化 ship-readiness gate snapshot，然后更新 evaluation artifact ref、ship metrics ref，
-以及最终的 phase / blocker outcome。
+`harness save-ship-metrics --task TASK_ID ...`（或追加 `.harness-flow/ship-metrics.jsonl`）。若持久化 workflow state，最后再 `harness gate --task TASK_ID`。
 
 ---
 
-## 步骤 9：PR 着陆 — CI 监控与自动修复循环
+## 步骤 9：PR 着陆
 
-PR 创建并持久化指标后，监控远端 CI 直到 PR 达到 **merge-ready** 状态
-（所有 required checks 通过 + 无 merge conflict）。
-
-如果 `gh` 不可用，**完全跳过** — 输出手动检查提示。
-
-### 9.1 转换到 Landing 阶段
-
-```bash
-# 更新 workflow state（如 workflow-state.json 存在）
-# phase: shipping → landing
-```
-
-### 9.2 轮询循环（最多 3 轮修复）
-
-```
-for round in 1..3:
-  1. 检查 PR CI 状态：
-     ```bash
-     harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json
-     ```
-
-  2. 如果 ci_status == "pass" 且 conflict == false：
-     → PR 已 merge-ready。跳出循环，继续步骤 9.4。
-
-  3. 如果 conflict == true：
-     → Rebase 到主干（与步骤 7.5 相同）：
-       ```bash
-       git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
-       ```
-     → 如果 rebase 失败：停止并报告冲突。
-     → 推送：`git push --force-with-lease`
-     → 等待 30s，然后重新轮询。
-
-  4. 如果 ci_status == "fail"：
-     a. 获取失败日志：
-        ```bash
-        harness ci-logs --branch "$(git rev-parse --abbrev-ref HEAD)" --json
-        ```
-     b. 诊断每个失败 job（auto-fixable / needs-human / infra-issue）。
-     c. 如果所有失败都是 infra-issue：停止 — 报告基础设施问题。
-     d. 如果存在 needs-human 且无 auto-fixable 失败：停止 — 报告。
-     e. 否则：尝试自动修复：
-        - 阅读失败的测试 / lint 输出
-        - 应用代码修复
-        - 运行本地 CI：`{{ ci_command }}`
-        - 如果本地 CI 通过：提交并推送
-          ```bash
-          git add <fixed-files>
-          git commit -m "fix: auto-fix CI failure (landing round N)"
-          git push
-          ```
-        - 等待 30s，然后重新轮询。
-
-  5. 如果 ci_status == "pending"：
-     → 指数退避等待：30s、60s、120s（上限 2 分钟）。
-     → 总等待上限：15 分钟。超时则停止并报告。
-```
-
-### 9.3 退出条件
-
-| 条件 | 动作 |
-|------|------|
-| CI 全绿 + 无冲突 | → 步骤 9.4（成功） |
-| 3 轮修复用尽 | → 停止并输出结构化报告 |
-| 所有失败都是 infra-issue | → 停止并输出结构化报告 |
-| needs-human 失败，无 auto-fixable | → 停止并输出结构化报告 |
-| Rebase 冲突无法解决 | → 停止并显示冲突详情 |
-| 轮询超时（15 分钟） | → 停止并报告超时 |
-
-**结构化失败报告格式：**
-```
-PR LANDING REPORT
-═══════════════════════════════════════════
-  PR:          #N (URL)
-  Status:      BLOCKED
-  Rounds:      M/3 attempted
-  Category:    auto-fixable | needs-human | infra-issue | timeout | conflict
-  Failed jobs: [list]
-  Suggestion:  [用户可执行的下一步建议]
-═══════════════════════════════════════════
-```
-
-### 9.4 着陆成功
-
-当 CI 全绿且无冲突时：
-1. 更新 `workflow-state.json`：landing gate → pass，phase → done
-2. 输出：
-   ```
-   PR LANDING: MERGE-READY ✓
-   PR #N: [URL]
-   CI: all checks passed
-   Conflict: none
-   ```
+无 `gh` → 跳过并提示人工。否则轮询 ≤3 次：`harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`；通过且无冲突 → 成功；冲突 → rebase + `git push --force-with-lease`；失败 → `harness ci-logs`、修复、`{{ ci_command }}`、提交、推送；pending → 退避（总上限约 15m）。**停止**条件：纯基础设施、需人工、轮次用尽、冲突无解。成功：更新 `workflow-state.json`，输出 merge-ready 摘要。
 
 ---
 
 ## Ship 交接
 
-将交付结果摘要写入 `workflow-state.json` 的 `handoff_summary` 字段（≤ 2000 字符）：
-PR URL、提交数、评审分数、处理的关键发现、遗留的 open items、
-着陆结果（merge-ready / 被阻塞及原因）。
-
-如果 `workflow-state.json` 不存在，跳过。
+`workflow-state.json` 的 `handoff_summary`（≤2000 字）：PR URL、提交数、分数、发现、着陆状态。
 
 ---
 
-## 状态持久化与中断恢复
+## 恢复（简表）
 
-所有状态持久化在 `.harness-flow/tasks/task-NNN/` 中：
-- `plan.md` — 计划（如存在）
-- `build-rN.md` — 每轮构建日志
-- `plan-eval-rN.md` — 每轮计划评审
-- `code-eval-rN.md` — 每轮代码评审
-- `workflow-state.json` — 权威任务状态（phase、gate、artifact refs）
+| 产物 / phase | 从哪步继续 |
+|--------------|------------|
+| 仅 plan，contracted | 步骤 1 快速 |
+| + build，building | 步骤 3 |
+| eval ITERATE，evaluating | 步骤 5（Step 5） |
+| eval PASS，evaluating | 步骤 5.9 |
+| gate PASS 未推送，shipping | 步骤 6 |
+| 已推送无 PR | 步骤 8 |
+| PR CI pending/fail，landing | 步骤 9 轮询 |
+| PR 全绿，landing | 步骤 9 结束 |
 
-### 中断恢复决策表
-
-如果本工作流中断后需要恢复，**必须按以下表格决定从哪步继续**，而非从头开始：
-
-| 已有产物 | workflow-state phase | 从哪步继续 | 说明 |
-|---------|---------------------|-----------|------|
-| 仅 `plan.md` | `contracted` | Step 1（使用快速路径） | plan 已完成，进入 ship 预检 |
-| `plan.md` + `build-rN.md` | `building` | Step 3（测试） | build 已完成，需要验证 |
-| `plan.md` + `code-eval-rN.md`（verdict=ITERATE） | `evaluating` | Step 5（修复循环） | eval 发现问题，继续修复 |
-| `plan.md` + `code-eval-rN.md`（verdict=PASS） | `evaluating` | Step 5.9（Gate 检查） | eval 已通过，验证 gate |
-| gate PASS + 未推送 | `shipping` | Step 6（提交） | 需要提交并推送 |
-| 已推送 + 无 PR | `shipping` | Step 8（创建 PR） | 代码已推送，创建 PR |
-| PR 已存在 + CI pending/fail | `landing` | Step 9.2（着陆循环） | PR 已提交，监控 CI |
-| PR 已存在 + CI 全绿 | `landing` | Step 9.4（着陆成功） | 完成着陆 |
-
-**恢复时不要**：
-- 不要重新运行已通过的 eval（除非 eval 之后有代码变更）
-- 不要重新创建已存在的任务目录
-- 不要重新运行已通过的测试（除非代码有变更）
+代码未变则勿重跑已通过 eval/测试。
 
 ---
 
 ## 重要规则
 
-- **绝不跳过 eval。** Step 3.8 必须运行。Step 5.9 验证它确实执行了。没有例外。
-  "测试通过"是不够的 — eval 捕获测试无法发现的问题（安全、设计、范围）。
-- **绝不跳过测试。** 如果测试在分类后仍然失败，停止。
-- **绝不跳过代码评审门禁。** Ship review gate（步骤 3.8）决定强度（FULL/LITE/FAST）。FULL 派遣全部 5 个角色，LITE 派遣 Engineer + QA，FAST 仅依赖 CI + 机器门禁。无论强度如何，`harness gate`（步骤 5.9）必须运行。如果个别角色派遣失败，按代码评审部分的阶梯降级。
-- **绝不 force push。** 只使用常规 `git push`。
-- **绝不请求琐碎的确认。** 自动提交、自动推送、自动 PR。
-- **为可二分性拆分提交** — 每个提交 = 一个逻辑变更。
-- **绝不在没有新鲜验证证据的情况下推送。** 如果测试后代码变了，重新运行。
-- **目标是：用户说 `/harness-ship`，他们看到的下一个东西就是 PR URL。**
+- **禁止跳过** 评审（3.8）与 **gate**（5.9）。仅测试不够。
+- **禁止跳过** ship review gate 强度规则；派遣失败按 **code-review-protocol.md** 降级。
+- **禁止 force push**，步骤 9 解决冲突时可用 `--force-with-lease`。
+- **不问琐碎确认** — 自动提交/推送/PR。
+- **可二分提交**；**推送前须有新鲜验证**。
+- **目标：** `/harness-ship` → 下一条输出即 PR URL。
+
+长期迭代 SSOT：`feedback_ledger_path`、`continue_pause_summary` — 见 `/harness-vision`。

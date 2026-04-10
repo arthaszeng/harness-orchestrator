@@ -9,21 +9,11 @@ description: "Minimal-interaction shipping pipeline: merge base, test, adaptive 
 
 # Harness Ship — Automated Pipeline
 
-You are running the `/harness-ship` workflow. This is a **minimal-interaction** pipeline.
-Run straight through and output the PR URL at the end.
+You are running `/harness-ship`. **minimal-interaction** pipeline: run through and output the PR URL.
 
-**Only stop for:**
-- On the trunk branch (abort)
-- Merge conflicts that cannot be auto-resolved (stop, show conflicts)
-- In-branch test failures that survive triage (pre-existing are triaged, not blocking)
-- ASK-classified review findings that need user judgment
-- Evaluation score stays below {{ pass_threshold }} after {{ max_iterations }} iterations
+**Stop for:** on `{{ trunk_branch }}`; unresolvable rebase conflicts; in-branch test failures after triage; ASK findings; evaluation score stays below {{ pass_threshold }} after {{ max_iterations }} eval rounds.
 
-**Never stop for:**
-- Uncommitted changes (always include them)
-- Commit message approval (auto-commit)
-- PR content (auto-generate)
-- AUTO-FIX review findings (fix and continue)
+**Do not stop for:** uncommitted changes; commit message or PR approval; AUTO-FIX findings.
 
 ---
 
@@ -33,140 +23,43 @@ Run straight through and output the PR URL at the end.
 {% include 'sections/_workspace-preflight.md.j2' %}
 {% endwith %}
 
+**Session boundary:** After each numbered step, persist context. Resolve `TASK_ID` via `harness task resolve --json` (`task_id` field). Pipe a JSON object valid for `SessionContext` (e.g. `task_id`, `current_phase`: `"ship"`, `current_step`, `current_state`, `next_step`):
+
+```bash
+echo '{"task_id":"TASK_ID","current_phase":"ship","current_step":"N","current_state":"<brief>","next_step":"<next>"}' | harness session write --task TASK_ID
+```
+
 ## Step 1: Pre-flight
 
-### Fast Path (same-session continuity)
+**Fast path** — use this **fast path** when conditions match (skip redundant checks): `harness task resolve --json` → `TASK_DIR`. If `workflow-state.json` is valid, `phase` ∈ {contracted, building, evaluating, shipping}, `has_handoff_summary`, branch matches `{{ branch_prefix }}/` → reuse `TASK_DIR`, read handoffs/plan/state, **still** `git fetch origin {{ trunk_branch }}`, then Step 2.
 
-Before running the full pre-flight, check whether it can be skipped — if the plan
-stage already completed in this session, most pre-flight work is redundant.
-
-1. Resolve the current task:
-   ```bash
-   harness task resolve --json
-   ```
-   This outputs: `{"task_id": "task-NNN", "task_dir": "...", "phase": "...", "has_plan": true, "has_handoff_summary": true, ...}`.
-   Use the `task_dir` value as `TASK_DIR`. If the command fails, fall back to scanning `.harness-flow/tasks/` for the latest `task-NNN` directory.
-2. Read `TASK_DIR/workflow-state.json` (or use fields already returned by `task resolve`).
-3. **Enter fast path if ALL conditions are met**:
-   - `workflow-state.json` exists and is valid
-   - `phase` is `contracted`, `building`, `evaluating`, or `shipping` (past plan stage)
-   - `has_handoff_summary` is `true` (prior stage wrote a handoff)
-   - Current branch starts with `{{ branch_prefix }}/` (already on a feature branch)
-
-4. **Fast path behavior**:
-   - ✅ Reuse existing `TASK_DIR` — do not re-scan or create
-   - ✅ Read `handoff_summary` as context — do not re-collect
-   - ✅ Skip branch check, config check (already verified in plan stage)
-   - ✅ Jump directly to Step 2 (Rebase)
-   - ❌ Do NOT skip `git fetch origin {{ trunk_branch }}` (rebase base must be fresh)
-
-5. **If fast path conditions are not met, run full pre-flight** (below)
-
-### Full Pre-flight
-
-1. Check the current branch. If on `{{ trunk_branch }}`, **abort**: "You're on the trunk branch. Ship from a feature branch."
-
-2. Run `git status`. Uncommitted changes are always included — no need to ask.
-
-3. Run `git diff {{ trunk_branch }}...HEAD --stat` and `git log {{ trunk_branch }}..HEAD --oneline` to understand what's being shipped.
-
-4. Check `.harness-flow/config.toml` exists.
-
-5. **Detect or create the task directory** (deterministic algorithm):
-   1. Scan `.harness-flow/tasks/` for all `task-NNN` directories
-   2. Let `L` = directory with the largest NNN (by numeric sort)
-   3. If `L` exists and `L/plan.md` exists → reuse `L` as `TASK_DIR`
-   4. Otherwise → create `task-{max(NNN)+1}` (or `task-001` if none exist) as `TASK_DIR`
-   5. All eval artifacts, ship-metrics, and build logs go into `TASK_DIR`
-
-   ```bash
-   mkdir -p .harness-flow/tasks/task-NNN
-   ```
-
-   If `TASK_DIR/workflow-state.json` has a non-empty `handoff_summary` field,
-   read it first for a compact summary of prior stage results.
-   (Backward compat: if `handoff-*.json` exists but `handoff_summary` is empty, read that.)
-   **Also read** `TASK_DIR/handoff-plan.json` and `TASK_DIR/handoff-build.json` when present (schema v2)
-   for structured `context_footprint` + decisions/risks — reuse that footprint before re-deriving scope.
-   Then read `TASK_DIR/plan.md` for full context.
-   If `TASK_DIR/workflow-state.json` exists, treat it as the canonical task-level
-   source for phase / gate / blocker / artifact refs. Update it instead of inventing
-   a parallel gate record elsewhere.
-
+**Full:** Not on `{{ trunk_branch }}` (else abort). `git status`; `git diff {{ trunk_branch }}...HEAD --stat` and `git log {{ trunk_branch }}..HEAD --oneline`. `.harness-flow/config.toml` exists. Task dir: largest `task-NNN` with `plan.md` else create; read `handoff_summary` / `handoff-*.json` / `handoff-plan.json` / `handoff-build.json` / `plan.md`; treat `workflow-state.json` as canonical.
 {% if memverse_enabled == "true" %}
-6. **Prior Learnings**: If Memverse MCP is available, search for learnings relevant to the
-   changed files/modules. Use multi-domain OR query (aligned with eval Step 0.7).
-   Include the project domain plus all five role-learning domains:
-   ```
-   search_memory(query=<key topics from diff>, domains="{{ project_name or memverse_domain }},{{ project_name or memverse_domain }}-architect-learning,{{ project_name or memverse_domain }}-engineer-learning,{{ project_name or memverse_domain }}-qa-learning,{{ project_name or memverse_domain }}-product-learning,{{ project_name or memverse_domain }}-project-manager-learning", limit=20)
-   ```
-   Display any prior pitfalls or patterns that apply to this diff.
-
+Memverse: `search_memory` with project + five `*-learning` domains (same query shape as eval).
 {% endif %}
-{% if memverse_enabled == "true" %}7.{% else %}6.{% endif %} **Eval Readiness Reminder**: This workflow WILL run a mandatory eval at Step 3.8.
-   After tests pass, the NEXT step is eval — NOT commit, NOT release.
-   Create a TODO list now with EVAL explicitly marked:
-
-   ```
-   - [ ] Pre-flight (Step 1)
-   - [ ] Rebase (Step 2)
-   - [ ] Tests (Step 3)
-   - [ ] Coverage Audit (Step 3.4)
-   - [ ] Plan Completion Audit (Step 3.5)
-   - [ ] **EVAL — MANDATORY** (Step 3.8)
-   - [ ] Scope Drift Detection (Step 4)
-   - [ ] Fix Loop if ITERATE (Step 5)
-   - [ ] Eval Artifact Gate (Step 5.9)
-   - [ ] Commit (Step 6)
-   - [ ] Verification Gate (Step 7)
-   - [ ] Pre-push Rebase (Step 7.5)
-   - [ ] Push + PR (Step 8)
-   ```
+**Eval Readiness Reminder** — Todo checklist must include **EVAL — MANDATORY** (Step 3.8) before commit.
 
 ---
 
-## Step 2: Rebase onto the base branch (BEFORE tests)
-
-Fetch and rebase onto the base branch so tests run against the latest state:
+## Step 2: Rebase (before tests)
 
 ```bash
 git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-**If rebase conflicts:** Try to auto-resolve simple conflicts (e.g. CHANGELOG ordering).
-If conflicts are complex or ambiguous, run `git rebase --abort`, **STOP** and show the conflicts.
-
-**If already up to date:** Continue silently.
+Conflicts: auto-fix trivial else `git rebase --abort` and **STOP**.
 
 ---
 
-## Step 3: Run Tests (on merged code)
-
-Run the full test suite:
+## Step 3: Run Tests
 
 ```bash
 {{ ci_command }}
 ```
 
-**If any test fails:** Do NOT immediately stop. Apply the Test Failure Ownership Triage:
+On failure: **MUST read** the protocol at `.cursor/skills/harness/harness-ship/ship-test-triage.md` before proceeding with this step. Pre-existing (fails on base) → note and continue; in-branch → fix (Step 5). All pass → continue.
 
-### Test Failure Triage
-
-For each failing test, determine ownership:
-
-1. Run the same test on the base branch (uses detached HEAD instead of branch checkout):
-   ```bash
-   CURRENT=$(git rev-parse --abbrev-ref HEAD) && git stash && git fetch origin {{ trunk_branch }} && git switch --detach origin/{{ trunk_branch }} && {{ ci_command }} 2>&1; git switch "$CURRENT" && git stash pop
-   ```
-   (Or use `git diff origin/{{ trunk_branch }}...HEAD` to check if the failing test file was modified on this branch)
-
-2. **Pre-existing failure** (fails on base branch too): Note it, continue. Not your problem.
-3. **In-branch failure** (passes on base, fails on HEAD): This IS your problem. Must fix.
-
-**After triage:** If in-branch failures remain, enter the fix loop (Step 5).
-If all failures were pre-existing, continue to Step 3.5.
-
-**If all pass:** Continue silently — note the counts briefly.
+{% include 'sections/_error-recovery.md.j2' %}
 
 {% include 'sections/_failure-pattern-save.md.j2' %}
 
@@ -174,111 +67,15 @@ If all failures were pre-existing, continue to Step 3.5.
 
 ## Step 3.4: Test Coverage Audit
 
-Analyze the diff to ensure changed code paths have adequate test coverage.
+Analyze the diff so changed code paths have adequate test coverage.
 
-### Quick Path (small change optimization)
-
-Count changed code files using the diff-stat CLI:
-```bash
-harness diff-stat --json
-```
-This outputs: `{"total": N, "code": N, "test": N, "doc": N, "other": N, "has_md_changes": bool, "files": [...]}`.
-Use the `code` field for the threshold check below.
-
-Fallback (if CLI unavailable):
-```bash
-git diff {{ trunk_branch }}..HEAD --name-only | grep -E '\.(py|ts|js|tsx|jsx|mjs)$' | wc -l
-```
-
-- **< 5 code files**: Use lightweight check — count GAPs and tested paths per file only,
-  output `COVERAGE SUMMARY: N files, M tested paths, K gaps`. Skip ASCII coverage charts and detailed tracing.
-- **≥ 5 code files**: Use full analysis flow below.
-
-### 1. Detect Test Framework
-Scan for: `pytest.ini`, `pyproject.toml [tool.pytest]`, `jest.config.*`, `vitest.config.*`,
-`Makefile` test targets, `tox.ini`, `setup.cfg [tool:pytest]`. Note the framework for later use.
-
-### 2. Trace Code Paths
-For each file in `git diff {{ trunk_branch }}..HEAD`:
-1. Read the changed file and identify all modified/added functions and methods
-2. For each function, trace:
-   - Happy path (normal execution)
-   - Each conditional branch (if/else, match/case)
-   - Each error path (try/except, error returns)
-   - Each loop boundary (empty collection, single item, many items)
-3. Draw an ASCII coverage diagram:
-
-```
-COVERAGE: src/harness/workflow.py
-├─ single_task_pass()
-│  ├─ [TESTED ★★★] happy path — tested in test_single_task_pass
-│  ├─ [TESTED ★★]  max iterations — tested in test_blocked_after_max
-│  ├─ [GAP]        empty spec input — no test
-│  └─ [TESTED ★]   dual eval failure — tested but shallow
-├─ split_spec_contract()
-│  ├─ [TESTED ★★★] with marker
-│  ├─ [TESTED ★★★] without marker
-│  └─ [TESTED ★★★] case insensitive
-```
-
-Legend: ★★★ = thorough (multiple assertions), ★★ = basic (single assertion), ★ = exists but shallow, GAP = no test
-
-### 3. User Flow Coverage
-Check that these scenarios are covered for changed code:
-- Concurrent/parallel execution (if applicable)
-- Empty/null state
-- Boundary values (0, max, negative)
-- Error recovery paths
-
-### 4. E2E Decision Matrix
-For changed code paths, recommend test type:
-- Pure function with no I/O → **unit test**
-- Single component with mocked deps → **unit test**
-- 2 components interacting → **integration test**
-- 3+ components or full user flow → **E2E test**
-- LLM/AI behavior validation → **eval test**
-
-### 5. Regression Rule (Iron Law)
-If the diff modifies existing behavior (changes to existing functions, not just new code):
-- There MUST be a regression test that verifies the old behavior still works
-- This is non-negotiable — generate the test if missing, do NOT ask
-
-### 6. Coverage Gate
-Calculate estimated coverage from the diagram:
-- Count total code paths and tested paths
-- **>= 80%**: PASS — continue
-- **>= 60%**: WARNING — output: "Coverage at ~X%. Consider adding tests for: [list GAP paths]"
-- **< 60%**: GATE — auto-generate tests for GAP paths (max 20 tests), run them, then re-assess
-
-### 7. Auto-Generate Missing Tests (when coverage < 60%)
-For each GAP path:
-1. Generate a test following the project's existing test patterns
-2. Run the test to verify it passes
-3. Cap at 20 generated tests per audit
-4. Commit generated tests: `git add tests/ && git commit -m "test: auto-generate coverage for gaps"`
+**MUST read** the protocol at `.cursor/skills/harness/harness-ship/ship-coverage-audit.md` before proceeding with this step.
 
 ---
 
 ## Step 3.5: Plan Completion Audit
 
-If a plan file exists at `.harness-flow/tasks/task-NNN/plan.md`:
-
-1. Extract every actionable item (checkboxes, numbered steps, imperative statements)
-2. Cross-reference against `git diff {{ trunk_branch }}...HEAD`
-3. Classify each: **DONE** / **PARTIAL** / **NOT DONE** / **CHANGED**
-4. Output:
-
-```
-PLAN COMPLETION AUDIT
-═══════════════════════════════════
-  [DONE]      Deliverable 1 — file(s) changed
-  [DONE]      Deliverable 2 — file(s) changed
-  [NOT DONE]  Deliverable 3 — no evidence in diff
-═══════════════════════════════════
-COMPLETION: X/Y DONE, M PARTIAL, K NOT DONE
-```
-
-If any NOT DONE items: note them in the PR body. Continue — this is informational, not blocking.
+If `plan.md` exists: extract actionable items; cross-check `git diff {{ trunk_branch }}...HEAD`; classify DONE/PARTIAL/NOT DONE/CHANGED; emit short audit block. NOT DONE → mention in PR; non-blocking.
 
 ---
 
@@ -286,23 +83,16 @@ If any NOT DONE items: note them in the PR body. Continue — this is informatio
 
 {% include 'sections/_ship-review-gate.md.j2' %}
 
-### Code Review Dispatch (for FULL and LITE intensity)
+**Dispatch:** FULL → 5 roles (`harness-architect`, `harness-product-owner`, `harness-engineer`, `harness-qa`, `harness-project-manager`); LITE → Engineer + QA; FAST → skip subagent reviews (gate wrote artifact).
 
-If the ship review gate determined **FULL** or **LITE** intensity, dispatch code reviewers
-using the Task tool — the main agent orchestrates but does NOT perform reviews itself.
-For **FULL**, dispatch all 5 roles. For **LITE**, dispatch only Engineer and QA.
-For **FAST**, skip this section entirely (eval artifact was already written by the gate).
-
-{% include 'sections/_code-review.md.j2' %}
+**MUST read** the protocol at `.cursor/skills/harness/harness-eval/code-review-protocol.md` before proceeding with this step.
 
 {% if review_gate == 'eng' %}
 
-**Review Gate (eng):** Evaluation is a hard gate — ITERATE verdict blocks shipping.
-All CRITICAL findings must be resolved before proceeding.
+**Review Gate (eng):** Eval is hard gate; ITERATE blocks; resolve CRITICAL before proceed.
 {% elif review_gate == 'advisory' %}
 
-**Review Gate (advisory):** Evaluation is advisory — ITERATE verdict is logged but does not block.
-CRITICAL findings are flagged but shipping continues.
+**Review Gate (advisory):** ITERATE logged; CRITICAL flagged; advisory mode **does not block** shipping on ITERATE alone.
 {% endif %}
 
 ---
@@ -310,188 +100,44 @@ CRITICAL findings are flagged but shipping continues.
 ## Step 3.9: Capture Learnings
 
 {% if memverse_enabled == "true" %}
-After the evaluation synthesis is complete, capture non-obvious insights as learnings
-(aligned with eval Step 2 — same logic, same metadata schema).
-
-### Admission Gate — what NOT to write
-
-**Never write** any of the following to Memverse (these are ephemeral work logs, not learnings):
-- Test counts, pass rates, CI status (e.g. "726 tests passed")
-- PR numbers, commit hashes, branch names (e.g. "PR #120, commit a40e0e7")
-- File change statistics (e.g. "19 files, 149 additions")
-- Review scores (e.g. "eval score 8.1/10")
-- Task ID + description parroting
-
-**Principle**: if the information already exists in git log / PR / workflow-state.json, do NOT
-duplicate it in Memverse. Only write **insights you would want to be reminded of in a future session**.
-
-### Capture Process
-
-1. Review all findings with confidence >= 7
-2. Parse merged findings for `[LEARNING]` items from each role's output.
-   Keep only entries that are:
-   - long-lived
-   - cross-project / cross-language reusable
-   - strongly role-relevant
-3. **Domain registration guard** (once per session, before the first write):
-   Call `manage_domain` for each role domain that will receive writes.
-   `manage_domain` is idempotent — registering an already-existing domain is a no-op,
-   so **skip `list_domains`** and just register directly:
-   ```
-   manage_domain(name="{{ project_name or memverse_domain }}-architect-learning", display="Architect Learning", aliases="{{ project_name or memverse_domain }} architect", keywords="architecture learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-engineer-learning", display="Engineer Learning", aliases="{{ project_name or memverse_domain }} engineer", keywords="engineering learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-qa-learning", display="QA Learning", aliases="{{ project_name or memverse_domain }} qa", keywords="testing qa learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-product-learning", display="Product Learning", aliases="{{ project_name or memverse_domain }} product", keywords="product learning patterns")
-   manage_domain(name="{{ project_name or memverse_domain }}-project-manager-learning", display="PM Learning", aliases="{{ project_name or memverse_domain }} pm", keywords="project management learning patterns")
-   ```
-   Fire all 5 calls **in parallel**. If this session already registered domains
-   (e.g. eval ran before ship), skip entirely.
-4. **Dedup guard** (prevents double-write when eval ran before ship in the same session):
-   For each qualifying `[LEARNING]` item, before writing, call:
-   ```
-   search_memory(query=<learning key or short text>, domains="{{ project_name or memverse_domain }}-<role>-learning", limit=5)
-   ```
-   If a result with substantially the same insight already exists → **skip** (log as `skipped-dedup`).
-   Only write if no near-duplicate is found.
-5. For each non-duplicate `[LEARNING]` item, the **parent orchestrator** (you) calls `add_memories`
-   with structured metadata (JSON string). Sub-agents do NOT call `add_memories` themselves.
-   **Text must include a `[domain]` prefix** to reinforce Memverse domain inference:
-   ```
-   add_memories(
-     text="[{{ project_name or memverse_domain }}-<role>-learning] <learning insight text>",
-     domain="{{ project_name or memverse_domain }}-<role>-learning",
-     metadata="{\"type\": \"<pattern|pitfall|preference|architecture|tool>\", \"key\": \"<kebab-case-id>\", \"confidence\": <1-10>, \"source\": \"observed\", \"role\": \"<role>\", \"task\": \"<task-id>\", \"files\": [\"<file1>\", \"<file2>\"]}"
-   )
-   ```
-   **Note**: `search_memory` supports `metadata_filter` for post-recall filtering (v5.28.0+).
-   For full-library exact matching by a metadata key, prefer `upsert_memory` with `upsert_key`.
-   If `upsert_memory` is not available, fall back to `add_memories` + `search_memory` dedup.
-   Treat writes as non-blocking fire-and-forget: do not block gate on write outcome.
-   **Parallel writes**: when multiple learnings are ready, dispatch all `add_memories` calls
-   concurrently (do not serialize).
-6. Log counters: `LEARNING_ADD scheduled|skipped-dedup|skipped|failed-open|domain-registered`.
-
-If Memverse MCP is not available: skip silently.
+After synthesis: write only durable `[LEARNING]` items (confidence ≥7), not logs (counts, PR#, hashes, scores). Register role domains once (parallel `manage_domain` calls), dedup via `search_memory`, `add_memories` with `[domain]` prefix + metadata; parallel writes; log `LEARNING_ADD` counters. Non-blocking.
 {% else %}
-Skip — Memverse not enabled.
+Skip — Memverse disabled.
 {% endif %}
 
 ---
 
 ## Step 4: Scope Drift Detection
 
-Check: did the diff deliver what was planned — nothing more, nothing less?
-
-1. Read plan (if exists), commit messages, and TODOS.md for stated intent
-2. Run `git diff {{ trunk_branch }}...HEAD --stat` and compare against intent
-3. Output:
-
-```
-Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
-Intent: <1-line summary>
-Delivered: <1-line summary>
-[If drift: list each out-of-scope change]
-[If missing: list each unaddressed requirement]
-```
-
-This is **INFORMATIONAL** — does not block shipping.
+Plan + commits + TODOS vs `git diff {{ trunk_branch }}...HEAD --stat` → one-line CLEAN/DRIFT/MISSING; informational.
 
 ---
 
 ## Step 5: Fix Loop (if ITERATE)
 
-If evaluation verdict is ITERATE:
-
-1. Read the evaluation feedback (specific fix suggestions)
-2. Apply fixes to the code
-3. Run `{{ ci_command }}` to verify
-4. Re-run evaluation (Step 3.8) with incremented round number
-5. Maximum {{ max_iterations }} total iterations
-
-If still ITERATE after {{ max_iterations }} rounds: **STOP**. Report the scores and
-unresolved findings.
+Apply feedback → `{{ ci_command }}` → re-run Step 3.8; max {{ max_iterations }}. Else **STOP** with scores/findings.
 
 ---
 
-## Step 5.5: TODOS.md Management
+## Step 5.5: TODOS.md
 
-If a `TODOS.md` file exists in the project root:
-
-1. Read `TODOS.md` and parse all TODO items
-2. Cross-reference against `git diff {{ trunk_branch }}...HEAD` to detect completed items:
-   - If a TODO references a file/function that was modified/added in the diff, check if the work is done
-   - If a TODO describes functionality that is now implemented, mark as completed
-3. Move completed items to a `## Completed` section at the bottom
-4. Output summary: "TODOS: N items marked complete, M remaining"
-5. If any items were updated, commit: `git add TODOS.md && git commit -m "chore: update TODOS.md"`
-
-If no `TODOS.md` exists: skip silently.
+If `TODOS.md` exists: reconcile with diff; move done to `## Completed`; commit if changed: `git add TODOS.md && git commit -m "chore: update TODOS.md"`.
 
 ---
 
-## Step 5.9: Eval Artifact Gate (MANDATORY — cannot be skipped)
-
-```
-╔══════════════════════════════════════════════════════════════╗
-║  EVAL GATE: Before committing, verify eval actually ran.    ║
-║  This catches the #1 workflow skip — jumping from           ║
-║  "tests pass" straight to "commit".                         ║
-╚══════════════════════════════════════════════════════════════╝
-```
-
-Run the **system-level gate check** using the `TASK_DIR` established in Step 1:
+## Step 5.9: Eval Artifact Gate (mandatory)
 
 ```bash
 harness gate --task TASK_ID
 ```
 
-Replace `TASK_ID` with the actual task directory name (e.g. `task-001`).
-
-**Interpreting the result:**
-- **Exit code 0 (PASS):** All hard checks passed. Proceed to Step 6.
-- **Exit code 1 (BLOCKED):** Read the output — it lists exactly which checks failed.
-
-**If BLOCKED — mandatory actions:**
-1. Read each `✗` line in the output to understand why.
-2. If eval is missing → you skipped Step 3.8. **Go back and run eval.**
-3. If eval verdict is ITERATE → complete the fix loop (Step 5) and re-evaluate.
-4. If eval is stale (warning) → consider re-running eval if code changed after it.
-5. Do NOT rationalize ("it's just templates", "tests pass so it's fine").
-   The eval catches issues tests cannot: security holes, design flaws, scope drift.
-6. After fixing, re-run `harness gate --task TASK_ID` to confirm.
-
-{% if review_gate == 'advisory' %}
-**Advisory mode:** ITERATE verdict is logged as a warning but does not block.
-The gate only blocks when eval is missing, empty, or has no parseable verdict.
-{% else %}
-**Eng mode:** The gate is a **hard block**. ITERATE verdict blocks shipping.
-Only **PASS** allows proceeding to Step 6.
-(Note: `harness gate` validates the verdict line, not the numeric score.
-The score threshold (>= {{ pass_threshold }}) is enforced during evaluation in Step 3.8.)
-{% endif %}
+0 = proceed. 1 = fix (missing eval → Step 3.8; ITERATE → Step 5; stale → re-eval if needed). {% if review_gate == 'advisory' %}Advisory: ITERATE warning only unless eval missing/empty.{% else %}Eng: ITERATE blocks; only PASS continues. Score ≥ {{ pass_threshold }} enforced in Step 3.8.{% endif %}
 
 ---
 
-## Step 6: Commit (bisectable chunks)
+## Step 6: Commit (bisectable)
 
-{% if review_gate == 'advisory' %}
-Once evaluation completes (advisory mode — ITERATE verdict is logged but does not block):
-{% else %}
-Once evaluation PASSES:
-{% endif %}
-
-1. **Bisectable commits**: Analyze the diff and group into logical commits:
-   - Infrastructure/config changes first
-   - Core logic + tests together
-   - Each commit must be independently valid
-
-2. **Commit format**: `<type>(scope): description`
-   Types: feat, fix, refactor, test, docs, chore
-
-3. Stage and commit by file groups (not `git add -A`):
-   ```bash
-   git add <specific-files> && git commit -m "<type>(scope): description"
-   ```
+{% if review_gate == 'advisory' %}After eval (advisory).{% else %}After PASS.{% endif %} Group infra → logic+tests; `feat|fix|refactor|test|docs|chore`; `git add <files> && git commit -m "<type>(scope): msg"`.
 
 ---
 
@@ -499,29 +145,9 @@ Once evaluation PASSES:
 
 ---
 
-## Step 7: Verification Gate — IRON LAW
+## Step 7: Verification Gate
 
-```
-IRON LAW: NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.
-
-Rationalization prevention:
-- "Should work now" → RUN IT.
-- "I'm confident" → Confidence is not evidence.
-- "I already tested earlier" → Code changed since then. Test again.
-- "It's a trivial change" → Trivial changes break production.
-- "Only docs changed" → Docs can have broken links, bad paths.
-
-Claiming work is complete without verification is dishonesty, not efficiency.
-```
-
-**Before pushing, verify:**
-
-1. Check if any code files changed since the last full `{{ ci_command }}` run
-   (`.py`/`.ts`/`.js` etc.; `.md`/`.json`/`.toml` and other non-code files don't count).
-   - **Code changed**: re-run `{{ ci_command }}`. Paste fresh output.
-   - **No code changed** (only docs/config changes, or review fixes already passed tests in Step 5): skip redundant test run.
-2. If tests fail: STOP. Fix and return to Step 3.
-3. Verify git status is clean (no stray untracked files).
+Re-run `{{ ci_command }}` if any code file changed since last full run; else skip if only docs/config and fixes already verified. Fail → Step 3. Clean `git status`.
 
 {% if hooks_pre_build or hooks_post_eval or hooks_pre_ship %}
 ---
@@ -531,288 +157,74 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 ---
 {% endif %}
 
-## Step 7.5: Pre-push Rebase (catch-up with trunk)
-
-Rebase onto the latest trunk **again** right before push, to absorb any commits
-that landed on `{{ trunk_branch }}` since Step 2 (e.g. CD version bumps from other PRs):
+## Step 7.5: Pre-push rebase
 
 ```bash
 git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
 ```
 
-- **If already up to date:** continue silently.
-- **If rebase conflicts:** try auto-resolve simple cases (e.g. version file ordering).
-  If complex, `git rebase --abort`, **STOP** and show conflicts.
+Same conflict policy as Step 2.
 
 ---
 
 ## Step 8: Push + PR
 
-1. Push with upstream tracking:
-   ```bash
-   git push -u origin HEAD
-   ```
-
-2. **PR Idempotency Check** — detect existing PR before creating a new one:
-   ```bash
-   EXISTING_PR=$(gh pr view --json url,number,state -q 'select(.state == "OPEN") | .number' 2>/dev/null || echo "")
-   ```
-   - If `EXISTING_PR` is non-empty: update the existing PR body with `gh pr edit $EXISTING_PR --body "..."`
-   - If empty: create a new PR
-
-3. Create or update PR:
-   ```bash
-   gh pr create --base {{ trunk_branch }} --title "<type>: <summary>" --body "$(cat <<'EOF'
-   ## Summary
-   <summarize ALL changes — group by logical section>
-
-   ## Evaluation Scores
-   | Dimension | Score |
-   |-----------|-------|
-   | Completeness | X/5 |
-   | Design | architect | X/10 |
-   | Completeness | product-owner | X/10 |
-   | Quality | engineer | X/10 |
-   | Regression | qa | X/10 |
-   | Scope | project-manager | X/10 |
-   | **Weighted Average** | | **X.X/10** |
-
-   ## Review Findings
-   - High confidence: N findings
-   - Auto-fixed: M findings
-   - Roles dispatched: architect ✓/✗  product-owner ✓/✗  engineer ✓/✗  qa ✓/✗  project-manager ✓/✗
-
-   ## Plan Completion
-   <completion checklist summary, or "No plan file">
-
-   ## Scope Check
-   <CLEAN or list drift/missing items>
-
-   ## Test Coverage
-   <ASCII coverage diagram summary, or "No coverage audit">
-
-   ## TODOS
-   <N completed, M remaining, or "No TODOS.md">
-
-   ## Test Results
-   - [x] All tests pass (N tests)
-
-   EOF
-   )"
-   ```
-
-   If `gh` is not available: print branch name and remote URL for manual PR creation.
-
-4. Output the PR URL.
-
----
-
-## Step 8.5: Doc-Release (conditional)
-
-**Precondition**: Check whether the diff contains `.md` file changes:
 ```bash
-harness diff-stat --json
+git push -u origin HEAD
 ```
-Check the `has_md_changes` field. Fallback: `git diff {{ trunk_branch }}..HEAD --name-only | grep '\.md$'`
 
-- **`has_md_changes` is `false` (no `.md` files changed)**: Silently skip the entire doc-release step.
-- **`has_md_changes` is `true` (`.md` files changed)**: Run the `/harness-doc-release` workflow:
-
-1. Compare the diff against all `.md` files in the project
-2. Auto-fix factual inaccuracies (file paths, version numbers, function names)
-3. Flag narrative/opinion changes for user review
-4. If any docs were updated, amend the last commit or create a new commit:
-   ```bash
-   git add '*.md' && git commit -m "docs: sync documentation with latest changes" && git push
-   ```
-
-If no documentation issues are found: skip silently.
+**MUST read** the protocol at `.cursor/skills/harness/harness-ship/ship-pr-protocol.md` before proceeding with this step. Output PR URL (or branch + remote if no `gh`).
 
 ---
 
-## Step 8.75: Ship Metrics Persistence
+## Step 8.5: Doc-Release
 
-Write ship metrics to `.harness-flow/tasks/task-NNN/ship-metrics.json` for retrospective consumption:
-
-Prefer the structured command (supports auto-inferred efficiency baseline fields):
-
-```bash
-harness save-ship-metrics --task TASK_ID --branch "$(git rev-parse --abbrev-ref HEAD)" --pr-quality-score 8.5 --test-count 285 --eval-rounds 1 --findings-critical 0 --findings-informational 2 --auto-fixed 1 --plan-total 5 --plan-done 5 --coverage-pct 85
-```
-
-```json
-{
-  "timestamp": "ISO-8601",
-  "branch": "agent/feature-name",
-  "coverage_pct": 85,
-  "plan_total": 5,
-  "plan_done": 5,
-  "pr_quality_score": 8.5,
-  "findings_critical": 0,
-  "findings_informational": 2,
-  "auto_fixed": 1,
-  "test_count": 285,
-  "eval_rounds": 1,
-  "models_used": ["architect", "product-owner", "engineer", "qa", "project-manager"]
-}
-```
-
-If no task directory exists, write to `.harness-flow/ship-metrics.jsonl` (append one JSON object per line).
-
-If `workflow-state.json` exists (or this branch introduced it), run `harness gate --task TASK_ID`
-one final time to persist the ship-readiness gate snapshot, then update the evaluation
-artifact ref, ship metrics ref, and final phase/blocker outcome before finishing.
+`harness diff-stat --json` → if `has_md_changes`: run `/harness-doc-release`; commit doc fixes if any.
 
 ---
 
-## Step 9: PR Landing — CI Monitoring & Auto-Fix Loop
+## Step 8.75: Ship metrics
 
-After the PR is created and metrics persisted, monitor remote CI until the PR
-reaches **merge-ready** state (all required checks green + no merge conflict).
-
-**Skip entirely** if `gh` is not available — output a manual-check reminder instead.
-
-### 9.1 Transition to Landing
-
-```bash
-# Update workflow state (if workflow-state.json exists)
-# phase: shipping → landing
-```
-
-### 9.2 Polling Loop (max 3 fix rounds)
-
-```
-for round in 1..3:
-  1. Check PR CI status:
-     ```bash
-     harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json
-     ```
-
-  2. If ci_status == "pass" AND conflict == false:
-     → PR is merge-ready. Break loop. Continue to Step 9.4.
-
-  3. If conflict == true:
-     → Rebase onto trunk (same as Step 7.5):
-       ```bash
-       git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
-       ```
-     → If rebase fails: STOP and report conflict.
-     → Push: `git push --force-with-lease`
-     → Wait 30s, then re-poll.
-
-  4. If ci_status == "fail":
-     a. Get failure logs:
-        ```bash
-        harness ci-logs --branch "$(git rev-parse --abbrev-ref HEAD)" --json
-        ```
-     b. Diagnose each failed job (auto-fixable / needs-human / infra-issue).
-     c. If ALL failures are infra-issue: STOP — report infrastructure problem.
-     d. If ANY failure is needs-human AND no auto-fixable failures: STOP — report.
-     e. Otherwise: attempt auto-fix:
-        - Read the failed test / lint output
-        - Apply code fixes
-        - Run local CI: `{{ ci_command }}`
-        - If local CI passes: commit and push
-          ```bash
-          git add <fixed-files>
-          git commit -m "fix: auto-fix CI failure (landing round N)"
-          git push
-          ```
-        - Wait 30s, then re-poll.
-
-  5. If ci_status == "pending":
-     → Wait with exponential backoff: 30s, 60s, 120s (cap at 2 min).
-     → Total wait cap: 15 minutes. If exceeded: STOP — report timeout.
-```
-
-### 9.3 Exit Conditions
-
-| Condition | Action |
-|-----------|--------|
-| CI green + no conflict | → Step 9.4 (success) |
-| 3 fix rounds exhausted | → STOP with structured report |
-| All failures are infra-issue | → STOP with structured report |
-| needs-human failure, no auto-fixable | → STOP with structured report |
-| Rebase conflict unresolvable | → STOP with conflict details |
-| Polling timeout (15 min) | → STOP with timeout report |
-
-**Structured failure report format:**
-```
-PR LANDING REPORT
-═══════════════════════════════════════════
-  PR:          #N (URL)
-  Status:      BLOCKED
-  Rounds:      M/3 attempted
-  Category:    auto-fixable | needs-human | infra-issue | timeout | conflict
-  Failed jobs: [list]
-  Suggestion:  [actionable next step for user]
-═══════════════════════════════════════════
-```
-
-### 9.4 Landing Success
-
-When CI is green and no conflict:
-1. Update `workflow-state.json`: landing gate → pass, phase → done
-2. Output:
-   ```
-   PR LANDING: MERGE-READY ✓
-   PR #N: [URL]
-   CI: all checks passed
-   Conflict: none
-   ```
+`harness save-ship-metrics --task TASK_ID ...` (or append `.harness-flow/ship-metrics.jsonl`). Final `harness gate --task TASK_ID` if persisting workflow state.
 
 ---
 
-## Ship Handoff
+## Step 9: PR landing
 
-Write a ship outcome summary to the `handoff_summary` field of `workflow-state.json` (≤ 2000 chars):
-PR URL, commit count, review scores, key findings addressed, remaining open items,
-landing outcome (merge-ready / blocked with reason).
-
-If `workflow-state.json` does not exist, skip.
+If `gh` unavailable: skip; remind user. Else: loop ≤3 — `harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`; pass + no conflict → success; conflict → rebase + `git push --force-with-lease`; fail → `harness ci-logs`, fix, `{{ ci_command }}`, commit, push; pending → backoff (cap ~15m). **STOP** on infra-only, needs-human, exhausted rounds, or unresolvable conflict. Success: update `workflow-state.json`, emit merge-ready summary.
 
 ---
 
-## State Persistence & Resume
+## Ship handoff
 
-All state is persisted in `.harness-flow/tasks/task-NNN/`:
-- `plan.md` — the plan (if exists)
-- `build-rN.md` — build logs per round
-- `plan-eval-rN.md` — plan evaluations per round
-- `code-eval-rN.md` — code evaluations per round
-- `workflow-state.json` — authoritative task state (phase, gates, artifact refs)
+Write ≤2000 chars to `handoff_summary` in `workflow-state.json` (PR URL, commits, scores, findings, landing status).
 
-### Resume Decision Table
+---
 
-If this workflow is interrupted and needs to resume, **use this table to determine
-where to continue** instead of starting from scratch:
+## Resume (short)
 
-| Existing artifacts | workflow-state phase | Resume from | Notes |
-|-------------------|---------------------|-------------|-------|
-| `plan.md` only | `contracted` | Step 1 (use fast path) | Plan done, enter ship pre-flight |
-| `plan.md` + `build-rN.md` | `building` | Step 3 (Tests) | Build done, needs verification |
-| `plan.md` + `code-eval-rN.md` (verdict=ITERATE) | `evaluating` | Step 5 (Fix loop) | Eval found issues, continue fixing |
-| `plan.md` + `code-eval-rN.md` (verdict=PASS) | `evaluating` | Step 5.9 (Gate check) | Eval passed, verify gate |
-| Gate PASS + not pushed | `shipping` | Step 6 (Commit) | Needs commit and push |
-| Pushed + no PR | `shipping` | Step 8 (Create PR) | Code pushed, create PR |
-| PR exists + CI pending/fail | `landing` | Step 9.2 (Landing loop) | PR submitted, monitor CI |
-| PR exists + CI green | `landing` | Step 9.4 (Landing success) | Finalize landing |
+| Artifacts / phase | Resume at |
+|-------------------|-----------|
+| plan only, contracted | Step 1 fast |
+| + build, building | Step 3 |
+| eval ITERATE, evaluating | Step 5 |
+| eval PASS, evaluating | Step 5.9 |
+| gate PASS unpushed, shipping | Step 6 |
+| pushed no PR | Step 8 |
+| PR CI pending/fail, landing | Step 9 loop |
+| PR green, landing | Step 9 done |
 
-**When resuming, do NOT**:
-- Re-run eval that already passed (unless code changed after eval)
-- Re-create task directories that already exist
-- Re-run tests that already passed (unless code changed)
+Do not re-run passed eval/tests unless code changed since.
 
 ---
 
 ## Important Rules
 
-- **Never skip eval.** Step 3.8 MUST run. Step 5.9 verifies it did. No exceptions.
-  "Tests pass" is NOT sufficient — eval catches what tests cannot (security, design, scope).
-- **Never skip tests.** If tests fail after triage, stop.
-- **Never skip the code review gate.** The ship review gate (Step 3.8) determines intensity (FULL/LITE/FAST). FULL dispatches all 5 roles, LITE dispatches Engineer + QA, FAST relies on CI + machine gate only. Regardless of intensity, `harness gate` (Step 5.9) must run. If individual role dispatches fail, degrade per the ladder in the code review section.
-- **Never force push.** Use regular `git push` only.
-- **Never ask for trivial confirmations.** Auto-commit, auto-push, auto-PR.
-- **Split commits for bisectability** — each commit = one logical change.
-- **Never push without fresh verification evidence.** If code changed after tests, re-run.
-- **The goal is: user says `/harness-ship`, next thing they see is the PR URL.**
+- **Never skip eval** (Step 3.8) or **gate** (Step 5.9). Tests alone are insufficient.
+- **Never skip** ship review gate intensity rules; on dispatch failure degrade per **code-review-protocol.md**.
+- **No force push** except `--force-with-lease` in Step 9 conflict recovery.
+- **No trivial asks** — auto-commit/push/PR.
+- **Bisectable commits**; **fresh verification** before push.
+- **Goal:** `/harness-ship` → next output is PR URL.
+
+Long-horizon loop SSOT: `feedback_ledger_path`, `continue_pause_summary` — see `/harness-vision`.

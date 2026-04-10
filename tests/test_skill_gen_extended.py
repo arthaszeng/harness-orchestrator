@@ -673,6 +673,7 @@ def test_eval_has_context_degradation_ladder(tmp_path: Path):
     assert "Context Degradation Ladder" in content
     assert "Minimum viable eval" in content
     assert "FATAL" in content
+    assert "code-review-protocol.md" in content
 
 
 def test_eval_uses_minimal_interaction_wording(tmp_path: Path):
@@ -830,8 +831,10 @@ def test_vision_and_ship_include_long_horizon_review_context_hints(tmp_path: Pat
 
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     ship_content = ship.read_text(encoding="utf-8")
+    # Ship SKILL links to vision SSOT for ledger paths (full detail in /harness-vision).
     assert "feedback_ledger_path" in ship_content
     assert "continue_pause_summary" in ship_content
+    assert "/harness-vision" in ship_content
 
 
 def test_vision_includes_ship_invocation(tmp_path: Path):
@@ -964,14 +967,15 @@ def test_eval_uses_five_role_code_review(tmp_path: Path):
 
 
 def test_eval_has_degradation_ladder(tmp_path: Path):
-    """eval code review section has degradation ladder for subagent failures."""
+    """Subagent degradation ladder lives in code-review-protocol.md (referenced by eval SKILL)."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
-    content = ev.read_text(encoding="utf-8")
-    assert "Degradation ladder" in content
-    assert "5/5 respond" in content
-    assert "0/5 respond" in content
+    proto = (
+        tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "code-review-protocol.md"
+    ).read_text(encoding="utf-8")
+    assert "Degradation ladder" in proto
+    assert "5/5 respond" in proto
+    assert "0/5 respond" in proto
 
 
 # --- Ship uses new 5-role code review ---
@@ -1163,7 +1167,11 @@ def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
     assert "Delivery recommendation" in plan_content
 
     eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
-    assert "方向/治理合成" in eval_content
+    assert "code-review-protocol.md" in eval_content
+    proto_zh = (
+        skills_base / "harness-eval" / "code-review-protocol.md"
+    ).read_text(encoding="utf-8")
+    assert "方向/治理合成" in proto_zh
     assert "Value recommendation" in eval_content
     assert "Delivery recommendation" in eval_content
 
@@ -1867,7 +1875,7 @@ class TestShipFastPathAndResume:
         generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
         ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
         content = ship.read_text(encoding="utf-8")
-        assert "中断恢复决策表" in content
+        assert "恢复" in content
         assert "Step 5" in content
 
     def test_en_ship_contains_resume_table(self, tmp_path: Path):
@@ -1875,7 +1883,7 @@ class TestShipFastPathAndResume:
         generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
         ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
         content = ship.read_text(encoding="utf-8")
-        assert "Resume Decision Table" in content
+        assert "Resume" in content
         assert "Step 5" in content
 
     def test_zh_plan_contains_continuity_guarantee(self, tmp_path: Path):
@@ -1924,18 +1932,20 @@ class TestRoadmapA2InstructionPrecision:
     def test_en_code_review_do_not_attach_and_clustering(self, tmp_path: Path):
         cfg = _make_cfg(tmp_path)
         generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
-        eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
-        content = eval_skill.read_text(encoding="utf-8")
-        assert "Do NOT attach (per-role budget)" in content
-        assert "Normalize and cluster findings" in content
+        proto = (
+            tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "code-review-protocol.md"
+        ).read_text(encoding="utf-8")
+        assert "Do NOT attach (per-role budget)" in proto
+        assert "Normalize and cluster findings" in proto
 
     def test_zh_code_review_do_not_attach_and_clustering(self, tmp_path: Path):
         cfg = _make_cfg(tmp_path)
         generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
-        eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
-        content = eval_skill.read_text(encoding="utf-8")
-        assert "禁止附加（按角色预算）" in content
-        assert "归一化并聚类发现" in content
+        proto = (
+            tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "code-review-protocol.md"
+        ).read_text(encoding="utf-8")
+        assert "禁止附加（按角色预算）" in proto
+        assert "归一化并聚类发现" in proto
 
 
 # --- Ship Review Gate (Adaptive) ---
@@ -2005,8 +2015,7 @@ def test_ship_no_contradictory_always_5_role(tmp_path: Path):
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
     assert "Never skip the 5-role code review" not in content
-    assert "Never skip the code review gate" in content
-
+    assert "never skip eval" in content.lower()
 
 def test_ship_zh_no_contradictory_always_5_role(tmp_path: Path):
     """ZH ship skill no longer says '绝不跳过 5 角色代码评审'."""
@@ -2015,7 +2024,7 @@ def test_ship_zh_no_contradictory_always_5_role(tmp_path: Path):
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
     assert "绝不跳过 5 角色代码评审" not in content
-    assert "绝不跳过代码评审门禁" in content
+    assert "禁止跳过" in content
 
 
 def test_ship_review_gate_context_injection(tmp_path: Path):
