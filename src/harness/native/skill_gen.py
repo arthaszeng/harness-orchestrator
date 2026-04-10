@@ -69,20 +69,18 @@ _RULE_TEMPLATES = [
     ("rule-safety-guardrails.mdc.j2", "harness-safety-guardrails"),
 ]
 
-_RESOURCE_FILES = [
-    "review-checklist.md",
-    "specialists/testing.md",
-    "specialists/security.md",
-    "specialists/performance.md",
-    "specialists/red-team.md",
-]
-
-_REFERENCE_FILES: list[tuple[str, str, str]] = [
-    # (template_name, target_skill, output_filename)
-    ("references/code-review-protocol.md.j2", "harness-eval", "code-review-protocol.md"),
-    ("references/ship-pr-protocol.md.j2", "harness-ship", "ship-pr-protocol.md"),
-    ("references/ship-test-triage.md.j2", "harness-ship", "ship-test-triage.md"),
-    ("references/ship-coverage-audit.md.j2", "harness-ship", "ship-coverage-audit.md"),
+_REFERENCE_FILES: list[tuple[str, str, str, str]] = [
+    # (source_path, target_skill, output_filename, mode)
+    # mode: "copy" = plain file copy, "render" = Jinja2 render with full_ctx
+    ("review-checklist.md", "harness-eval", "review-checklist.md", "copy"),
+    ("specialists/testing.md", "harness-eval", "specialists/testing.md", "copy"),
+    ("specialists/security.md", "harness-eval", "specialists/security.md", "copy"),
+    ("specialists/performance.md", "harness-eval", "specialists/performance.md", "copy"),
+    ("specialists/red-team.md", "harness-eval", "specialists/red-team.md", "copy"),
+    ("references/code-review-protocol.md.j2", "harness-eval", "code-review-protocol.md", "render"),
+    ("references/ship-pr-protocol.md.j2", "harness-ship", "ship-pr-protocol.md", "render"),
+    ("references/ship-test-triage.md.j2", "harness-ship", "ship-test-triage.md", "render"),
+    ("references/ship-coverage-audit.md.j2", "harness-ship", "ship-coverage-audit.md", "render"),
 ]
 
 
@@ -408,28 +406,29 @@ def generate_native_artifacts(
             typer.echo(t("native.generated_rule", path=_rel(project_root, out_path)))
             count += 1
 
-    # Resources → .cursor/skills/harness/harness-eval/<path>  (plain copy)
-    eval_resource_dir = skills_base / "harness-eval"
-    eval_resource_dir.mkdir(parents=True, exist_ok=True)
-    for resource_path in _RESOURCE_FILES:
-        src = tmpl_dir / resource_path
-        if not src.exists():
-            typer.echo(f"  [warn] resource not found: {resource_path}", err=True)
-            continue
-        dest = eval_resource_dir / resource_path
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-        typer.echo(t("native.generated_skill", path=_rel(project_root, dest)))
-        count += 1
-
-    # Reference files → .cursor/skills/harness/<target_skill>/<filename>  (Jinja render)
-    for ref_tmpl, target_skill, out_name in _REFERENCE_FILES:
+    # Reference files → .cursor/skills/harness/<target_skill>/<filename>
+    for source_path, target_skill, out_name, mode in _REFERENCE_FILES:
         target_dir = skills_base / target_skill
         target_dir.mkdir(parents=True, exist_ok=True)
         out_path = target_dir / out_name
-        if _try_render_and_write(ref_tmpl, f"ref:{out_name}", out_path, full_ctx):
-            typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
-            count += 1
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if mode == "copy":
+            src = tmpl_dir / source_path
+            if not src.exists():
+                typer.echo(f"  [warn] resource not found: {source_path}", err=True)
+                continue
+            try:
+                out_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+                typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
+                count += 1
+            except OSError as exc:
+                typer.echo(f"  [error] skipping {out_name}: {exc}", err=True)
+                skipped.append(out_name)
+        else:
+            if _try_render_and_write(source_path, f"ref:{out_name}", out_path, full_ctx):
+                typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
+                count += 1
 
     if skipped:
         typer.echo(

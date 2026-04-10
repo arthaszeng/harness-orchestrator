@@ -4,55 +4,20 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 import typer
 
+from harness.commands._resolve import resolve_task_dir_readonly, resolve_task_dir_strict
 from harness.core.ui import get_ui
 
 _EXIT_VALIDATION = 1
 _EXIT_NOT_FOUND = 2
 
 
-def _resolve_task_dir_strict(task: str) -> Path:
-    """Resolve task dir, creating if needed. Reuses artifact pattern."""
-    from harness.core.config import HarnessConfig
-    from harness.core.task_identity import TaskIdentityResolver
-
-    cfg = HarnessConfig.load(Path.cwd())
-    resolver = TaskIdentityResolver.from_config(cfg)
-    if not resolver.is_valid_task_key(task):
-        raise typer.BadParameter(
-            f"Invalid task ID '{task}' for strategy '{resolver.strategy}'"
-        )
-    agents_dir = Path.cwd() / ".harness-flow"
-    task_dir = (agents_dir / "tasks" / task).resolve()
-    if not task_dir.is_relative_to((agents_dir / "tasks").resolve()):
-        raise typer.BadParameter(f"Invalid task ID '{task}': path traversal detected")
-    task_dir.mkdir(parents=True, exist_ok=True)
-    return task_dir
-
-
-def _resolve_task_dir_readonly(task: str) -> Path | None:
-    """Resolve task dir without creating. Returns None if absent."""
-    from harness.core.config import HarnessConfig
-    from harness.core.task_identity import TaskIdentityResolver
-
-    cfg = HarnessConfig.load(Path.cwd())
-    resolver = TaskIdentityResolver.from_config(cfg)
-    if not resolver.is_valid_task_key(task):
-        raise typer.BadParameter(
-            f"Invalid task ID '{task}' for strategy '{resolver.strategy}'"
-        )
-    agents_dir = Path.cwd() / ".harness-flow"
-    task_dir = (agents_dir / "tasks" / task).resolve()
-    if not task_dir.is_relative_to((agents_dir / "tasks").resolve()):
-        raise typer.BadParameter(f"Invalid task ID '{task}': path traversal detected")
-    return task_dir if task_dir.is_dir() else None
-
-
 def run_handoff_write(*, task: str) -> None:
     """Read JSON from stdin, validate as StageHandoff, and save."""
+    from pydantic import ValidationError
+
     from harness.core.handoff import StageHandoff, save_handoff
     from harness.core.workflow_state import load_workflow_state
 
@@ -79,11 +44,11 @@ def run_handoff_write(*, task: str) -> None:
 
     try:
         handoff = StageHandoff.model_validate(payload)
-    except Exception as exc:
+    except ValidationError as exc:
         ui.error(f"validation failed: {exc}")
         raise typer.Exit(code=_EXIT_VALIDATION)
 
-    task_dir = _resolve_task_dir_strict(task)
+    task_dir = resolve_task_dir_strict(task)
     path = save_handoff(task_dir, handoff)
 
     ws = load_workflow_state(task_dir)
@@ -108,7 +73,7 @@ def run_handoff_read(
     )
 
     ui = get_ui()
-    task_dir = _resolve_task_dir_readonly(task)
+    task_dir = resolve_task_dir_readonly(task)
     if task_dir is None:
         ui.error(f"task directory not found for '{task}'")
         raise typer.Exit(code=_EXIT_NOT_FOUND)

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import typer
 
+from harness.commands._resolve import resolve_task_dir_readonly
+
 _ARTIFACT_GLOBS = [
     "plan.md",
     "handoff-*.json",
@@ -40,31 +42,23 @@ def _scan_artifacts(task_dir: Path) -> list[tuple[str, int, int]]:
 def run_context_budget(*, task: str, as_json: bool = False) -> None:
     """Scan task artifacts and report estimated token usage vs budget."""
     from harness.core.config import HarnessConfig
-    from harness.core.task_identity import TaskIdentityResolver
 
     cfg = HarnessConfig.load(Path.cwd())
-    resolver = TaskIdentityResolver.from_config(cfg)
-    if not resolver.is_valid_task_key(task):
-        raise typer.BadParameter(
-            f"Invalid task ID '{task}' for strategy '{resolver.strategy}'"
-        )
+    task_dir = resolve_task_dir_readonly(task)
 
-    agents_dir = Path.cwd() / ".harness-flow"
-    task_dir = (agents_dir / "tasks" / task).resolve()
-    if not task_dir.is_relative_to((agents_dir / "tasks").resolve()):
-        raise typer.BadParameter(f"Invalid task ID '{task}': path traversal detected")
-
-    if not task_dir.is_dir():
-        task_dir.mkdir(parents=True, exist_ok=True)
+    if task_dir is None:
+        artifacts: list[tuple[str, int, int]] = []
+        total_chars = 0
+    else:
+        artifacts = _scan_artifacts(task_dir)
+        total_chars = sum(c for _, c, _ in artifacts)
 
     budget = cfg.workflow.context_budget_tokens
-    artifacts = _scan_artifacts(task_dir)
-    total_chars = sum(c for _, c, _ in artifacts)
     total_tokens = total_chars // 4
     over_budget = total_tokens > budget
 
     if as_json:
-        output = {
+        output: dict[str, object] = {
             "task": task,
             "budget_tokens": budget,
             "total_chars": total_chars,
