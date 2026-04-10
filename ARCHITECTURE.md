@@ -67,6 +67,12 @@ Two modes:
 Loads task-level **`workflow-state.json`** under `.harness-flow/tasks/task-NNN/` and
 renders canonical phase / gate / blocker information via **Rich** (`core/ui.py` patterns).
 
+### `calibrate_cmd.py`
+
+`harness calibrate` — cross-task review calibration report. Scans all task
+directories for `review-outcome.json`, generates aggregated statistics
+(Rich terminal or `--json`), and supports single-task view via `--task`.
+
 ### `update.py`
 
 Queries PyPI for newer versions, runs **`pip install --upgrade harness-flow`** when requested, and runs lightweight **config migration** checks with user-visible warnings. It does **not** write project artifacts; users should run **`harness init --force`** in the target repository when regeneration is needed.
@@ -173,6 +179,31 @@ from a single task directory (skipping corrupt lines). `search_failure_patterns(
 aggregates across all task and archive directories via `iter_task_dirs` /
 `iter_archive_dirs`, supporting normalized substring query and category filtering.
 
+### `review_calibration.py`
+
+Review calibration: prediction-vs-outcome tracking and cross-task aggregation.
+
+**Layer 1 — Data model:** `ReviewOutcome` persists per-task prediction snapshots
+(eval aggregate, dimension scores, verdict, finding count) alongside actual
+outcomes (CI pass/fail, revert detection) in `review-outcome.json`.
+
+**Layer 2 — Aggregation:** `generate_calibration_report()` collects outcomes
+from all task/archive directories and computes prediction accuracy
+(verdict vs CI result alignment), dimension biases (per-dimension delta from
+aggregate), and score-outcome correlation (point-biserial). Requires ≥5
+paired samples for full statistics; degrades gracefully with fewer.
+
+**Integration points:**
+- `artifacts.save_evaluation(kind="code")` writes prediction sidecar
+  automatically (both structured and `raw_body` paths)
+- `post_ship.PostShipManager.record_outcome()` collects actual outcomes
+  (best-effort, failure-isolated from core cleanup path)
+- `harness calibrate` CLI exposes Rich and JSON reports
+
+The calibration pipeline reads only `review-outcome.json` files and does
+**not** consume `events.jsonl` to avoid dual truth-source conflicts with
+the session-level event stream.
+
 ### `progress.py`
 
 **`suggest_next_action`** and **`update_progress`** helpers for markdown progress narratives (e.g. `.harness-flow/progress.md`) aligned with native workflows.
@@ -263,6 +294,7 @@ All user-visible harness **behavior** in the IDE is intended to flow from these 
 - `vision.md` — product/engineering vision for skills.
 - `tasks/`, `archive/` — task artifacts and history (convention from harness workflow docs).
 - `tasks/task-NNN/workflow-state.json` — canonical task-level phase/gate/blocker/artifact state.
+- `tasks/task-NNN/review-outcome.json` — prediction-vs-outcome calibration data (auto-populated by `save_evaluation` and `post_ship`).
 
 **Generated IDE (`.cursor/`)**
 

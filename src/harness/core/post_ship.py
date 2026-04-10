@@ -1,4 +1,8 @@
-"""Post-ship lifecycle orchestration (PR merge -> trunk sync -> branch cleanup)."""
+"""Post-ship lifecycle orchestration (PR merge -> trunk sync -> branch cleanup).
+
+Includes best-effort review calibration outcome collection (``record_outcome``)
+which is triggered after successful merge finalization.
+"""
 
 from __future__ import annotations
 
@@ -118,6 +122,14 @@ class PostShipManager:
         merged = self.check_pr_state(pr_number=pr_number, branch=branch)
         if not merged.ok:
             return merged
+
+        task_dir = self._resolve_task_dir(task_key)
+        if task_dir is not None:
+            self.record_outcome(
+                task_dir=task_dir,
+                pr_number=pr_number,
+                branch=branch,
+            )
 
         task_branch = self._resolve_task_branch(
             task_key=task_key,
@@ -262,6 +274,131 @@ class PostShipManager:
                 "url": merged.context.get("url", ""),
             },
         )
+
+    def record_outcome(
+        self,
+        *,
+        task_dir: Path,
+        pr_number: int | None = None,
+        branch: str | None = None,
+    ) -> None:
+        """Best-effort: collect actual outcome and write to review-outcome.json.
+
+        Failures are logged but never propagate — this must not interfere with
+        the core post-ship cleanup path.
+        """
+        try:
+            from harness.core.review_calibration import (
+                ReviewActualOutcome,
+                ReviewOutcome,
+                load_review_outcome,
+                save_review_outcome,
+            )
+
+            ci_passed = self._check_pr_ci_status(pr_number=pr_number, branch=branch)
+            has_revert = self._detect_revert(pr_number=pr_number, branch=branch)
+
+            from datetime import datetime, timezone
+            actual = ReviewActualOutcome(
+                ci_passed=ci_passed,
+                has_revert=has_revert,
+                recorded_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            )
+
+            existing = load_review_outcome(task_dir)
+            if existing is not None:
+                existing.outcome = actual
+                save_review_outcome(task_dir, existing)
+            else:
+                outcome = ReviewOutcome(
+                    task_id=task_dir.name,
+                    outcome=actual,
+                )
+                save_review_outcome(task_dir, outcome)
+
+            log.info("Review outcome recorded for %s", task_dir.name)
+        except Exception:
+            log.debug("Failed to record review outcome", exc_info=True)
+
+    def _check_pr_ci_status(
+        self,
+        *,
+        pr_number: int | None,
+        branch: str | None,
+    ) -> bool | None:
+        """Query PR checks to determine CI pass/fail. Returns None on failure."""
+        args = ["pr", "checks"]
+        if pr_number is not None:
+            args.append(str(pr_number))
+        elif branch and branch.strip():
+            args.extend(["--head", branch.strip()])
+        else:
+            return None
+
+        result, payload = run_gh_json(
+            args,
+            self.project_root,
+            timeout=30,
+            code_on_error="PR_CHECKS_FAILED",
+        )
+        if not result.ok or not payload:
+            return None
+
+        if isinstance(payload, list):
+            checks = payload
+        elif isinstance(payload, dict):
+            checks = payload.get("checks", payload.get("statusCheckRollup", []))
+            if not isinstance(checks, list):
+                checks = []
+        else:
+            return None
+
+        if not checks:
+            return None
+
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+            conclusion = str(check.get("conclusion", "")).upper()
+            state = str(check.get("state", "")).upper()
+            if conclusion == "FAILURE" or state == "FAILURE":
+                return False
+        return True
+
+    def _detect_revert(
+        self,
+        *,
+        pr_number: int | None,
+        branch: str | None,
+    ) -> bool | None:
+        """Simple heuristic: search recent commits for revert references."""
+        search_term = ""
+        if pr_number:
+            search_term = f"#{pr_number}"
+        elif branch:
+            search_term = branch
+
+        if not search_term:
+            return None
+
+        result = run_git_result(
+            ["log", "--oneline", "-20", "--grep", f"revert.*{search_term}",
+             "--regexp-ignore-case", self.trunk_branch],
+            self.project_root,
+            code_on_error="REVERT_SEARCH_FAILED",
+            message="failed to search for reverts",
+        )
+        if not result.ok:
+            return None
+        return bool(result.stdout.strip())
+
+    def _resolve_task_dir(self, task_key: str) -> Path | None:
+        """Resolve the task directory for *task_key*. Returns None on failure."""
+        agents_dir = self.project_root / ".harness-flow"
+        task_dir = agents_dir / "tasks" / task_key
+        if task_dir.is_dir():
+            return task_dir
+        return None
 
     def _load_pr_payload(self, *, pr_number: int | None, branch: str | None) -> GitOperationResult:
         if pr_number is None and not (branch and branch.strip()):

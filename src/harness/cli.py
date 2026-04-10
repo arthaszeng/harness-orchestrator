@@ -574,6 +574,20 @@ def session_read_cmd(
 app.add_typer(session_cli, name="session")
 
 
+@app.command(name="calibrate")
+def calibrate_cmd(
+    task: str = typer.Option(
+        "", "--task", "-t",
+        help="Show outcome for a single task (e.g. task-068). Omit for aggregate report.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Review calibration report — prediction vs actual outcome analysis."""
+    from harness.commands.calibrate_cmd import run_calibrate
+
+    run_calibrate(task=task or None, as_json=as_json)
+
+
 @app.command(name="context-budget")
 def context_budget_cmd(
     task: str = typer.Option(

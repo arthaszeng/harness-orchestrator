@@ -135,7 +135,144 @@ def save_evaluation(
     task_dir.mkdir(parents=True, exist_ok=True)
     path = task_dir / f"{kind}-eval-r{round_num}.md"
     path.write_text(content, encoding="utf-8")
+
+    if kind == "code":
+        _snapshot_prediction_sidecar(
+            task_dir, content=content, scores=scores, verdict=verdict,
+            findings=findings,
+        )
+
     return path
+
+
+def _snapshot_prediction_sidecar(
+    task_dir: Path,
+    *,
+    content: str,
+    scores: dict[str, dict[str, Any]] | None,
+    verdict: str,
+    findings: list[str] | None,
+) -> None:
+    """Best-effort write of prediction snapshot to review-outcome.json.
+
+    Called internally by ``save_evaluation`` for code evals only.
+    Failures are logged but never propagate.
+    """
+    import logging as _log
+
+    try:
+        from harness.core.gates import parse_eval_aggregate_score
+        from harness.core.review_calibration import (
+            ReviewOutcome,
+            ReviewPrediction,
+            load_review_outcome,
+            save_review_outcome,
+        )
+
+        if scores is not None:
+            dim_scores = {
+                dim: float(info.get("score", 0)) for dim, info in scores.items()
+            }
+            total = sum(dim_scores.values())
+            count = len(dim_scores)
+            aggregate = total / count if count > 0 else None
+        else:
+            aggregate = parse_eval_aggregate_score(content)
+            if aggregate is None:
+                aggregate = _parse_aggregate_from_table(content)
+            dim_scores = _parse_dimension_scores(content)
+
+        if scores is not None:
+            parsed_verdict = verdict
+        else:
+            parsed_verdict = ""
+            import re as _re
+            m = _re.search(r"^##\s+Verdict:\s+(\S+)", content, _re.MULTILINE | _re.IGNORECASE)
+            if m:
+                parsed_verdict = m.group(1).upper()
+
+        finding_count = len(findings) if findings else _count_findings_from_content(content)
+
+        prediction = ReviewPrediction(
+            eval_aggregate=aggregate,
+            dimension_scores=dim_scores,
+            verdict=parsed_verdict.upper() if parsed_verdict else "",
+            finding_count=finding_count,
+        )
+
+        existing = load_review_outcome(task_dir)
+        if existing is not None:
+            existing.prediction = prediction
+            save_review_outcome(task_dir, existing)
+        else:
+            outcome = ReviewOutcome(
+                task_id=task_dir.name,
+                prediction=prediction,
+            )
+            save_review_outcome(task_dir, outcome)
+    except Exception:
+        _log.getLogger(__name__).debug(
+            "Failed to snapshot prediction sidecar", exc_info=True,
+        )
+
+
+_TABLE_AGGREGATE_RE = re.compile(
+    r"\*\*Average\*\*.*?(\d+(?:\.\d+)?)\s*/\s*10",
+    re.IGNORECASE,
+)
+
+
+def _parse_aggregate_from_table(content: str) -> float | None:
+    """Fallback parser for aggregate score in table format with empty cells."""
+    import math as _math
+
+    m = _TABLE_AGGREGATE_RE.search(content)
+    if not m:
+        return None
+    try:
+        val = float(m.group(1))
+    except (ValueError, TypeError):
+        return None
+    if not _math.isfinite(val):
+        return None
+    return val
+
+
+_DIM_SCORE_RE = re.compile(
+    r"^\|\s*([^|*]+?)\s*\|\s*[^|]*\|\s*(\d+(?:\.\d+)?)\s*/\s*10\s*\|",
+    re.MULTILINE,
+)
+
+
+def _parse_dimension_scores(content: str) -> dict[str, float]:
+    """Extract per-dimension scores from markdown table."""
+    results: dict[str, float] = {}
+    for m in _DIM_SCORE_RE.finditer(content):
+        dim = m.group(1).strip()
+        if dim.lower() in ("average", "**average**", "weighted avg", "weighted average"):
+            continue
+        try:
+            results[dim] = float(m.group(2))
+        except ValueError:
+            continue
+    return results
+
+
+def _count_findings_from_content(content: str) -> int:
+    """Count finding bullet points from markdown content (heuristic)."""
+    in_findings = False
+    count = 0
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## Findings"):
+            in_findings = True
+            continue
+        if in_findings:
+            if stripped.startswith("##"):
+                break
+            if stripped.startswith("- ") and stripped != "- None":
+                count += 1
+    return count
 
 
 def save_build_log(
