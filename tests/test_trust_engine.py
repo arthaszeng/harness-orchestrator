@@ -189,6 +189,19 @@ def test_medium_trust_boundary_accuracy():
     assert profile.level == TrustLevel.MEDIUM
 
 
+def test_medium_trust_boundary_samples_below():
+    outcomes = _make_outcomes_for_level(4, ci_passed=True)
+    report = CalibrationReport(
+        prediction_accuracy=0.90,
+        has_sufficient_data=False,
+        outcomes_with_prediction=4,
+        outcomes_with_result=4,
+        sample_count=4,
+    )
+    profile = compute_trust_profile(report, outcomes)
+    assert profile.level == TrustLevel.LOW
+
+
 def test_medium_trust_boundary_accuracy_below():
     outcomes = _make_outcomes_for_level(5, ci_passed=True)
     report = CalibrationReport(

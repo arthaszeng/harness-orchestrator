@@ -12,7 +12,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
     from harness.core.review_calibration import CalibrationReport, ReviewOutcome
@@ -27,28 +27,43 @@ class TrustLevel(str, Enum):
     PROBATION = "PROBATION"
 
 
-_LEVEL_META: dict[TrustLevel, dict] = {
-    TrustLevel.HIGH: {
-        "escalation_adjustment": -2,
-        "threshold_adjustment": -0.5,
-        "description": "High historical accuracy — suggest lighter review",
-    },
-    TrustLevel.MEDIUM: {
-        "escalation_adjustment": -1,
-        "threshold_adjustment": 0.0,
-        "description": "Moderate accuracy — standard review intensity",
-    },
-    TrustLevel.LOW: {
-        "escalation_adjustment": 0,
-        "threshold_adjustment": 0.0,
-        "description": "Insufficient data — conservative review",
-    },
-    TrustLevel.PROBATION: {
-        "escalation_adjustment": 3,
-        "threshold_adjustment": 1.0,
-        "description": "Recent revert detected — intensified review",
-    },
+class TrustLevelMeta(BaseModel):
+    """Metadata for a trust level — public API for display consumers."""
+
+    model_config = ConfigDict(frozen=True)
+
+    escalation_adjustment: int = 0
+    threshold_adjustment: float = 0.0
+    description: str = ""
+
+
+TRUST_LEVEL_META: dict[TrustLevel, TrustLevelMeta] = {
+    TrustLevel.HIGH: TrustLevelMeta(
+        escalation_adjustment=-2,
+        threshold_adjustment=-0.5,
+        description="High historical accuracy — suggest lighter review",
+    ),
+    TrustLevel.MEDIUM: TrustLevelMeta(
+        escalation_adjustment=-1,
+        threshold_adjustment=0.0,
+        description="Moderate accuracy — standard review intensity",
+    ),
+    TrustLevel.LOW: TrustLevelMeta(
+        escalation_adjustment=0,
+        threshold_adjustment=0.0,
+        description="Insufficient data — conservative review",
+    ),
+    TrustLevel.PROBATION: TrustLevelMeta(
+        escalation_adjustment=3,
+        threshold_adjustment=1.0,
+        description="Recent revert detected — intensified review",
+    ),
 }
+
+
+def get_trust_level_meta(level: TrustLevel) -> TrustLevelMeta:
+    """Public API to retrieve trust level metadata for display."""
+    return TRUST_LEVEL_META.get(level, TrustLevelMeta())
 
 
 class TrustProfile(BaseModel):
@@ -101,6 +116,28 @@ class TrustConfig(BaseModel):
         description="Number of most recent tasks to scan for reverts.",
     )
 
+    @model_validator(mode="after")
+    def _validate_thresholds(self) -> "TrustConfig":
+        if self.accuracy_high < self.accuracy_medium:
+            import warnings
+
+            warnings.warn(
+                f"accuracy_high ({self.accuracy_high}) < accuracy_medium "
+                f"({self.accuracy_medium}); HIGH trust will be unreachable",
+                UserWarning,
+                stacklevel=2,
+            )
+        if self.min_samples_high < self.min_samples_medium:
+            import warnings
+
+            warnings.warn(
+                f"min_samples_high ({self.min_samples_high}) < min_samples_medium "
+                f"({self.min_samples_medium}); HIGH trust will be unreachable",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
+
 
 def compute_trust_profile(
     report: CalibrationReport,
@@ -115,7 +152,7 @@ def compute_trust_profile(
 
     sorted_outcomes = sorted(
         outcomes,
-        key=lambda o: o.updated_at or o.created_at or "",
+        key=lambda o: (o.updated_at or o.created_at or "", o.task_id),
         reverse=True,
     )
 
@@ -162,11 +199,11 @@ def compute_trust_profile(
         else:
             reason = "no prediction accuracy available"
 
-    meta = _LEVEL_META[level]
+    meta = TRUST_LEVEL_META[level]
     return TrustProfile(
         level=level,
-        escalation_adjustment=meta["escalation_adjustment"],
-        threshold_adjustment=meta["threshold_adjustment"],
+        escalation_adjustment=meta.escalation_adjustment,
+        threshold_adjustment=meta.threshold_adjustment,
         reason=reason,
         prediction_accuracy=accuracy,
         paired_samples=paired,

@@ -11,7 +11,6 @@ from harness.core.ui import get_ui
 
 def run_trust(
     *,
-    task: str | None = None,
     as_json: bool = False,
 ) -> None:
     """Compute and display the current trust profile."""
@@ -111,10 +110,10 @@ def _print_rich(profile, report, ui) -> None:
     console.print()
     console.print("ADJUSTMENTS (advisory)")
     console.print("─" * 50)
-    adj = profile.escalation_adjustment
-    sign = "+" if adj >= 0 else ""
-    console.print(f"  Escalation:           {sign}{adj}")
-    console.print(f"  Threshold:            {sign}{profile.threshold_adjustment:.1f}")
+    esc_sign = "+" if profile.escalation_adjustment >= 0 else ""
+    thr_sign = "+" if profile.threshold_adjustment >= 0 else ""
+    console.print(f"  Escalation:           {esc_sign}{profile.escalation_adjustment}")
+    console.print(f"  Threshold:            {thr_sign}{profile.threshold_adjustment:.1f}")
     console.print()
     console.print("SUPPORTING DATA")
     console.print("─" * 50)
