@@ -37,6 +37,7 @@ def run_gate(*, task: Optional[str] = None) -> None:
         ui.info(t("gate.recovery.no_task"))
         raise typer.Exit(code=1)
 
+    cfg = None
     try:
         cfg = HarnessConfig.load()
         review_gate_mode = cfg.native.review_gate
@@ -44,7 +45,12 @@ def run_gate(*, task: Optional[str] = None) -> None:
         ui.warn(t("gate.config_fallback"))
         review_gate_mode = "eng"
 
-    verdict = check_ship_readiness(task_dir, review_gate_mode=review_gate_mode)
+    trust_profile = _compute_trust_for_gate(cfg)
+    verdict = check_ship_readiness(
+        task_dir,
+        review_gate_mode=review_gate_mode,
+        trust_profile=trust_profile,
+    )
 
     _render_verdict(console, task_dir, verdict)
 
@@ -56,6 +62,26 @@ def run_gate(*, task: Optional[str] = None) -> None:
 
     if not verdict.passed:
         raise typer.Exit(code=1)
+
+
+def _compute_trust_for_gate(cfg):
+    """Best-effort trust profile computation for gate display."""
+    try:
+        from harness.core.review_calibration import (
+            collect_outcomes,
+            generate_calibration_report,
+        )
+        from harness.core.trust_engine import TrustConfig, compute_trust_profile
+
+        trust_cfg = cfg.workflow.trust if cfg is not None else TrustConfig()
+        agents_dir = Path.cwd() / ".harness-flow"
+        outcomes = collect_outcomes(agents_dir)
+        if not outcomes:
+            return None
+        report = generate_calibration_report(outcomes)
+        return compute_trust_profile(report, outcomes, config=trust_cfg)
+    except Exception:
+        return None
 
 
 def _gate_check_label(check_name: str) -> str:
@@ -104,5 +130,16 @@ def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
         band_key = f"score_band.{verdict.score_band.value}"
         band_text = t(band_key, score=f"{verdict.aggregate_score:.1f}")
         console.print(f"\n  {band_text}")
+
+    if verdict.trust_level is not None:
+        from harness.core.trust_engine import get_trust_level_meta
+
+        meta = get_trust_level_meta(verdict.trust_level)
+        sign = "+" if meta.escalation_adjustment >= 0 else ""
+        console.print(
+            f"\n  [cyber.dim]Trust: {verdict.trust_level.value} — "
+            f"escalation adjustment {sign}{meta.escalation_adjustment} "
+            f"({meta.description})[/]"
+        )
 
     console.print()

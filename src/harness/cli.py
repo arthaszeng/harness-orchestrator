@@ -588,6 +588,16 @@ def calibrate_cmd(
     run_calibrate(task=task or None, as_json=as_json)
 
 
+@app.command(name="trust")
+def trust_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Progressive trust profile — display trust level and advisory adjustments."""
+    from harness.commands.trust_cmd import run_trust
+
+    run_trust(as_json=as_json)
+
+
 @app.command(name="context-budget")
 def context_budget_cmd(
     task: str = typer.Option(

@@ -17,6 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from harness.core.model_selection import validate_model_name
 from harness.core.roles import NATIVE_REVIEW_ROLES
+from harness.core.trust_engine import TrustConfig
+
+
+def _default_trust_config() -> TrustConfig:
+    return TrustConfig()
 
 
 class HarnessConfigError(Exception):
@@ -156,6 +161,10 @@ class WorkflowConfig(BaseModel):
         default=50000,
         ge=1000,
         description="Estimated token budget for task artifacts.",
+    )
+    trust: "TrustConfig" = Field(
+        default_factory=lambda: _default_trust_config(),
+        description="Progressive trust thresholds for review gate adjustment.",
     )
 
 
