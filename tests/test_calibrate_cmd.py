@@ -128,3 +128,5 @@ class TestCalibrateSingleTask:
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(app, ["calibrate", "--task", "task-999"])
         assert result.exit_code == 1
+        assert "Task directory not found" in result.output
+        assert "AttributeError" not in (result.output or "")

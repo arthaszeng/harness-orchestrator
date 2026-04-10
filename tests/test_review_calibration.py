@@ -369,3 +369,66 @@ class TestPredictionSidecar:
         assert second is not None
         assert second.prediction.eval_aggregate == pytest.approx(8.0)
         assert second.prediction.verdict == "PASS"
+
+    def test_raw_body_2col_dimension_scores(self, tmp_path: Path):
+        """Score in column 2: | Role | X/10 | Verdict |."""
+        from harness.core.artifacts import save_evaluation
+
+        raw = (
+            "# Code Evaluation\n\n"
+            "| Role | Score | Verdict |\n"
+            "|------|-------|---------|\n"
+            "| Architect | 8/10 | ITERATE |\n"
+            "| Product Owner | 8.5/10 | PASS |\n"
+            "| Engineer | 5/10 | ITERATE |\n"
+            "| QA | 8/10 | PASS |\n"
+            "| **Average** | | **7.4/10** |\n\n"
+            "## Verdict: PASS\n"
+        )
+        save_evaluation(tmp_path, kind="code", raw_body=raw)
+        outcome = load_review_outcome(tmp_path)
+        assert outcome is not None
+        assert outcome.prediction.dimension_scores == {
+            "Architect": 8.0,
+            "Product Owner": 8.5,
+            "Engineer": 5.0,
+            "QA": 8.0,
+        }
+
+    def test_raw_body_3col_dimension_scores(self, tmp_path: Path):
+        """Score in column 3: | Dim | PASS | X/10 |."""
+        from harness.core.artifacts import save_evaluation
+
+        raw = (
+            "# Code Evaluation\n\n"
+            "| Dimension | Verdict | Score |\n"
+            "|-----------|---------|-------|\n"
+            "| Architecture | PASS | 9/10 |\n"
+            "| Engineering | ITERATE | 6.5/10 |\n"
+            "| **Average** | | **7.8/10** |\n\n"
+            "## Verdict: PASS\n"
+        )
+        save_evaluation(tmp_path, kind="code", raw_body=raw)
+        outcome = load_review_outcome(tmp_path)
+        assert outcome is not None
+        assert outcome.prediction.dimension_scores == {
+            "Architecture": 9.0,
+            "Engineering": 6.5,
+        }
+
+    def test_raw_body_mixed_format_no_double_count(self, tmp_path: Path):
+        """Both regexes match but setdefault prevents overwrite."""
+        from harness.core.artifacts import save_evaluation
+
+        raw = (
+            "# Code Evaluation\n\n"
+            "| Role | Score | Verdict |\n"
+            "|------|-------|---------|\n"
+            "| Architect | 8/10 | PASS |\n"
+            "| **Average** | | **8.0/10** |\n\n"
+            "## Verdict: PASS\n"
+        )
+        save_evaluation(tmp_path, kind="code", raw_body=raw)
+        outcome = load_review_outcome(tmp_path)
+        assert outcome is not None
+        assert outcome.prediction.dimension_scores["Architect"] == 8.0

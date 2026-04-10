@@ -65,7 +65,7 @@ def _show_single_task(
                 json.dump({"error": "not_found", "task": task}, sys.stdout)
                 sys.stdout.write("\n")
             else:
-                ui.warning(f"Task directory not found: {task}")  # type: ignore[attr-defined]
+                ui.warn(f"Task directory not found: {task}")  # type: ignore[attr-defined]
             raise SystemExit(1)
 
     outcome = load_review_outcome(task_dir)
