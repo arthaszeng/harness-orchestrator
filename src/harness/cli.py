@@ -129,6 +129,63 @@ def task_done_cmd(
 
 app.add_typer(task_cli, name="task")
 
+def _register_subcommand_groups() -> None:
+    from harness.commands.escalation import app as escalation_app
+    from harness.commands.review_score import app as review_score_app
+    from harness.commands.barrier import app as barrier_app
+
+    app.add_typer(escalation_app, name="escalation-score")
+    app.add_typer(review_score_app, name="review-score")
+    app.add_typer(barrier_app, name="barrier")
+
+
+_register_subcommand_groups()
+
+
+@app.command(name="plan-lint")
+def plan_lint_cmd(
+    task: str = typer.Option("", "--task", "-t", help="Task ID"),
+    as_json: bool = typer.Option(True, "--json/--no-json", help="JSON output"),
+) -> None:
+    """Validate plan.md structure for a task."""
+    from harness.commands.plan_lint import run_plan_lint
+
+    run_plan_lint(task=task or None, as_json=as_json)
+
+
+@app.command(name="ship-prepare")
+def ship_prepare_cmd(
+    task: str = typer.Option("", "--task", "-t", help="Task ID"),
+    as_json: bool = typer.Option(True, "--json/--no-json", help="JSON output"),
+) -> None:
+    """Pre-compute ship metadata (diff + escalation + review hints)."""
+    from harness.commands.ship_prepare import run_ship_prepare
+
+    run_ship_prepare(task=task or None, as_json=as_json)
+
+
+@app.command(name="preflight-bundle")
+def preflight_bundle_cmd(
+    task: str = typer.Option("", "--task", "-t", help="Task ID"),
+    phase: str = typer.Option("build", "--phase", "-p", help="Phase: build|ship"),
+    as_json: bool = typer.Option(True, "--json/--no-json", help="JSON output"),
+) -> None:
+    """Run 4-in-1 preflight checks for build/ship phase."""
+    from harness.commands.preflight import run_preflight_bundle
+
+    run_preflight_bundle(task=task or None, phase=phase, as_json=as_json)
+
+
+@app.command(name="plan-completion-audit")
+def plan_completion_audit_cmd(
+    task: str = typer.Option("", "--task", "-t", help="Task ID"),
+    as_json: bool = typer.Option(True, "--json/--no-json", help="JSON output"),
+) -> None:
+    """Audit deliverable completion against git diff."""
+    from harness.commands.plan_audit import run_plan_completion_audit
+
+    run_plan_completion_audit(task=task or None, as_json=as_json)
+
 
 @app.command(name="diff-stat")
 def diff_stat_cmd(
