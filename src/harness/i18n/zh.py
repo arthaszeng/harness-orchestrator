@@ -168,6 +168,7 @@ MESSAGES: dict[str, str] = {
     "score_band.redo": "评分 {score}/10 — 建议重新规划或大幅返工",
 
     # ── status command ───────────────────────────────────────────
+    "status.no_session": "没有活跃的会话。",
     "status.next_title": "下一步",
     "status.current_task": "当前任务",
     "status.stats_brief": "已完成 {completed} · 阻塞 {blocked} · 平均分 {avg:.1f}",

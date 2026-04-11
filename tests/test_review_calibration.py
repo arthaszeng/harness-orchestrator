@@ -187,6 +187,19 @@ class TestCalibrationReport:
         report = generate_calibration_report(outcomes)
         assert report.prediction_accuracy == pytest.approx(3 / 5)
 
+    def test_prediction_accuracy_excludes_empty_verdict(self):
+        outcomes = [
+            _make_outcome(task_id="task-001", verdict="PASS", ci_passed=True),
+            _make_outcome(task_id="task-002", verdict="PASS", ci_passed=False),
+            _make_outcome(task_id="task-003", verdict="", ci_passed=True),
+            _make_outcome(task_id="task-004", verdict="  ", ci_passed=False),
+            _make_outcome(task_id="task-005", verdict="ITERATE", ci_passed=False),
+        ]
+        report = generate_calibration_report(outcomes)
+        # Only 3 outcomes with non-empty verdict: task-001 (correct),
+        # task-002 (wrong), task-005 (correct) → accuracy = 2/3
+        assert report.prediction_accuracy == pytest.approx(2 / 3)
+
     def test_dimension_biases(self):
         dims = {"Architecture": 9.0, "Engineering": 7.0, "QA": 8.0}
         outcomes = [

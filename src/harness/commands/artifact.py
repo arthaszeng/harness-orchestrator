@@ -297,7 +297,7 @@ def _infer_manual_interventions_per_task(task_dir: Path) -> float:
 
 
 def _infer_first_pass_rate(task_dir: Path) -> float:
-    from harness.core.gates import _CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE
+    from harness.core.gates import CODE_EVAL_ROUND_RE, LEGACY_EVAL_ROUND_RE
 
     code_eval_rounds: list[int] = []
     try:
@@ -305,7 +305,7 @@ def _infer_first_pass_rate(task_dir: Path) -> float:
     except OSError:
         return 0.0
     for p in entries:
-        for pattern in (_CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE):
+        for pattern in (CODE_EVAL_ROUND_RE, LEGACY_EVAL_ROUND_RE):
             m = pattern.search(p.name)
             if m:
                 code_eval_rounds.append(int(m.group(1)))

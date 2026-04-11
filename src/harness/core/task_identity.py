@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -29,6 +30,12 @@ the character set that task directories and JSON fields can safely hold.
 Runtime identity validation (numeric vs Jira vs custom) is handled by
 ``TaskIdentityResolver.is_valid_task_key()``.
 """
+
+
+@lru_cache(maxsize=16)
+def _compiled_pattern(strategy: TaskIdStrategy, custom_pattern: str = "") -> re.Pattern[str]:
+    """Compile and cache the regex pattern for a given strategy/custom_pattern pair."""
+    return re.compile(_build_pattern(strategy, custom_pattern))
 
 
 def _build_pattern(strategy: TaskIdStrategy, custom_pattern: str = "") -> str:
@@ -75,7 +82,7 @@ class TaskIdentityResolver:
 
     @property
     def fullmatch_re(self) -> re.Pattern[str]:
-        return re.compile(_build_pattern(self.strategy, self.custom_pattern))
+        return _compiled_pattern(self.strategy, self.custom_pattern)
 
     def is_valid_task_key(self, task_key: str) -> bool:
         if not task_key or len(task_key) > _SAFE_KEY_MAX_LEN:

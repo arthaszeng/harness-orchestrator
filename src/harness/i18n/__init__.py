@@ -5,10 +5,10 @@ Usage::
     from harness.i18n import t, set_lang
 
     set_lang("zh")          # switch to Chinese
-    print(t("init.done"))   # "初始化完成！"
+    print(t("init.complete_title"))   # "✅ 初始化完成"
 
     # with interpolation
-    print(t("init.found", line="pytest.ini"))  # e.g. "    Found pytest.ini"
+    print(t("gate.no_task", suffix=" for 'task-001'"))
 """
 
 from __future__ import annotations

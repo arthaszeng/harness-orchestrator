@@ -209,7 +209,7 @@ class HarnessConfig(BaseModel):
                 raise HarnessConfigError(
                     f"Cannot read {config_path}: {type(exc).__name__}: {exc}"
                 ) from exc
-            except Exception as exc:
+            except (ValueError, KeyError) as exc:
                 raise HarnessConfigError(
                     f"Invalid TOML in {config_path}: {exc}"
                 ) from exc

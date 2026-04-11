@@ -179,16 +179,21 @@ def generate_calibration_report(outcomes: list[ReviewOutcome]) -> CalibrationRep
 
 
 def _compute_prediction_accuracy(paired: list[ReviewOutcome]) -> float | None:
-    """Fraction of tasks where verdict=PASS aligned with ci_passed=True."""
-    if not paired:
+    """Fraction of tasks where verdict=PASS aligned with ci_passed=True.
+
+    Samples with empty verdict are excluded — they represent incomplete
+    predictions that would skew the accuracy calculation.
+    """
+    with_verdict = [o for o in paired if o.prediction.verdict.strip()]
+    if not with_verdict:
         return None
     correct = 0
-    for o in paired:
+    for o in with_verdict:
         verdict_positive = o.prediction.verdict.upper() == "PASS"
         outcome_positive = o.outcome.ci_passed is True
         if verdict_positive == outcome_positive:
             correct += 1
-    return correct / len(paired)
+    return correct / len(with_verdict)
 
 
 def _compute_point_biserial(paired: list[ReviewOutcome]) -> float | None:

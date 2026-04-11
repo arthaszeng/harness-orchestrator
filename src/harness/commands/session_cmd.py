@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import sys
-
 import typer
 
+from harness.commands._cli_helpers import read_stdin_json_object
 from harness.commands._resolve import resolve_task_dir_readonly, resolve_task_dir_strict
 from harness.core.ui import get_ui
 
@@ -21,25 +19,7 @@ def run_session_write(*, task: str) -> None:
     from harness.core.session_context import SessionContext, save_session_context
 
     ui = get_ui()
-
-    if sys.stdin.isatty():
-        ui.error("no input on stdin (expected JSON)")
-        raise typer.Exit(code=_EXIT_VALIDATION)
-
-    raw_text = sys.stdin.read().strip()
-    if not raw_text:
-        ui.error("empty stdin")
-        raise typer.Exit(code=_EXIT_VALIDATION)
-
-    try:
-        payload = json.loads(raw_text)
-    except json.JSONDecodeError as exc:
-        ui.error(f"invalid JSON: {exc}")
-        raise typer.Exit(code=_EXIT_VALIDATION)
-
-    if not isinstance(payload, dict):
-        ui.error("expected a JSON object")
-        raise typer.Exit(code=_EXIT_VALIDATION)
+    payload = read_stdin_json_object(exit_code=_EXIT_VALIDATION)
 
     try:
         ctx = SessionContext.model_validate(payload)

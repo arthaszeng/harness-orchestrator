@@ -236,21 +236,24 @@ def test_sync_task_state_updates_artifacts_and_gate(tmp_path: Path):
     assert loaded.gates.plan_review.reason == "approved"
 
 
-def test_sync_task_state_rejects_invalid_existing_state(tmp_path: Path):
+def test_sync_task_state_rebuilds_invalid_existing_state(tmp_path: Path):
     task_dir = tmp_path / ".harness-flow" / "tasks" / "task-001"
     task_dir.mkdir(parents=True)
     state_path = task_dir / WORKFLOW_STATE_FILENAME
     state_path.write_text("{broken", encoding="utf-8")
 
-    import pytest
+    import warnings as _warnings
 
-    with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
-        sync_task_state(
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
+        result = sync_task_state(
             task_dir,
             artifact_updates={"build_log": ".harness-flow/tasks/task-001/build-r1.md"},
         )
-
-    assert state_path.read_text(encoding="utf-8") == "{broken"
+    rebuild_warnings = [x for x in w if "Rebuilding corrupt" in str(x.message)]
+    assert len(rebuild_warnings) >= 1
+    assert result.task_id == "task-001"
+    assert result.artifacts.build_log == ".harness-flow/tasks/task-001/build-r1.md"
 
 
 def test_sync_task_state_rejects_artifact_ref_outside_task(tmp_path: Path):

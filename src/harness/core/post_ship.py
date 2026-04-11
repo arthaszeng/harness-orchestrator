@@ -468,7 +468,10 @@ class PostShipManager:
         branches: list[str] = []
         for raw in listed.stdout.splitlines():
             candidate = raw.strip().lstrip("*").strip()
-            if candidate:
+            if not candidate:
+                continue
+            inferred = self.infer_task_key_from_branch(candidate)
+            if inferred == task_key:
                 branches.append(candidate)
         if not branches:
             if pr_head_ref:
@@ -494,7 +497,14 @@ class PostShipManager:
         )
         if not listed.ok:
             return None
-        branches = [line.strip().lstrip("*").strip() for line in listed.stdout.splitlines() if line.strip()]
+        branches = []
+        for line in listed.stdout.splitlines():
+            candidate = line.strip().lstrip("*").strip()
+            if not candidate:
+                continue
+            inferred = self.infer_task_key_from_branch(candidate)
+            if inferred == task_key:
+                branches.append(candidate)
         return len(branches) > 1
 
     def _local_branch_exists(self, branch: str) -> bool | None:

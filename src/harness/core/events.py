@@ -15,12 +15,25 @@ from harness.core.roles import DEFAULT_RUNTIME
 
 
 class EventEmitter:
-    """Append-only JSONL event writer for a single session run."""
+    """Append-only JSONL event writer for a single session run.
+
+    File handle is opened lazily on first write and reused for the lifetime of
+    the emitter.  Each record is flushed immediately to ensure audit reliability.
+
+    **Thread safety**: this class assumes single-threaded writes.  If concurrent
+    writes are needed, callers must synchronize externally.
+    """
 
     def __init__(self, agents_dir: Path, session_id: str) -> None:
         self._run_dir = agents_dir / "runs" / session_id
         self._run_dir.mkdir(parents=True, exist_ok=True)
         self._path = self._run_dir / "events.jsonl"
+        self._file: Any | None = None
+
+    def _ensure_open(self) -> Any:
+        if self._file is None or self._file.closed:
+            self._file = self._path.open("a", encoding="utf-8")
+        return self._file
 
     def _emit(self, event: str, **fields: Any) -> None:
         record = {
@@ -28,8 +41,21 @@ class EventEmitter:
             "event": event,
             **fields,
         }
-        with self._path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        f = self._ensure_open()
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        f.flush()
+
+    def close(self) -> None:
+        """Close the underlying file handle (idempotent)."""
+        if self._file is not None and not self._file.closed:
+            self._file.close()
+        self._file = None
+
+    def __enter__(self) -> "EventEmitter":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
 
     # ── agent lifecycle ──────────────────────────────────────────
 
@@ -104,4 +130,7 @@ class NullEventEmitter(EventEmitter):
         pass  # skip directory creation
 
     def _emit(self, event: str, **fields: Any) -> None:
+        pass
+
+    def close(self) -> None:
         pass

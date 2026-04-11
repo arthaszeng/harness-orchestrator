@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import typer
 from pydantic import ValidationError
@@ -12,6 +12,10 @@ from pydantic import ValidationError
 from harness.core.gates import CheckStatus, GateVerdict, check_ship_readiness, write_gate_snapshot
 from harness.core.ui import get_ui
 from harness.core.workflow_state import resolve_task_dir
+
+if TYPE_CHECKING:
+    from harness.core.config import HarnessConfig
+    from harness.core.trust_engine import TrustProfile
 
 log = logging.getLogger("harness.commands.gate")
 
@@ -64,7 +68,7 @@ def run_gate(*, task: Optional[str] = None) -> None:
         raise typer.Exit(code=1)
 
 
-def _compute_trust_for_gate(cfg):
+def _compute_trust_for_gate(cfg: "HarnessConfig | None") -> "TrustProfile | None":
     """Best-effort trust profile computation for gate display."""
     try:
         from harness.core.review_calibration import (
@@ -80,7 +84,8 @@ def _compute_trust_for_gate(cfg):
             return None
         report = generate_calibration_report(outcomes)
         return compute_trust_profile(report, outcomes, config=trust_cfg)
-    except Exception:
+    except (OSError, ValueError, ValidationError, AttributeError) as exc:
+        log.debug("trust profile computation failed: %s", exc, exc_info=True)
         return None
 
 

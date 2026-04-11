@@ -315,16 +315,17 @@ class TestTaskDone:
         ws_data = json.loads((tasks / "task-001" / WORKFLOW_STATE_FILENAME).read_text())
         assert ws_data["phase"] == "done"
 
-    def test_corrupt_workflow_state_friendly_error(self, tmp_path, monkeypatch):
+    def test_corrupt_workflow_state_rebuilds_and_completes(self, tmp_path, monkeypatch):
         tasks = tmp_path / ".harness-flow" / "tasks"
         t1 = tasks / "task-001"
         t1.mkdir(parents=True)
         (t1 / WORKFLOW_STATE_FILENAME).write_text("NOT JSON")
 
         monkeypatch.chdir(tmp_path)
-        with pytest.raises(typer.Exit) as exc_info:
-            run_task_done(task="task-001")
-        assert exc_info.value.exit_code == 1
+        run_task_done(task="task-001")
+
+        ws_data = json.loads((t1 / WORKFLOW_STATE_FILENAME).read_text())
+        assert ws_data["phase"] == "done"
 
     def test_done_from_shipping(self, tmp_path, monkeypatch):
         tasks = tmp_path / ".harness-flow" / "tasks"

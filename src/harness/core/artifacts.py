@@ -18,11 +18,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from harness.core.gates import (
+    BUILD_ROUND_RE,
+    CODE_EVAL_ROUND_RE,
+    LEGACY_BUILD_ROUND_RE,
+    LEGACY_EVAL_ROUND_RE,
+)
+
 _PLAN_EVAL_ROUND_RE = re.compile(r"plan-eval-r(\d+)\.md$")
-_CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
-_LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
-_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.md$")
-_LEGACY_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
 
 
 def _next_round(task_dir: Path, patterns: tuple[re.Pattern[str], ...]) -> int:
@@ -44,13 +47,13 @@ def next_eval_round(task_dir: Path) -> int:
     """Return the next global eval round across plan/code eval files."""
     return _next_round(
         task_dir,
-        (_PLAN_EVAL_ROUND_RE, _CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE),
+        (_PLAN_EVAL_ROUND_RE, CODE_EVAL_ROUND_RE, LEGACY_EVAL_ROUND_RE),
     )
 
 
 def next_build_round(task_dir: Path) -> int:
     """Return the next build log round number."""
-    return _next_round(task_dir, (_BUILD_ROUND_RE, _LEGACY_BUILD_ROUND_RE))
+    return _next_round(task_dir, (BUILD_ROUND_RE, LEGACY_BUILD_ROUND_RE))
 
 
 def save_evaluation(

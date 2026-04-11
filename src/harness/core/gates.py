@@ -99,10 +99,10 @@ def parse_eval_aggregate_score(content: str) -> float | None:
     return val
 
 
-_CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
-_LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
-_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.md$")
-_LEGACY_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
+CODE_EVAL_ROUND_RE = re.compile(r"code-eval-r(\d+)\.md$")
+LEGACY_EVAL_ROUND_RE = re.compile(r"evaluation-r(\d+)\.md$")
+BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.md$")
+LEGACY_BUILD_ROUND_RE = re.compile(r"build-r(\d+)\.log$")
 _VERDICT_LINE_RE = re.compile(r"^##\s+Verdict:\s+(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 
 
@@ -168,7 +168,7 @@ def check_ship_readiness(
 
     latest_eval = _latest_numbered_file_from_patterns(
         task_dir,
-        (_CODE_EVAL_ROUND_RE, _LEGACY_EVAL_ROUND_RE),
+        (CODE_EVAL_ROUND_RE, LEGACY_EVAL_ROUND_RE),
     )
     if latest_eval and _file_exists_and_nonempty(latest_eval):
         checks.append(CheckItem("eval_exists", CheckStatus.PASS))
@@ -231,7 +231,7 @@ def check_ship_readiness(
 
     latest_build = _latest_numbered_file_from_patterns(
         task_dir,
-        (_BUILD_ROUND_RE, _LEGACY_BUILD_ROUND_RE),
+        (BUILD_ROUND_RE, LEGACY_BUILD_ROUND_RE),
     )
     if latest_build and latest_build.exists():
         checks.append(CheckItem("build_exists", CheckStatus.PASS))
@@ -270,12 +270,18 @@ def check_ship_readiness(
     ws = load_workflow_state(task_dir)
     if ws is not None:
         eval_gate = ws.gates.evaluation
-        if eval_gate.status != GateStatus.UNKNOWN:
+        if eval_gate.status == GateStatus.PASS:
             checks.append(CheckItem("workflow_state_gate", CheckStatus.PASS))
-        else:
+        elif eval_gate.status == GateStatus.UNKNOWN:
             checks.append(CheckItem(
                 "workflow_state_gate", CheckStatus.WARNING,
                 "workflow-state evaluation gate is UNKNOWN — has eval updated the state?",
+            ))
+        else:
+            checks.append(CheckItem(
+                "workflow_state_gate", CheckStatus.WARNING,
+                f"workflow-state evaluation gate is {eval_gate.status.value.upper()}"
+                f" (reason: {eval_gate.reason or 'none'})",
             ))
     else:
         checks.append(CheckItem(

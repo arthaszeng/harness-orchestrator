@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import typer
+
 from harness.core.ui import get_ui
 
 
@@ -66,7 +68,7 @@ def _show_single_task(
                 sys.stdout.write("\n")
             else:
                 ui.warn(f"Task directory not found: {task}")  # type: ignore[attr-defined]
-            raise SystemExit(1)
+            raise typer.Exit(1)
 
     outcome = load_review_outcome(task_dir)
     if outcome is None:

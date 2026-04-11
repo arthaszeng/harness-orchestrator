@@ -340,7 +340,10 @@ def sync_task_state(
     state_path = task_dir / WORKFLOW_STATE_FILENAME
     state = load_workflow_state(task_dir)
     if state is None and state_path.exists():
-        raise ValueError("existing workflow-state.json is invalid")
+        warnings.warn(
+            f"Rebuilding corrupt workflow-state.json at {state_path}",
+            stacklevel=2,
+        )
     if state is None:
         state = WorkflowState(task_id=task_dir.name)
 

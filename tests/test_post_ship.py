@@ -16,7 +16,9 @@ class _Resolver:
         if not branch.startswith(prefix):
             return None
         remainder = branch[len(prefix):]
-        return remainder.split("-", 1)[0]
+        import re
+        m = re.match(r"(task-\d+)", remainder)
+        return m.group(1) if m else None
 
 
 class _BranchManager:

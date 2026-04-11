@@ -70,3 +70,25 @@ class TestExtractTaskIdFromBranch:
         )
         assert extract_task_key_from_branch("feat/task-123-scope", cwd=tmp_path) == "task-123"
 
+
+class TestRegexCompileCaching:
+    """Verify that fullmatch_re uses cached compiled patterns."""
+
+    def test_same_strategy_returns_same_compiled_object(self):
+        from harness.core.task_identity import _compiled_pattern
+
+        _compiled_pattern.cache_clear()
+        r1 = TaskIdentityResolver(strategy="hybrid")
+        r2 = TaskIdentityResolver(strategy="hybrid")
+        assert r1.fullmatch_re is r2.fullmatch_re
+        assert _compiled_pattern.cache_info().hits >= 1
+
+    def test_different_strategies_produce_different_objects(self):
+        from harness.core.task_identity import _compiled_pattern
+
+        _compiled_pattern.cache_clear()
+        r_hybrid = TaskIdentityResolver(strategy="hybrid")
+        r_numeric = TaskIdentityResolver(strategy="numeric")
+        assert r_hybrid.fullmatch_re is not r_numeric.fullmatch_re
+        assert _compiled_pattern.cache_info().misses >= 2
+

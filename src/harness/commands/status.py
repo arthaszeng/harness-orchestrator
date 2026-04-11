@@ -57,7 +57,7 @@ def run_status(*, verbose: bool = False, progress_line: bool = False) -> None:
     _, workflow_state = load_current_workflow_state(agents_dir)
 
     if workflow_state is None:
-        ui.info("no active session.")
+        ui.info(t("status.no_session"))
         return
 
     action = suggest_next_action(workflow_state)

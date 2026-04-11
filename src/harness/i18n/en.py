@@ -170,6 +170,7 @@ MESSAGES: dict[str, str] = {
     "score_band.redo": "Score {score}/10 — consider re-planning or major rework",
 
     # ── status command ───────────────────────────────────────────
+    "status.no_session": "no active session.",
     "status.next_title": "Next step",
     "status.current_task": "Current task",
     "status.stats_brief": "{completed} done · {blocked} blocked · avg {avg:.1f}",

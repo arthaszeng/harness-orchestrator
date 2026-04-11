@@ -429,16 +429,20 @@ class TestWriteGateSnapshot:
         assert reloaded.artifacts.plan == "plan.md"
         assert reloaded.gates.ship_readiness.status == GateStatus.PASS
 
-    def test_rejects_invalid_existing_state(self, tmp_path: Path):
+    def test_rebuilds_invalid_existing_state(self, tmp_path: Path):
         task_dir = tmp_path / "task-001"
         task_dir.mkdir()
         (task_dir / "workflow-state.json").write_text("{broken", encoding="utf-8")
         verdict = GateVerdict(passed=True, checks=[], summary="all checks passed")
 
-        import pytest
+        import warnings as _warnings
 
-        with pytest.raises(ValueError, match="existing workflow-state.json is invalid"):
-            write_gate_snapshot(task_dir, verdict)
+        with _warnings.catch_warnings(record=True) as w:
+            _warnings.simplefilter("always")
+            result = write_gate_snapshot(task_dir, verdict)
+        rebuild_warnings = [x for x in w if "Rebuilding corrupt" in str(x.message)]
+        assert len(rebuild_warnings) >= 1
+        assert result is True
 
     def test_does_not_change_phase(self, tmp_path: Path):
         task_dir = tmp_path / "task-001"
