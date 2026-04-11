@@ -17,7 +17,7 @@ from harness.core.escalation import compute_ship_escalation
 
 def run_ship_prepare(*, task: str | None = None, as_json: bool = True) -> None:
     """Pre-compute ship phase metadata (diff + escalation + review hints)."""
-    from harness.commands.diff_stat import _classify_file
+    from harness.commands.diff_stat import classify_file
     from harness.core.workflow_state import resolve_task_dir
     from harness.integrations.git_ops import run_git
 
@@ -40,7 +40,7 @@ def run_ship_prepare(*, task: str | None = None, as_json: bool = True) -> None:
     files = [f for f in (result.stdout or "").strip().splitlines() if f]
     categories: dict[str, list[str]] = {"code": [], "test": [], "doc": [], "other": []}
     for f in files:
-        categories[_classify_file(f)].append(f)
+        categories[classify_file(f)].append(f)
 
     stat_result = run_git(["diff", "--shortstat", diff_range], cwd, timeout=10)
     additions, deletions = 0, 0

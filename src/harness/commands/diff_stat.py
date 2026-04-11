@@ -16,7 +16,7 @@ _TEST_DIR_MARKERS = ("tests/", "__tests__/", "test/")
 _TEST_FILE_MARKERS = ("test_", "_test.")
 
 
-def _classify_file(path: str) -> str:
+def classify_file(path: str) -> str:
     """Return 'code', 'test', 'doc', or 'other'."""
     lower = path.lower()
     suffix = Path(lower).suffix
@@ -58,7 +58,7 @@ def run_diff_stat(*, as_json: bool = True) -> None:
     files = [f for f in result.stdout.strip().splitlines() if f]
     categories: dict[str, list[str]] = {"code": [], "test": [], "doc": [], "other": []}
     for f in files:
-        categories[_classify_file(f)].append(f)
+        categories[classify_file(f)].append(f)
 
     output = {
         "trunk_branch": trunk,

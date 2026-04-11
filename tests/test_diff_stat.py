@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import typer
 
-from harness.commands.diff_stat import _classify_file, run_diff_stat
+from harness.commands.diff_stat import classify_file as _classify_file, run_diff_stat
 
 
 class TestClassifyFile:

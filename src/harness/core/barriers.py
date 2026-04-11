@@ -63,12 +63,15 @@ def _write_atomic(path: Path, content: str) -> None:
         prefix=f".{path.stem}.",
         suffix=".tmp",
     )
+    closed = False
     try:
         os.write(fd, content.encode("utf-8"))
         os.close(fd)
+        closed = True
         os.replace(tmp_path_str, str(path))
     except BaseException:
-        os.close(fd) if not os.get_inheritable(fd) else None  # noqa: E501
+        if not closed:
+            os.close(fd)
         try:
             os.unlink(tmp_path_str)
         except OSError:

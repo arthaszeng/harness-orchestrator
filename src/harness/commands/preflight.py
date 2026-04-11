@@ -48,6 +48,7 @@ def run_preflight_bundle(
     budget_ok = _check_context_budget(task_dir)
     result["context_budget_ok"] = budget_ok
     if not budget_ok:
+        result["ok"] = False
         result["errors"].append("context budget exceeded")
 
     ws_path = task_dir / "workflow-state.json"

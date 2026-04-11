@@ -35,7 +35,7 @@ PLAN_PASS_THRESHOLD: float = 7.0
 CODE_PASS_THRESHOLD: float = 7.0
 
 
-def _validate_input(data: dict[str, Any], kind: str) -> list[dict[str, Any]]:
+def _validate_input(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Validate stdin JSON and return roles list."""
     if "roles" not in data:
         typer.echo(json.dumps({"error": "missing field: roles"}), err=True)
@@ -146,7 +146,7 @@ def compute_cmd(
         typer.echo(json.dumps({"error": f"unknown kind: {kind}"}), err=True)
         raise typer.Exit(1)
 
-    roles = _validate_input(data, kind)
+    roles = _validate_input(data)
     dimensions, aggregate = _compute_weighted_average(roles, weights)
 
     current_findings = _collect_finding_texts(roles)
