@@ -476,7 +476,7 @@ def test_eval_template_size(tmp_path: Path):
     root = _setup_project(tmp_path)
     cfg = HarnessConfig.load(root)
     generate_native_artifacts(root, cfg=cfg, lang="en")
-    eval_skill = (root / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md").read_text(
+    eval_skill = (root / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md").read_text(
         encoding="utf-8"
     )
     assert len(eval_skill) < 10_000
@@ -504,8 +504,10 @@ def test_resume_directive_in_rendered_skills(tmp_path: Path):
     cfg = HarnessConfig.load(root)
     generate_native_artifacts(root, cfg=cfg, lang="en")
     base = root / ".cursor" / "skills" / "harness"
+    internal_names = {"harness-build", "harness-eval"}
     for name in ("harness-build", "harness-ship", "harness-eval"):
-        text = (base / name / "SKILL.md").read_text(encoding="utf-8")
+        filename = "PROTOCOL.md" if name in internal_names else "SKILL.md"
+        text = (base / name / filename).read_text(encoding="utf-8")
         assert "Recovery after interruption" in text
 
 
@@ -517,7 +519,7 @@ def test_build_template_has_handoff_read(tmp_path: Path):
     root = _setup_project(tmp_path)
     cfg = HarnessConfig.load(root)
     generate_native_artifacts(root, cfg=cfg, lang="en")
-    build = (root / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md").read_text(
+    build = (root / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md").read_text(
         encoding="utf-8"
     )
     assert "harness handoff read" in build
@@ -528,7 +530,7 @@ def test_build_template_has_session_write(tmp_path: Path):
     root = _setup_project(tmp_path)
     cfg = HarnessConfig.load(root)
     generate_native_artifacts(root, cfg=cfg, lang="en")
-    build = (root / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md").read_text(
+    build = (root / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md").read_text(
         encoding="utf-8"
     )
     assert "harness session write" in build

@@ -7,7 +7,9 @@ import pytest
 
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
+    _INTERNAL_SKILL_NAMES,
     _build_full_context,
+    _cleanup_legacy_paths,
     _detect_project_lang,
     generate_native_artifacts,
     resolve_native_lang,
@@ -259,7 +261,7 @@ def test_generated_skill_contains_project_lang_section(tmp_path: Path):
     cfg = HarnessConfig.load(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
-    build_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md")
+    build_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md")
     content = build_skill.read_text(encoding="utf-8")
     assert "Python-Specific Guidance" in content
     assert "ruff check" in content
@@ -269,7 +271,7 @@ def test_generated_skill_includes_error_recovery(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
-    build_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md")
+    build_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md")
     content = build_skill.read_text(encoding="utf-8")
     assert "Error Recovery Matrix" in content
     assert "Import error" in content
@@ -279,7 +281,7 @@ def test_generated_eval_includes_trust_boundary(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
-    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = eval_skill.read_text(encoding="utf-8")
     assert "Trust Boundaries" in content
     assert "UNTRUSTED" in content
@@ -289,9 +291,11 @@ def test_generated_plan_build_eval_ship_reference_workflow_state(tmp_path: Path)
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
+    from harness.native.skill_gen import _INTERNAL_SKILL_NAMES
     skills_base = tmp_path / ".cursor" / "skills" / "harness"
     for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
-        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        filename = "PROTOCOL.md" if name in _INTERNAL_SKILL_NAMES else "SKILL.md"
+        content = (skills_base / name / filename).read_text(encoding="utf-8")
         assert "workflow-state.json" in content, f"{name} missing workflow-state reference"
 
 
@@ -328,7 +332,7 @@ def test_generated_eval_includes_hook_points_when_configured(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.native.hooks_post_eval = "scripts/post-eval.sh"
     generate_native_artifacts(tmp_path, cfg=cfg)
-    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = eval_skill.read_text(encoding="utf-8")
     assert "Post-Eval Hook" in content
     assert "scripts/post-eval.sh" in content
@@ -337,7 +341,7 @@ def test_generated_eval_includes_hook_points_when_configured(tmp_path: Path):
 def test_generated_eval_no_hook_residue_when_empty(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    eval_skill = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = eval_skill.read_text(encoding="utf-8")
     assert "Post-Eval Hook" not in content
 
@@ -355,7 +359,7 @@ def test_generated_ship_advisory_mode(tmp_path: Path):
 def test_generated_build_no_hook_residue_when_empty(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md")
+    build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md")
     content = build.read_text(encoding="utf-8")
     assert "Pre-Build Hook" not in content
     lines = content.split("\n")
@@ -440,7 +444,7 @@ def test_no_claude_references_in_templates(tmp_path: Path):
 def test_error_recovery_no_test_overlap(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md")
+    build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md")
     content = build.read_text(encoding="utf-8")
     assert "Error Recovery Matrix" in content
     matrix_start = content.index("Error Recovery Matrix")
@@ -667,7 +671,7 @@ def test_retro_custom_window_days(tmp_path: Path):
 def test_eval_has_context_degradation_ladder(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = ev.read_text(encoding="utf-8")
     assert "Context Degradation Ladder" in content
     assert "Minimum viable eval" in content
@@ -678,7 +682,7 @@ def test_eval_has_context_degradation_ladder(tmp_path: Path):
 def test_eval_uses_minimal_interaction_wording(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = ev.read_text(encoding="utf-8")
     assert "minimal-interaction" in content
     assert "non-interactive" not in content
@@ -694,22 +698,25 @@ def test_ship_uses_minimal_interaction_wording(tmp_path: Path):
 
 
 def test_total_skill_count_is_nine(tmp_path: Path):
-    """9 skills are generated (brainstorm merged into vision)."""
+    """9 skills are generated: 6 public (SKILL.md) + 3 internal (PROTOCOL.md)."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
     skills_dir = tmp_path / ".cursor" / "skills" / "harness"
-    skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
-    assert len(skill_dirs) == 9
+    public_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    internal_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "PROTOCOL.md").exists()]
+    assert len(public_dirs) == 6, f"Expected 6 public skills, got {len(public_dirs)}: {[d.name for d in public_dirs]}"
+    assert len(internal_dirs) == 3, f"Expected 3 internal skills, got {len(internal_dirs)}: {[d.name for d in internal_dirs]}"
+    assert len(public_dirs) + len(internal_dirs) == 9
 
 
 # --- v3.1: Unified multi-role system + recursive composition ---
 
 
 def test_five_role_agents_generated(tmp_path: Path):
-    """5 role agents are generated (no old evaluator/adversarial-reviewer)."""
+    """5 role agents are generated in _agents/ (hidden from Cursor menu)."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     agent_files = sorted(f.stem for f in agents_dir.glob("harness-*.md"))
     assert "harness-architect" in agent_files
     assert "harness-product-owner" in agent_files
@@ -725,7 +732,7 @@ def test_role_agents_have_dual_mode(tmp_path: Path):
     """Each role agent contains both plan-review and code-eval mode sections."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -737,7 +744,7 @@ def test_role_agents_have_output_contract(tmp_path: Path):
     """Each role agent has the unified output contract format."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -751,7 +758,7 @@ def test_role_agents_have_memverse_integration(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = True
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -763,7 +770,7 @@ def test_qa_agent_has_ci_ownership(tmp_path: Path):
     """QA agent is explicitly the only CI runner."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    qa = (tmp_path / ".cursor" / "agents" / "harness-qa.md").read_text(encoding="utf-8")
+    qa = (tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-qa.md").read_text(encoding="utf-8")
     assert "CI Ownership" in qa
     assert "ONLY" in qa
     assert "pytest" in qa
@@ -775,7 +782,7 @@ def test_role_model_override_in_agent(tmp_path: Path):
     cfg.native.role_models = {"architect": "gpt-4.1"}
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=["gpt-4.1"]):
         generate_native_artifacts(tmp_path, cfg=cfg)
-    arch = (tmp_path / ".cursor" / "agents" / "harness-architect.md").read_text(encoding="utf-8")
+    arch = (tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-architect.md").read_text(encoding="utf-8")
     assert "gpt-4.1" in arch
 
 
@@ -783,7 +790,7 @@ def test_agent_omits_model_frontmatter_when_using_default(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     with patch("harness.native.skill_gen.detect_cursor_recent_models", return_value=[]):
         generate_native_artifacts(tmp_path, cfg=cfg)
-    arch = (tmp_path / ".cursor" / "agents" / "harness-architect.md").read_text(encoding="utf-8")
+    arch = (tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-architect.md").read_text(encoding="utf-8")
     frontmatter = arch.split("---", 2)[1]
     assert "model:" not in frontmatter
 
@@ -902,7 +909,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
-    po = (tmp_path / ".cursor" / "agents" / "harness-product-owner.md").read_text(encoding="utf-8")
+    po = (tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-product-owner.md").read_text(encoding="utf-8")
     assert "Roadmap / Plan Backlog alignment" in po
     assert "direction progress" in po
     assert "Long-Horizon Governance Boundary" in po
@@ -910,7 +917,7 @@ def test_product_and_pm_agents_include_direction_governance(tmp_path: Path):
     assert "single-round" in po
     assert "`N/A`" in po
 
-    pm = (tmp_path / ".cursor" / "agents" / "harness-project-manager.md").read_text(encoding="utf-8")
+    pm = (tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-project-manager.md").read_text(encoding="utf-8")
     assert "Roadmap / Active Plan" in pm
     assert "Backlog health" in pm
     assert "Long-Horizon Governance Boundary" in pm
@@ -948,7 +955,7 @@ def test_eval_uses_five_role_code_review(tmp_path: Path):
     """eval template dispatches 5 role subagents, not old 3-pass system."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md")
+    ev = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md")
     content = ev.read_text(encoding="utf-8")
     assert "Adaptive Multi-Role Code Review" in content
     assert "harness-architect" in content
@@ -1098,11 +1105,11 @@ def test_zh_generated_artifacts_contain_chinese(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
 
-    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md"
+    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md"
     content = build_skill.read_text(encoding="utf-8")
     assert "严格按合约交付" in content, "zh build skill should contain Chinese principles"
 
-    architect = tmp_path / ".cursor" / "agents" / "harness-architect.md"
+    architect = tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-architect.md"
     content_arch = architect.read_text(encoding="utf-8")
     assert "架构" in content_arch, "zh architect agent should contain Chinese"
 
@@ -1136,13 +1143,13 @@ def test_zh_vision_and_governance_agents_contain_loop_concepts(tmp_path: Path):
     assert "150" in content_vs
     assert "consolidation_needed" in content_vs
 
-    po = tmp_path / ".cursor" / "agents" / "harness-product-owner.md"
+    po = tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-product-owner.md"
     content_po = po.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_po
     assert "方向推进证据" in content_po
     assert "Value recommendation" in content_po
 
-    pm = tmp_path / ".cursor" / "agents" / "harness-project-manager.md"
+    pm = tmp_path / ".cursor" / "skills" / "harness" / "_agents" / "harness-project-manager.md"
     content_pm = pm.read_text(encoding="utf-8")
     assert "长期方向治理边界" in content_pm
     assert "Backlog 健康度" in content_pm
@@ -1153,9 +1160,11 @@ def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
 
+    from harness.native.skill_gen import _INTERNAL_SKILL_NAMES
     skills_base = tmp_path / ".cursor" / "skills" / "harness"
     for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
-        content = (skills_base / name / "SKILL.md").read_text(encoding="utf-8")
+        filename = "PROTOCOL.md" if name in _INTERNAL_SKILL_NAMES else "SKILL.md"
+        content = (skills_base / name / filename).read_text(encoding="utf-8")
         assert "workflow-state.json" in content, f"{name} missing zh workflow-state reference"
 
     plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
@@ -1163,7 +1172,7 @@ def test_zh_plan_build_eval_ship_reference_workflow_state(tmp_path: Path):
     assert "Value recommendation" in plan_content
     assert "Delivery recommendation" in plan_content
 
-    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    eval_content = (skills_base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "code-review-protocol.md" in eval_content
     proto_zh = (
         skills_base / "harness-eval" / "code-review-protocol.md"
@@ -1190,7 +1199,7 @@ def test_en_generation_unchanged_after_zh_addition(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
 
-    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md"
+    build_skill = tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md"
     content = build_skill.read_text(encoding="utf-8")
     assert "Deliver exactly per contract" in content
     assert "严格按合约交付" not in content
@@ -1294,10 +1303,10 @@ def test_en_templates_reference_handoff(tmp_path: Path):
     plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in plan_content
 
-    build_content = (skills_base / "harness-build" / "SKILL.md").read_text(encoding="utf-8")
+    build_content = (skills_base / "harness-build" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in build_content
 
-    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    eval_content = (skills_base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in eval_content
 
     ship_content = (skills_base / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
@@ -1313,10 +1322,10 @@ def test_zh_templates_reference_handoff(tmp_path: Path):
     plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in plan_content
 
-    build_content = (skills_base / "harness-build" / "SKILL.md").read_text(encoding="utf-8")
+    build_content = (skills_base / "harness-build" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in build_content
 
-    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    eval_content = (skills_base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "handoff_summary" in eval_content
 
     ship_content = (skills_base / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
@@ -1340,7 +1349,7 @@ class TestRoadmapA3StructuredHandoffTemplates:
     def test_build_writes_handoff_build_and_reads_plan_footprint(self, tmp_path: Path, lang: str):
         cfg = _make_cfg(tmp_path)
         generate_native_artifacts(tmp_path, lang=lang, cfg=cfg)
-        build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "SKILL.md").read_text(
+        build = (tmp_path / ".cursor" / "skills" / "harness" / "harness-build" / "PROTOCOL.md").read_text(
             encoding="utf-8"
         )
         assert "handoff-plan.json" in build
@@ -1352,7 +1361,7 @@ class TestRoadmapA3StructuredHandoffTemplates:
         cfg = _make_cfg(tmp_path)
         generate_native_artifacts(tmp_path, lang=lang, cfg=cfg)
         base = tmp_path / ".cursor" / "skills" / "harness"
-        ev = (base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+        ev = (base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
         ship = (base / "harness-ship" / "SKILL.md").read_text(encoding="utf-8")
         assert "handoff-plan.json" in ev
         assert "handoff-build.json" in ev
@@ -1479,7 +1488,7 @@ def test_agent_context_layers_comment(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
 
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for agent_name in ("harness-architect", "harness-product-owner",
                        "harness-engineer", "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{agent_name}.md").read_text(encoding="utf-8")
@@ -1491,7 +1500,7 @@ def test_zh_agent_context_layers_comment(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
 
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for agent_name in ("harness-architect", "harness-product-owner",
                        "harness-engineer", "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{agent_name}.md").read_text(encoding="utf-8")
@@ -1528,7 +1537,7 @@ def test_memverse_disabled_agents_no_memverse_content(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = False
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1542,7 +1551,7 @@ def test_memverse_enabled_agents_have_memverse_content(tmp_path: Path):
     cfg.integrations.memverse.enabled = True
     cfg.integrations.memverse.domain_prefix = "my-custom-domain"
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1554,7 +1563,7 @@ def test_memverse_disabled_eval_no_memverse(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = False
     generate_native_artifacts(tmp_path, cfg=cfg)
-    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "search_memory" not in content
     assert "add_memories" not in content
 
@@ -1564,7 +1573,7 @@ def test_memverse_enabled_eval_has_memverse(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = True
     generate_native_artifacts(tmp_path, cfg=cfg)
-    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    content = (tmp_path / ".cursor" / "skills" / "harness" / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "search_memory" in content
     assert "add_memories" in content
 
@@ -1648,7 +1657,7 @@ def test_zh_memverse_disabled_no_leakage(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = False
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1660,7 +1669,7 @@ def test_zh_memverse_enabled_has_content(tmp_path: Path):
     cfg = _make_cfg(tmp_path)
     cfg.integrations.memverse.enabled = True
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1755,7 +1764,7 @@ def test_en_generated_agents_contain_language_directive(tmp_path: Path):
     """EN agents contain English language directive."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="en", cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1779,7 +1788,7 @@ def test_zh_generated_agents_contain_language_directive(tmp_path: Path):
     """ZH agents contain Chinese language directive."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, lang="zh", cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")
@@ -1807,7 +1816,7 @@ def test_en_dispatch_sections_contain_response_language(tmp_path: Path):
     plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
     assert "response_language: en" in plan_content, "EN plan missing response_language"
 
-    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    eval_content = (skills_base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "response_language: en" in eval_content, "EN eval missing response_language"
 
 
@@ -1820,7 +1829,7 @@ def test_zh_dispatch_sections_contain_response_language(tmp_path: Path):
     plan_content = (skills_base / "harness-plan" / "SKILL.md").read_text(encoding="utf-8")
     assert "response_language: zh" in plan_content, "ZH plan missing response_language"
 
-    eval_content = (skills_base / "harness-eval" / "SKILL.md").read_text(encoding="utf-8")
+    eval_content = (skills_base / "harness-eval" / "PROTOCOL.md").read_text(encoding="utf-8")
     assert "response_language: zh" in eval_content, "ZH eval missing response_language"
 
 
@@ -1903,11 +1912,13 @@ class TestRoadmapA2InstructionPrecision:
 
     @pytest.mark.parametrize("lang", ["en", "zh"])
     def test_core_skills_contain_harness_progress(self, tmp_path: Path, lang: str):
+        from harness.native.skill_gen import _INTERNAL_SKILL_NAMES
         cfg = _make_cfg(tmp_path)
         generate_native_artifacts(tmp_path, lang=lang, cfg=cfg)
         base = tmp_path / ".cursor" / "skills" / "harness"
         for name in ("harness-plan", "harness-build", "harness-eval", "harness-ship"):
-            text = (base / name / "SKILL.md").read_text(encoding="utf-8")
+            filename = "PROTOCOL.md" if name in _INTERNAL_SKILL_NAMES else "SKILL.md"
+            text = (base / name / filename).read_text(encoding="utf-8")
             assert "HARNESS_PROGRESS" in text, f"{lang}/{name} missing HARNESS_PROGRESS"
 
     def test_en_plan_review_task_composition_and_clustering(self, tmp_path: Path):
@@ -2045,3 +2056,116 @@ def test_ship_adaptive_description(tmp_path: Path):
     ship = (tmp_path / ".cursor" / "skills" / "harness" / "harness-ship" / "SKILL.md")
     content = ship.read_text(encoding="utf-8")
     assert "adaptive" in content.lower() or "FULL/LITE/FAST" in content
+
+
+# --- Skill visibility: public vs internal ---
+
+
+class TestSkillVisibility:
+    """Internal skills use PROTOCOL.md; public skills use SKILL.md."""
+
+    def test_public_skills_use_skill_md(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, cfg=cfg)
+        base = tmp_path / ".cursor" / "skills" / "harness"
+        for name in ("harness-plan", "harness-vision", "harness-ship",
+                     "harness-investigate", "harness-learn", "harness-retro"):
+            assert (base / name / "SKILL.md").exists(), f"{name} should have SKILL.md"
+            assert not (base / name / "PROTOCOL.md").exists(), f"{name} should NOT have PROTOCOL.md"
+
+    def test_internal_skills_use_protocol_md(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, cfg=cfg)
+        base = tmp_path / ".cursor" / "skills" / "harness"
+        for name in ("harness-build", "harness-eval", "harness-doc-release"):
+            assert (base / name / "PROTOCOL.md").exists(), f"{name} should have PROTOCOL.md"
+            assert not (base / name / "SKILL.md").exists(), f"{name} should NOT have SKILL.md"
+
+    def test_agents_in_hidden_directory(self, tmp_path: Path):
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, cfg=cfg)
+        hidden = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
+        old = tmp_path / ".cursor" / "agents"
+        for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                     "harness-qa", "harness-project-manager"):
+            assert (hidden / f"{name}.md").exists(), f"{name} should be in _agents/"
+            assert not (old / f"{name}.md").exists(), f"{name} should NOT be in .cursor/agents/"
+
+
+class TestLegacyCleanup:
+    """Cleanup of pre-4.2 layout artifacts."""
+
+    def test_removes_old_internal_skill_md(self, tmp_path: Path):
+        base = tmp_path / ".cursor" / "skills" / "harness"
+        for name in ("harness-build", "harness-eval", "harness-doc-release"):
+            d = base / name
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "SKILL.md").write_text("old content", encoding="utf-8")
+
+        _cleanup_legacy_paths(tmp_path)
+
+        for name in ("harness-build", "harness-eval", "harness-doc-release"):
+            assert not (base / name / "SKILL.md").exists()
+
+    def test_removes_old_agent_files(self, tmp_path: Path):
+        old_agents = tmp_path / ".cursor" / "agents"
+        old_agents.mkdir(parents=True, exist_ok=True)
+        for name in ("harness-architect", "harness-qa"):
+            (old_agents / f"{name}.md").write_text("old content", encoding="utf-8")
+        (old_agents / "my-custom-agent.md").write_text("keep me", encoding="utf-8")
+
+        _cleanup_legacy_paths(tmp_path)
+
+        assert not (old_agents / "harness-architect.md").exists()
+        assert not (old_agents / "harness-qa.md").exists()
+        assert (old_agents / "my-custom-agent.md").exists(), "Non-harness files must survive"
+
+    def test_removes_empty_agents_dir(self, tmp_path: Path):
+        old_agents = tmp_path / ".cursor" / "agents"
+        old_agents.mkdir(parents=True, exist_ok=True)
+        (old_agents / "harness-architect.md").write_text("old", encoding="utf-8")
+
+        _cleanup_legacy_paths(tmp_path)
+
+        assert not old_agents.exists(), "Empty .cursor/agents/ should be removed"
+
+    def test_keeps_agents_dir_if_non_empty(self, tmp_path: Path):
+        old_agents = tmp_path / ".cursor" / "agents"
+        old_agents.mkdir(parents=True, exist_ok=True)
+        (old_agents / "harness-architect.md").write_text("old", encoding="utf-8")
+        (old_agents / "user-agent.md").write_text("keep", encoding="utf-8")
+
+        _cleanup_legacy_paths(tmp_path)
+
+        assert old_agents.exists(), ".cursor/agents/ should survive if non-harness files remain"
+        assert (old_agents / "user-agent.md").exists()
+
+    def test_full_upgrade_path(self, tmp_path: Path):
+        """Simulate upgrade: old layout → init --force → only new layout remains."""
+        base = tmp_path / ".cursor" / "skills" / "harness"
+        old_agents = tmp_path / ".cursor" / "agents"
+
+        for name in ("harness-build", "harness-eval", "harness-doc-release"):
+            d = base / name
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "SKILL.md").write_text("old", encoding="utf-8")
+        old_agents.mkdir(parents=True, exist_ok=True)
+        for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                     "harness-qa", "harness-project-manager"):
+            (old_agents / f"{name}.md").write_text("old", encoding="utf-8")
+
+        cfg = _make_cfg(tmp_path)
+        generate_native_artifacts(tmp_path, cfg=cfg, force=True)
+
+        for name in ("harness-build", "harness-eval", "harness-doc-release"):
+            assert not (base / name / "SKILL.md").exists()
+            assert (base / name / "PROTOCOL.md").exists()
+
+        assert not old_agents.exists() or not any(
+            f.name.startswith("harness-") for f in old_agents.iterdir()
+        )
+
+        hidden = base / "_agents"
+        for name in ("harness-architect", "harness-product-owner", "harness-engineer",
+                     "harness-qa", "harness-project-manager"):
+            assert (hidden / f"{name}.md").exists()

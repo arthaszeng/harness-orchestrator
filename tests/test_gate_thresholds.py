@@ -91,7 +91,7 @@ def test_role_agents_have_strictly_prohibited(tmp_path: Path):
     """Each role agent contains a Strictly Prohibited section."""
     cfg = _make_cfg(tmp_path)
     generate_native_artifacts(tmp_path, cfg=cfg)
-    agents_dir = tmp_path / ".cursor" / "agents"
+    agents_dir = tmp_path / ".cursor" / "skills" / "harness" / "_agents"
     for name in ("harness-architect", "harness-product-owner", "harness-engineer",
                  "harness-qa", "harness-project-manager"):
         content = (agents_dir / f"{name}.md").read_text(encoding="utf-8")

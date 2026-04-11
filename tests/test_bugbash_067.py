@@ -21,13 +21,13 @@ runner = CliRunner()
 
 CRITICAL_SKILL_FILES = [
     ".cursor/skills/harness/harness-ship/SKILL.md",
-    ".cursor/skills/harness/harness-eval/SKILL.md",
-    ".cursor/skills/harness/harness-build/SKILL.md",
+    ".cursor/skills/harness/harness-eval/PROTOCOL.md",
+    ".cursor/skills/harness/harness-build/PROTOCOL.md",
     ".cursor/skills/harness/harness-plan/SKILL.md",
     ".cursor/skills/harness/harness-vision/SKILL.md",
     ".cursor/skills/harness/harness-investigate/SKILL.md",
     ".cursor/skills/harness/harness-learn/SKILL.md",
-    ".cursor/skills/harness/harness-doc-release/SKILL.md",
+    ".cursor/skills/harness/harness-doc-release/PROTOCOL.md",
     ".cursor/skills/harness/harness-retro/SKILL.md",
 ]
 
@@ -39,11 +39,11 @@ CRITICAL_REFERENCE_FILES = [
 ]
 
 CRITICAL_AGENT_FILES = [
-    ".cursor/agents/harness-architect.md",
-    ".cursor/agents/harness-product-owner.md",
-    ".cursor/agents/harness-engineer.md",
-    ".cursor/agents/harness-qa.md",
-    ".cursor/agents/harness-project-manager.md",
+    ".cursor/skills/harness/_agents/harness-architect.md",
+    ".cursor/skills/harness/_agents/harness-product-owner.md",
+    ".cursor/skills/harness/_agents/harness-engineer.md",
+    ".cursor/skills/harness/_agents/harness-qa.md",
+    ".cursor/skills/harness/_agents/harness-project-manager.md",
 ]
 
 CRITICAL_RULE_FILES = [
@@ -303,7 +303,7 @@ class TestEvalRoutingPointers:
     def test_eval_contains_protocol_pointers(self, project: Path):
         cfg = HarnessConfig.load(project)
         generate_native_artifacts(project, cfg=cfg, lang="en")
-        content = (project / ".cursor/skills/harness/harness-eval/SKILL.md").read_text(encoding="utf-8")
+        content = (project / ".cursor/skills/harness/harness-eval/PROTOCOL.md").read_text(encoding="utf-8")
         assert "code-review-protocol.md" in content
 
 
@@ -316,7 +316,7 @@ class TestBuildCLIReferences:
     def test_build_contains_cli_references(self, project: Path):
         cfg = HarnessConfig.load(project)
         generate_native_artifacts(project, cfg=cfg, lang="en")
-        content = (project / ".cursor/skills/harness/harness-build/SKILL.md").read_text(encoding="utf-8")
+        content = (project / ".cursor/skills/harness/harness-build/PROTOCOL.md").read_text(encoding="utf-8")
         assert "harness handoff read" in content
         assert "harness session write" in content or "harness session" in content
 
@@ -365,7 +365,7 @@ class TestResumeDirective:
     def test_resume_directive_in_build(self, project: Path):
         cfg = HarnessConfig.load(project)
         generate_native_artifacts(project, cfg=cfg, lang="en")
-        content = (project / ".cursor/skills/harness/harness-build/SKILL.md").read_text(encoding="utf-8")
+        content = (project / ".cursor/skills/harness/harness-build/PROTOCOL.md").read_text(encoding="utf-8")
         assert "session read" in content.lower() or "resume" in content.lower()
 
     def test_resume_directive_in_ship(self, project: Path):

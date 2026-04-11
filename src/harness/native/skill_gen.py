@@ -42,17 +42,22 @@ def resolve_native_lang(project_root: Path | None = None, lang: str | None = Non
 
 _TEMPLATE_DIR = "native"
 
-_SKILL_TEMPLATES = [
+_PUBLIC_SKILL_TEMPLATES = [
     ("skill-vision.md.j2", "harness-vision"),
     ("skill-plan.md.j2", "harness-plan"),
-    ("skill-build.md.j2", "harness-build"),
-    ("skill-eval.md.j2", "harness-eval"),
     ("skill-ship.md.j2", "harness-ship"),
     ("skill-investigate.md.j2", "harness-investigate"),
     ("skill-learn.md.j2", "harness-learn"),
-    ("skill-doc-release.md.j2", "harness-doc-release"),
     ("skill-retro.md.j2", "harness-retro"),
 ]
+
+_INTERNAL_SKILL_TEMPLATES = [
+    ("skill-build.md.j2", "harness-build"),
+    ("skill-eval.md.j2", "harness-eval"),
+    ("skill-doc-release.md.j2", "harness-doc-release"),
+]
+
+_SKILL_TEMPLATES = _PUBLIC_SKILL_TEMPLATES + _INTERNAL_SKILL_TEMPLATES
 
 _AGENT_TEMPLATES = [
     ("agent-architect.md.j2", "harness-architect"),
@@ -61,6 +66,8 @@ _AGENT_TEMPLATES = [
     ("agent-qa.md.j2", "harness-qa"),
     ("agent-project-manager.md.j2", "harness-project-manager"),
 ]
+
+_INTERNAL_SKILL_NAMES = frozenset(name for _, name in _INTERNAL_SKILL_TEMPLATES)
 
 _RULE_TEMPLATES = [
     ("rule-trust-boundary.mdc.j2", "harness-trust-boundary"),
@@ -331,6 +338,25 @@ def _render_template(tmpl_dir: Path, tmpl_name: str, context: dict[str, str]) ->
 
 
 
+def _cleanup_legacy_paths(project_root: Path) -> None:
+    """Remove artifacts from pre-4.2 layout that would pollute the Cursor menu."""
+    skills_base = project_root / ".cursor" / "skills" / "harness"
+    old_agents_dir = project_root / ".cursor" / "agents"
+
+    for skill_name in _INTERNAL_SKILL_NAMES:
+        stale = skills_base / skill_name / "SKILL.md"
+        if stale.is_file():
+            stale.unlink()
+
+    for _, agent_name in _AGENT_TEMPLATES:
+        stale = old_agents_dir / f"{agent_name}.md"
+        if stale.is_file():
+            stale.unlink()
+
+    if old_agents_dir.is_dir() and not any(old_agents_dir.iterdir()):
+        old_agents_dir.rmdir()
+
+
 def generate_native_artifacts(
     project_root: Path,
     *,
@@ -341,6 +367,8 @@ def generate_native_artifacts(
     """Generate all Cursor-native mode artifacts. Returns count of files written."""
     if cfg is None:
         cfg = HarnessConfig.load(project_root)
+
+    _cleanup_legacy_paths(project_root)
 
     tmpl_dir = _get_template_dir(lang)
     rule_activation = cfg.native.rule_activation
@@ -365,19 +393,20 @@ def generate_native_artifacts(
             skipped.append(artifact_name)
             return False
 
-    # Skills → .cursor/skills/harness/<name>/SKILL.md
+    # Skills → .cursor/skills/harness/<name>/SKILL.md (public) or PROTOCOL.md (internal)
     skills_base = project_root / ".cursor" / "skills" / "harness"
     for tmpl_name, skill_name in _SKILL_TEMPLATES:
         skill_dir = skills_base / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        out_path = skill_dir / "SKILL.md"
+        filename = "PROTOCOL.md" if skill_name in _INTERNAL_SKILL_NAMES else "SKILL.md"
+        out_path = skill_dir / filename
         ctx = _filter_context(full_ctx, "skill", skill_name)
         if _try_render_and_write(tmpl_name, skill_name, out_path, ctx):
             typer.echo(t("native.generated_skill", path=_rel(project_root, out_path)))
             count += 1
 
-    # Agents → .cursor/agents/<name>.md
-    agents_dir = project_root / ".cursor" / "agents"
+    # Agents → .cursor/skills/harness/_agents/<name>.md (hidden from Cursor agent menu)
+    agents_dir = skills_base / "_agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
     for tmpl_name, agent_name in _AGENT_TEMPLATES:
         out_path = agents_dir / f"{agent_name}.md"
