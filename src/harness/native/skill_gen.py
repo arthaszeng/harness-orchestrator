@@ -278,18 +278,20 @@ def _build_layered_context(
 def _planner_principles(lang: str = "en") -> str:
     if lang == "zh":
         return (
-            "1. **交付清晰的合约** — 每个交付物必须有验收标准\n"
-            "2. **先搜索再构建** — 在提出新模式之前，先检查项目已有的实现\n"
-            "3. **完整性** — 在成本较低时覆盖测试、错误处理和类型安全\n"
-            "4. **范围纪律** — 不添加超出需求的交付物\n"
-            "5. **不做实现** — 你负责规划，Builder 负责实现"
+            "1. **先做系统设计思考** — 写 Spec 之前，先识别核心挑战、必要架构约束和常见设计陷阱\n"
+            "2. **交付清晰的合约** — 每个交付物必须有验收标准\n"
+            "3. **先搜索再构建** — 在提出新模式之前，先检查项目已有的实现\n"
+            "4. **完整性** — 在成本较低时覆盖测试、错误处理和类型安全\n"
+            "5. **范围纪律** — 不添加超出需求的交付物\n"
+            "6. **不做实现** — 你负责规划，Builder 负责实现"
         )
     return (
-        "1. **Deliver a clear contract** — every deliverable must have acceptance criteria\n"
-        "2. **Search Before Building** — check what the project already uses before proposing new patterns\n"
-        "3. **Completeness** — cover tests, error handling, and type safety when cost is small\n"
-        "4. **Scope discipline** — do not add deliverables beyond the stated requirement\n"
-        "5. **No implementation** — you plan, the Builder implements"
+        "1. **Design thinking first** — before writing the Spec, identify core challenges, essential architectural constraints, and common design pitfalls\n"
+        "2. **Deliver a clear contract** — every deliverable must have acceptance criteria\n"
+        "3. **Search Before Building** — check what the project already uses before proposing new patterns\n"
+        "4. **Completeness** — cover tests, error handling, and type safety when cost is small\n"
+        "5. **Scope discipline** — do not add deliverables beyond the stated requirement\n"
+        "6. **No implementation** — you plan, the Builder implements"
     )
 
 
@@ -300,14 +302,14 @@ def _builder_principles(lang: str = "en") -> str:
             "2. **小提交** — 每个逻辑单元一个提交；格式 `<type>(scope): description`\n"
             "3. **遵循项目约定** — 写新代码前先检查已有模式\n"
             "4. **测试覆盖** — 新行为需要测试；变更必须保持现有测试通过\n"
-            "5. **不做架构决策** — Planner 负责架构；你负责实现"
+            "5. **对照设计原则实现** — 合约中的 Design Principles 是必须满足的架构约束；实现前逐条确认"
         )
     return (
         "1. **Deliver exactly per contract** — implement only what the contract lists\n"
         "2. **Small commits** — one commit per logical unit; message format `<type>(scope): description`\n"
         "3. **Follow project conventions** — check existing patterns before writing new code\n"
         "4. **Test coverage** — new behavior needs tests; changes must keep existing tests passing\n"
-        "5. **No architecture calls** — Planner owns architecture; you implement"
+        "5. **Implement against Design Principles** — the Design Principles in the contract are mandatory architectural constraints; verify each one before implementing"
     )
 
 

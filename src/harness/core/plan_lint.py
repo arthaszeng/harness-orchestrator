@@ -17,6 +17,9 @@ _CHECKBOX_RE = re.compile(r"^\s*-\s*\[[ x]\]", re.MULTILINE)
 REQUIRED_SPEC_SECTIONS = {"analysis", "approach", "impact", "risks"}
 REQUIRED_CONTRACT_SECTIONS = {"deliverables", "acceptance criteria", "out of scope"}
 
+DESIGN_THINKING_HEADINGS = {"system design thinking", "系统设计思考"}
+DESIGN_PRINCIPLES_HEADINGS = {"design principles", "设计原则"}
+
 
 @dataclass
 class PlanLintError:
@@ -26,25 +29,40 @@ class PlanLintError:
 
 
 @dataclass
+class PlanLintWarning:
+    code: str
+    message: str
+    line: int | None = None
+
+
+@dataclass
 class PlanLintResult:
     valid: bool
     errors: list[PlanLintError] = field(default_factory=list)
+    warnings: list[PlanLintWarning] = field(default_factory=list)
     has_spec: bool = False
     has_contract: bool = False
+    has_design_principles: bool = False
     deliverable_count: int = 0
     estimated_files: int | None = None
     plan_mode: str = "unknown"
 
     def to_dict(self) -> dict:
-        return {
+        result: dict = {
             "valid": self.valid,
             "errors": [{"code": e.code, "message": e.message, "line": e.line} for e in self.errors],
             "plan_mode": self.plan_mode,
             "has_spec": self.has_spec,
             "has_contract": self.has_contract,
+            "has_design_principles": self.has_design_principles,
             "deliverable_count": self.deliverable_count,
             "estimated_files": self.estimated_files,
         }
+        if self.warnings:
+            result["warnings"] = [
+                {"code": w.code, "message": w.message, "line": w.line} for w in self.warnings
+            ]
+        return result
 
 
 def _normalize_heading(text: str) -> str:
@@ -54,6 +72,7 @@ def _normalize_heading(text: str) -> str:
 def lint_plan(plan_path: Path) -> PlanLintResult:
     """Validate plan.md structure and return lint result."""
     errors: list[PlanLintError] = []
+    warnings: list[PlanLintWarning] = []
 
     if not plan_path.exists():
         return PlanLintResult(
@@ -81,6 +100,8 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
     has_spec = "spec" in heading_titles
     has_contract = "contract" in heading_titles
 
+    has_design_principles = bool(heading_titles & DESIGN_PRINCIPLES_HEADINGS)
+
     if not has_spec:
         errors.append(PlanLintError(code="NO_SPEC", message="missing '# Spec' section"))
 
@@ -100,6 +121,12 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
                 code="MISSING_CONTRACT_SECTION",
                 message=f"missing Contract sub-section: {req}",
             ))
+
+    if not has_design_principles:
+        warnings.append(PlanLintWarning(
+            code="NO_DESIGN_PRINCIPLES",
+            message="missing 'Design Principles' section in Contract — consider adding design constraints for the Builder",
+        ))
 
     deliverables = _DELIVERABLE_RE.findall(content)
     if not deliverables:
@@ -121,8 +148,10 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
     return PlanLintResult(
         valid=valid,
         errors=errors,
+        warnings=warnings,
         has_spec=has_spec,
         has_contract=has_contract,
+        has_design_principles=has_design_principles,
         deliverable_count=deliverable_count,
         estimated_files=estimated_files_val,
         plan_mode=plan_mode,

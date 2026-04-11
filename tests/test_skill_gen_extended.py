@@ -7,7 +7,6 @@ import pytest
 
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
-    _INTERNAL_SKILL_NAMES,
     _build_full_context,
     _cleanup_legacy_paths,
     _detect_project_lang,
