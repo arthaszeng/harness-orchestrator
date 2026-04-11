@@ -61,11 +61,33 @@ not become parallel gate sources.
 ```markdown
 # Spec
 
+## System Design Thinking
+
+Before writing the Analysis, step back and think at the system level. Answer these three questions:
+
+### Core Challenges
+What are the first-principles challenges for this type of system? Not "what features to build" but "why is this type of system hard to get right".
+(e.g., webhook delivery → reliability of async delivery, fairness of backoff strategy, idempotency of delivery)
+
+### Architectural Constraints
+Which design constraints are non-negotiable? List those that must be satisfied, with rationale:
+- Testability (sleep/time functions injectable to avoid real waits in tests)
+- Idempotency (same input executed multiple times produces same result)
+- Concurrency safety (thread/process safe, no race conditions)
+- Injectability (external dependencies injected via interfaces, not hardcoded)
+- Graceful shutdown (in-flight work can complete safely or roll back)
+
+Keep only constraints relevant to this task; remove inapplicable ones.
+
+### Design Pitfalls
+What are the common design pitfalls for this type of system? List 2-3 most likely traps.
+(e.g., synchronous delivery blocking the publish path, hardcoded time.sleep making tests brittle, no idempotency lock causing duplicate delivery)
+
 ## Analysis
-(Technical analysis of the requirement — what problem is being solved, why it matters)
+(Technical analysis of the requirement — what problem is being solved, why it matters. Reference the Design Thinking conclusions above.)
 
 ## Approach
-(Implementation approach, key decisions, alternatives considered and why rejected)
+(Implementation approach, key decisions, alternatives considered and why rejected. Explain how the architectural constraints above are satisfied.)
 
 ## Impact
 (Files affected, blast radius, dependencies)
@@ -77,6 +99,14 @@ not become parallel gate sources.
 
 # Contract
 
+## Design Principles
+(Distill 3-5 concrete design principles from System Design Thinking. The Builder must follow these.
+Each principle must be verifiable — confirmable through code review or tests.)
+
+- [ ] DP1: (e.g., sleep/time functions injected via parameter, no direct time.sleep calls)
+- [ ] DP2: (e.g., each delivery uses delivery_id as idempotency lock, duplicate requests return immediately)
+- ...
+
 ## Deliverables
 - [ ] Deliverable 1: description + acceptance criteria
 - [ ] Deliverable 2: description + acceptance criteria
@@ -85,6 +115,7 @@ not become parallel gate sources.
 ## Acceptance Criteria
 - All tests pass
 - No regressions introduced
+- All Design Principles satisfied in implementation
 - (specific criteria from the requirement)
 
 ## Out of Scope

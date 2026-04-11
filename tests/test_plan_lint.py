@@ -41,6 +41,51 @@ Risk list.
 - Nothing extra
 """
 
+VALID_PLAN_WITH_DESIGN_PRINCIPLES = """\
+# Spec
+
+## System Design Thinking
+
+### Core Challenges
+Async reliability.
+
+### Architectural Constraints
+- Testability
+
+### Design Pitfalls
+- Hardcoded sleep
+
+## Analysis
+Technical analysis here.
+
+## Approach
+Implementation approach here.
+
+## Impact
+Impact description.
+
+## Risks
+Risk list.
+
+---
+
+# Contract
+
+## Design Principles
+- [ ] DP1: Injectable sleep
+- [ ] DP2: Idempotency lock
+
+## Deliverables
+- [ ] **D1: First deliverable**
+  - AC: something
+
+## Acceptance Criteria
+- All tests pass
+
+## Out of Scope
+- Nothing extra
+"""
+
 MINIMAL_PLAN = "# Just some text"
 
 
@@ -105,6 +150,40 @@ class TestLintPlan:
         result = lint_plan(p)
         assert result.estimated_files == 40
 
+    def test_valid_plan_warns_no_design_principles(self, tmp_path):
+        p = tmp_path / "plan.md"
+        p.write_text(VALID_PLAN)
+        result = lint_plan(p)
+        assert result.valid is True
+        assert result.has_design_principles is False
+        assert any(w.code == "NO_DESIGN_PRINCIPLES" for w in result.warnings)
+
+    def test_plan_with_design_principles_no_warning(self, tmp_path):
+        p = tmp_path / "plan.md"
+        p.write_text(VALID_PLAN_WITH_DESIGN_PRINCIPLES)
+        result = lint_plan(p)
+        assert result.valid is True
+        assert result.has_design_principles is True
+        assert not any(w.code == "NO_DESIGN_PRINCIPLES" for w in result.warnings)
+
+    def test_design_principles_in_to_dict(self, tmp_path):
+        p = tmp_path / "plan.md"
+        p.write_text(VALID_PLAN_WITH_DESIGN_PRINCIPLES)
+        result = lint_plan(p)
+        d = result.to_dict()
+        assert d["has_design_principles"] is True
+        assert "warnings" not in d or not any(
+            w["code"] == "NO_DESIGN_PRINCIPLES" for w in d.get("warnings", [])
+        )
+
+    def test_warnings_in_to_dict(self, tmp_path):
+        p = tmp_path / "plan.md"
+        p.write_text(VALID_PLAN)
+        result = lint_plan(p)
+        d = result.to_dict()
+        assert "warnings" in d
+        assert any(w["code"] == "NO_DESIGN_PRINCIPLES" for w in d["warnings"])
+
 
 class TestPlanLintCLI:
     """CLI-layer tests for plan-lint command."""
@@ -156,8 +235,8 @@ class TestPlanLintCLI:
         )
         result = runner.invoke(app, ["plan-lint", "--task", "task-001", "--json"])
         data = json.loads(result.stdout)
-        expected_keys = {
+        required_keys = {
             "valid", "errors", "has_spec", "has_contract",
-            "deliverable_count", "estimated_files", "plan_mode",
+            "has_design_principles", "deliverable_count", "estimated_files", "plan_mode",
         }
-        assert set(data.keys()) == expected_keys
+        assert required_keys.issubset(set(data.keys()))

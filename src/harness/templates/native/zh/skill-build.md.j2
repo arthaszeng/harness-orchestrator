@@ -79,6 +79,18 @@ echo '{"task_id":"task-NNN","current_phase":"build","current_step":"2/7","curren
 
 ---
 
+## 步骤 2.5：对照设计原则
+
+如果 `plan.md` 包含 `## Design Principles` section，在写代码之前逐条审视：
+
+1. 读取所有 DP（Design Principle）条目
+2. 对每条原则，确认你即将编写的实现方案能满足它
+3. 如果某条原则与你的实现思路冲突，记录在构建日志中并按原则调整
+
+这一步不需要额外工具调用 — 只需要在开始实现前花 10 秒思考。
+
+---
+
 ## 步骤 3：实现
 
 对合约中的每个交付物：
