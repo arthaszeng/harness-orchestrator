@@ -83,7 +83,7 @@ class TestBarrierCLIUnknownTask:
         ])
         assert result.exit_code == 1
         import json
-        err_data = json.loads(result.stderr or result.output)
+        err_data = json.loads(result.output)
         assert "error" in err_data
 
     def test_check_unknown_task(self, tmp_path, monkeypatch):
@@ -96,5 +96,5 @@ class TestBarrierCLIUnknownTask:
         ])
         assert result.exit_code == 1
         import json
-        err_data = json.loads(result.stderr or result.output)
+        err_data = json.loads(result.output)
         assert "error" in err_data
