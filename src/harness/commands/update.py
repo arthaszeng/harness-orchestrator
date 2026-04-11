@@ -139,6 +139,61 @@ def _pip_upgrade(target_version: str | None = None) -> bool:
     return True
 
 
+def _check_other_python_envs(current_version: str) -> list[tuple[str, str]]:
+    """Detect other pyenv Python versions with outdated harness-flow installs.
+
+    Returns list of (python_version, harness_version) tuples for mismatched envs.
+    """
+    mismatched: list[tuple[str, str]] = []
+    pyenv_root_raw = subprocess.run(
+        ["pyenv", "root"], capture_output=True, text=True, timeout=5,
+    ).stdout.strip() if _has_pyenv() else ""
+    if not pyenv_root_raw:
+        return mismatched
+
+    pyenv_root = Path(pyenv_root_raw)
+    versions_dir = pyenv_root / "versions"
+    if not versions_dir.is_dir():
+        return mismatched
+
+    current_prefix = Path(sys.prefix).resolve()
+
+    for ver_dir in sorted(versions_dir.iterdir()):
+        if not ver_dir.is_dir():
+            continue
+        python_bin = ver_dir / "bin" / "python"
+        if not python_bin.exists():
+            continue
+        if ver_dir.resolve() == current_prefix or str(current_prefix).startswith(str(ver_dir.resolve())):
+            continue
+        try:
+            result = subprocess.run(
+                [
+                    str(python_bin), "-c",
+                    "from importlib.metadata import version; print(version('harness-flow'))",
+                ],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                installed = result.stdout.strip()
+                if installed and installed != current_version:
+                    mismatched.append((ver_dir.name, installed))
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+
+    return mismatched
+
+
+def _has_pyenv() -> bool:
+    try:
+        result = subprocess.run(
+            ["pyenv", "--version"], capture_output=True, text=True, timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _migrate_config(project_root: Path) -> int:
     """Check .harness-flow/config.toml for missing/deprecated keys. Returns count of warnings."""
     config_path = project_root / ".harness-flow" / "config.toml"
@@ -268,10 +323,23 @@ def run_update(*, check: bool = False, force: bool = False, target_version: str 
     console.print(f"  [cyber.magenta]▸[/] {t('update.migrate_title')}")
     warning_count = _migrate_config(project_root)
 
+    # Step 4: Check other Python environments for stale harness-flow
+    effective_version = _installed_distribution_version() or __version__
+    mismatched = _check_other_python_envs(effective_version)
+    if mismatched:
+        console.print()
+        console.print("  [cyber.warn]![/] Other Python environments have outdated harness-flow:")
+        for py_ver, hf_ver in mismatched:
+            console.print(
+                f"    [cyber.dim]Python {py_ver}[/] → harness-flow [cyber.warn]{hf_ver}[/]"
+                f"  [cyber.dim](run: pyenv shell {py_ver} && pip install harness-flow=={effective_version})[/]"
+            )
+
     console.print()
     status = "[cyber.green]✓[/] clean" if warning_count == 0 else f"[cyber.warn]{warning_count}[/] warning(s)"
+    env_status = f" · [cyber.warn]{len(mismatched)} stale env(s)[/]" if mismatched else ""
     console.print(Panel(
-        f"  Status: {status}",
+        f"  Status: {status}{env_status}",
         title="[cyber.header]UPDATE COMPLETE[/]",
         border_style="cyber.border",
         padding=(0, 1),
