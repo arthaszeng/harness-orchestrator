@@ -179,10 +179,18 @@ def generate_calibration_report(outcomes: list[ReviewOutcome]) -> CalibrationRep
 
 
 def _compute_prediction_accuracy(paired: list[ReviewOutcome]) -> float | None:
-    """Fraction of tasks where verdict=PASS aligned with ci_passed=True.
+    """Fraction of tasks where verdict aligned with actual outcome.
+
+    Outcome is considered **negative** when ``ci_passed`` is ``False``
+    *or* ``has_revert`` is ``True`` (even if CI passed — a revert means
+    the review prediction was wrong).
 
     Samples with empty verdict are excluded — they represent incomplete
     predictions that would skew the accuracy calculation.
+
+    Note: ``_compute_point_biserial`` intentionally uses only ``ci_passed``
+    for group assignment, so accuracy and correlation have different
+    "outcome" semantics.
     """
     with_verdict = [o for o in paired if o.prediction.verdict.strip()]
     if not with_verdict:
@@ -190,7 +198,7 @@ def _compute_prediction_accuracy(paired: list[ReviewOutcome]) -> float | None:
     correct = 0
     for o in with_verdict:
         verdict_positive = o.prediction.verdict.upper() == "PASS"
-        outcome_positive = o.outcome.ci_passed is True
+        outcome_positive = o.outcome.ci_passed is True and o.outcome.has_revert is not True
         if verdict_positive == outcome_positive:
             correct += 1
     return correct / len(with_verdict)
