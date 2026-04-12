@@ -243,14 +243,24 @@ def run_search_failures(
     *,
     query: str = "",
     category: str = "",
+    phase: str = "",
     limit: int = 20,
+    as_json: bool = False,
 ) -> None:
     """Search failure patterns across all task directories."""
     from harness.core.failure_patterns import search_failure_patterns
 
     ui = get_ui()
     agents_dir = Path.cwd() / ".harness-flow"
-    results = search_failure_patterns(agents_dir, query=query, category=category, limit=limit)
+    results = search_failure_patterns(
+        agents_dir, query=query, category=category, phase=phase, limit=limit,
+    )
+
+    if as_json:
+        import json
+
+        typer.echo(json.dumps([r.model_dump() for r in results], indent=2, default=str))
+        return
 
     if not results:
         ui.info("No matching failure patterns found.")

@@ -509,22 +509,30 @@ def save_failure(
 def search_failures(
     query: str = typer.Option(
         "", "--query", "-q",
-        help="Search query (normalized substring match against signatures)",
+        help="Search query (normalized substring match against full text)",
     ),
     category: str = typer.Option(
         "", "--category", "-c",
         help="Filter by category (case-insensitive exact match)",
+    ),
+    phase: str = typer.Option(
+        "", "--phase", "-p",
+        help="Filter by phase (case-insensitive exact match)",
     ),
     limit: int = typer.Option(
         20, "--limit", "-n",
         help="Maximum number of results (min 1)",
         min=1,
     ),
+    as_json: bool = typer.Option(
+        False, "--json",
+        help="Print machine-readable JSON array",
+    ),
 ) -> None:
     """Search failure patterns across all tasks."""
     from harness.commands.artifact import run_search_failures
 
-    run_search_failures(query=query, category=category, limit=limit)
+    run_search_failures(query=query, category=category, phase=phase, limit=limit, as_json=as_json)
 
 
 @app.command(name="pr-status")

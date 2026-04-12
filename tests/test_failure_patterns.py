@@ -9,6 +9,8 @@ from harness.core.failure_patterns import (
     FAILURE_PATTERNS_FILENAME,
     FailurePattern,
     FailurePatternLoadResult,
+    _build_search_text,
+    aggregate_failure_patterns,
     load_failure_patterns,
     save_failure_pattern,
     search_failure_patterns,
@@ -280,7 +282,7 @@ class TestSearchFailurePatterns:
         assert results == []
 
     def test_search_includes_project_level(self, tmp_path: Path):
-        """Project-level failure-patterns.jsonl is searched before task dirs."""
+        """Project-level failure-patterns.jsonl is included in results."""
         agents_dir = tmp_path / ".harness-flow"
         (agents_dir / "tasks" / "task-001").mkdir(parents=True)
 
@@ -289,8 +291,9 @@ class TestSearchFailurePatterns:
 
         results = search_failure_patterns(agents_dir)
         assert len(results) == 2
-        assert results[0].task_id == "seed"
-        assert results[1].task_id == "task-001"
+        task_ids = {r.task_id for r in results}
+        assert "seed" in task_ids
+        assert "task-001" in task_ids
 
     def test_search_project_level_with_query(self, tmp_path: Path):
         agents_dir = tmp_path / ".harness-flow"
@@ -303,7 +306,7 @@ class TestSearchFailurePatterns:
         assert len(results) == 1
         assert "injectable sleep" in results[0].summary
 
-    def test_search_project_level_respects_limit(self, tmp_path: Path):
+    def test_search_respects_limit_after_sort(self, tmp_path: Path):
         agents_dir = tmp_path / ".harness-flow"
         (agents_dir / "tasks" / "task-001").mkdir(parents=True)
 
@@ -313,7 +316,129 @@ class TestSearchFailurePatterns:
 
         results = search_failure_patterns(agents_dir, limit=2)
         assert len(results) == 2
-        assert all(r.task_id == "seed" for r in results)
+
+    def test_search_full_text_matches_root_cause(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", summary="test failed", root_cause="missing mock for time.sleep")
+
+        results = search_failure_patterns(agents_dir, query="time.sleep")
+        assert len(results) == 1
+        assert results[0].root_cause == "missing mock for time.sleep"
+
+    def test_search_full_text_matches_fix_applied(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", summary="timeout error", fix_applied="wrap sleep in injectable param")
+
+        results = search_failure_patterns(agents_dir, query="injectable param")
+        assert len(results) == 1
+
+    def test_search_full_text_matches_error_output(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", summary="CI broke", error_output="ModuleNotFoundError: redis")
+
+        results = search_failure_patterns(agents_dir, query="redis")
+        assert len(results) == 1
+
+    def test_search_phase_filter(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", phase="build", summary="build fail")
+        _save(t1, task_id="task-001", phase="eval", summary="eval fail")
+
+        results = search_failure_patterns(agents_dir, phase="build")
+        assert len(results) == 1
+        assert results[0].phase == "build"
+
+    def test_search_phase_case_insensitive(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", phase="Build", summary="fail")
+
+        results = search_failure_patterns(agents_dir, phase="build")
+        assert len(results) == 1
+
+    def test_search_sorted_by_recurrence_then_recency(self, tmp_path: Path):
+        agents_dir = _make_agents_dir(tmp_path, ["task-001"])
+        t1 = agents_dir / "tasks" / "task-001"
+        _save(t1, task_id="task-001", summary="low recurrence", recurrence_count=1)
+        _save(t1, task_id="task-001", summary="high recurrence", recurrence_count=5)
+        _save(t1, task_id="task-001", summary="medium recurrence", recurrence_count=3)
+
+        results = search_failure_patterns(agents_dir)
+        assert results[0].summary == "high recurrence"
+        assert results[1].summary == "medium recurrence"
+        assert results[2].summary == "low recurrence"
+
+
+# ---------------------------------------------------------------------------
+# D6: aggregate
+# ---------------------------------------------------------------------------
+
+
+class TestAggregateFailurePatterns:
+    def test_aggregate_basic(self):
+        p1 = FailurePattern(
+            id="fp-1", task_id="task-001", phase="build", category="test-failure",
+            signature="SIG A", summary="error A v1", recurrence_count=2,
+            first_seen="2026-01-01", last_seen="2026-01-01",
+        )
+        p2 = FailurePattern(
+            id="fp-2", task_id="task-002", phase="build", category="ci-failure",
+            signature="SIG A", summary="error A v2", recurrence_count=3,
+            first_seen="2026-01-02", last_seen="2026-01-02",
+        )
+        p3 = FailurePattern(
+            id="fp-3", task_id="task-001", phase="eval", category="test-failure",
+            signature="SIG B", summary="error B", recurrence_count=1,
+            first_seen="2026-01-01", last_seen="2026-01-01",
+        )
+        result = aggregate_failure_patterns([p1, p2, p3])
+        assert len(result) == 2
+        assert result[0].signature == "SIG A"
+        assert result[0].total_recurrence == 5
+        assert set(result[0].categories) == {"test-failure", "ci-failure"}
+        assert set(result[0].tasks) == {"task-001", "task-002"}
+        assert result[0].latest_summary == "error A v2"
+        assert result[1].signature == "SIG B"
+        assert result[1].total_recurrence == 1
+
+    def test_aggregate_empty(self):
+        assert aggregate_failure_patterns([]) == []
+
+    def test_aggregate_single_pattern(self):
+        p = FailurePattern(
+            id="fp-1", task_id="task-001", phase="build", category="test-failure",
+            signature="SIG", summary="err", recurrence_count=1,
+            first_seen="2026-01-01", last_seen="2026-01-01",
+        )
+        result = aggregate_failure_patterns([p])
+        assert len(result) == 1
+        assert result[0].total_recurrence == 1
+        assert result[0].tasks == ["task-001"]
+
+
+# ---------------------------------------------------------------------------
+# D7: _build_search_text
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSearchText:
+    def test_includes_all_fields(self):
+        p = FailurePattern(
+            id="fp-1", task_id="t", phase="build", category="test-failure",
+            signature="SIG", summary="summary text",
+            root_cause="root cause detail", fix_applied="fix detail",
+            error_output="error output detail",
+            recurrence_count=1, first_seen="", last_seen="",
+        )
+        text = _build_search_text(p)
+        assert "SUMMARY TEXT" in text
+        assert "ROOT CAUSE DETAIL" in text
+        assert "FIX DETAIL" in text
+        assert "ERROR OUTPUT DETAIL" in text
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +542,60 @@ class TestCLI:
         result = runner.invoke(app, ["search-failures"])
         assert result.exit_code == 0, result.output
         assert "no matching" in result.output.lower()
+
+    def test_search_failures_cli_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        import json as json_mod
+
+        from typer.testing import CliRunner
+
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        _save(task_dir, task_id="task-001", summary="json test error")
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".harness-flow" / "config.toml").write_text(
+            '[project]\nname = "test"\n[ci]\ncommand = ""\n'
+            '[models]\ndefault = ""\n[workflow]\n[native]\n'
+            '[integrations.memverse]\nenabled = false\n',
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["search-failures", "--json"])
+        assert result.exit_code == 0, result.output
+        parsed = json_mod.loads(result.output)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+        assert parsed[0]["summary"] == "json test error"
+        assert "memverse_sync" not in parsed[0]
+
+    def test_search_failures_cli_phase(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        from typer.testing import CliRunner
+
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        _save(task_dir, task_id="task-001", phase="build", summary="build err")
+        _save(task_dir, task_id="task-001", phase="eval", summary="eval err")
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".harness-flow" / "config.toml").write_text(
+            '[project]\nname = "test"\n[ci]\ncommand = ""\n'
+            '[models]\ndefault = ""\n[workflow]\n[native]\n'
+            '[integrations.memverse]\nenabled = false\n',
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["search-failures", "--phase", "build"])
+        assert result.exit_code == 0, result.output
+        assert "build err" in result.output
+        assert "eval err" not in result.output
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ agent (which has an authenticated MCP session) executes the actual
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -237,22 +238,41 @@ def load_failure_patterns(task_dir: Path) -> FailurePatternLoadResult:
     return FailurePatternLoadResult(path=str(path), items=items, errors=errors)
 
 
+def _build_search_text(pattern: FailurePattern) -> str:
+    """Build a normalized search text from all relevant fields of *pattern*.
+
+    Used by both :func:`search_failure_patterns` and
+    :func:`aggregate_failure_patterns` to match queries against the full
+    content of a failure pattern (not just the signature).
+    """
+    parts = [
+        pattern.summary,
+        pattern.root_cause,
+        pattern.fix_applied,
+        pattern.error_output,
+    ]
+    return normalize_finding_signature(" ".join(parts))
+
+
 def search_failure_patterns(
     agents_dir: Path,
     *,
     query: str = "",
     category: str = "",
+    phase: str = "",
     limit: int = 20,
 ) -> list[FailurePattern]:
     """Search failure patterns across project-level, task, and archive directories.
 
-    Search order: project-level ``failure-patterns.jsonl`` (in *agents_dir*)
-    first, then per-task directories, then archive directories.
+    Collects **all** matching patterns, sorts by ``recurrence_count`` (desc)
+    then ``last_seen`` (desc), and truncates to *limit*.
 
     Matching rules:
-    - ``query``: normalized substring containment against the pattern signature
+    - ``query``: normalized substring against full search text
+      (summary + root_cause + fix_applied + error_output)
     - ``category``: case-insensitive exact match
-    - Empty query + empty category returns all patterns (up to *limit*)
+    - ``phase``: case-insensitive exact match
+    - Empty filters return all patterns
     """
     if limit < 1:
         limit = 1
@@ -260,27 +280,68 @@ def search_failure_patterns(
 
     normalized_query = normalize_finding_signature(query) if query else ""
     category_lower = category.lower().strip() if category else ""
+    phase_lower = phase.lower().strip() if phase else ""
 
-    results: list[FailurePattern] = []
+    candidates: list[FailurePattern] = []
 
-    def _collect(source_dir: Path) -> bool:
-        """Load patterns from *source_dir* and append matches.  Return True when limit reached."""
+    def _collect(source_dir: Path) -> None:
         result = load_failure_patterns(source_dir)
         for item in result.items:
-            if normalized_query and normalized_query not in item.signature:
+            if normalized_query and normalized_query not in _build_search_text(item):
                 continue
             if category_lower and item.category.lower().strip() != category_lower:
                 continue
-            results.append(item)
-            if len(results) >= limit:
-                return True
-        return False
+            if phase_lower and item.phase.lower().strip() != phase_lower:
+                continue
+            candidates.append(item)
 
-    if _collect(agents_dir):
-        return results
-
+    _collect(agents_dir)
     for task_dir in iter_task_dirs(agents_dir) + iter_archive_dirs(agents_dir):
-        if _collect(task_dir):
-            return results
+        _collect(task_dir)
 
-    return results
+    candidates.sort(key=lambda p: (p.recurrence_count, p.last_seen), reverse=True)
+    return candidates[:limit]
+
+
+@dataclass
+class AggregatedPattern:
+    """A failure pattern aggregated by signature across tasks."""
+
+    signature: str
+    total_recurrence: int
+    categories: list[str]
+    tasks: list[str]
+    latest_summary: str
+    latest_fix: str
+
+
+def aggregate_failure_patterns(
+    patterns: list[FailurePattern],
+) -> list[AggregatedPattern]:
+    """Aggregate failure patterns by signature, summing recurrence counts.
+
+    Returns results sorted by ``total_recurrence`` descending.
+    """
+    groups: dict[str, AggregatedPattern] = {}
+    for p in patterns:
+        key = p.signature
+        if key not in groups:
+            groups[key] = AggregatedPattern(
+                signature=key,
+                total_recurrence=0,
+                categories=[],
+                tasks=[],
+                latest_summary=p.summary,
+                latest_fix=p.fix_applied,
+            )
+        agg = groups[key]
+        agg.total_recurrence += p.recurrence_count
+        if p.category not in agg.categories:
+            agg.categories.append(p.category)
+        if p.task_id not in agg.tasks:
+            agg.tasks.append(p.task_id)
+        agg.latest_summary = p.summary
+        agg.latest_fix = p.fix_applied
+
+    result = sorted(groups.values(), key=lambda a: a.total_recurrence, reverse=True)
+    return result
