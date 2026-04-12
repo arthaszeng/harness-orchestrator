@@ -1,0 +1,67 @@
+# Plan Preflight — Detailed Protocol
+
+This is the reference protocol for workspace preflight. The main skill template
+calls `harness git-preflight --json` for the happy path; read this only when
+the CLI is unavailable or returns non-actionable output.
+
+## 0. Worktree Bootstrap
+
+If `.harness-flow` does **not** exist, you may be in a linked worktree:
+
+```bash
+harness worktree-setup
+```
+
+Manual fallback:
+```bash
+MAIN=$(git rev-parse --git-common-dir | xargs dirname)
+ln -sfn "$MAIN/.harness-flow" .harness-flow
+mkdir -p .cursor/skills
+ln -sfn "$MAIN/.cursor/skills/harness" .cursor/skills/harness
+ln -sfn "$MAIN/.cursor/agents" .cursor/agents
+ln -sfn "$MAIN/.cursor/rules" .cursor/rules
+```
+
+## 1. Clean Check
+
+```bash
+git status --porcelain
+```
+
+Non-empty → ABORT. Guide user: `git stash -u`, `git commit`, or `git checkout -- .`
+
+## 2. Branch Check
+
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+```
+
+- Starts with `{{ branch_prefix }}/` → get `branch_task_key` from preflight JSON.
+  - **Same task**: align with trunk (`git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}`), skip steps 3–4.
+  - **Different task**: ABORT — guide user to switch branches.
+  - **Empty key**: treat as same task (resume).
+- `HEAD` (detached): ABORT.
+- Otherwise: continue to step 3.
+
+## 3. Trunk Alignment
+
+```bash
+git checkout {{ trunk_branch }}
+git pull origin {{ trunk_branch }}
+```
+
+Failure → ABORT with error output.
+
+## 4. Create Feature Branch
+
+```bash
+harness task next-id --json
+git checkout -b {{ branch_prefix }}/task-NNN-<short-desc>
+```
+
+Fallback for task number:
+```bash
+mkdir -p .harness-flow/tasks
+ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
+```
+Increment max by 1, zero-pad to 3 digits. Start at 001 if none exist.

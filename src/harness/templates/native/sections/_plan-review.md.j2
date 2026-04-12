@@ -1,127 +1,55 @@
 ## Plan Review — Adaptive Dispatch (FAST/LITE/FULL)
 
-### Escalation-Based Review Intensity
-
-After writing `plan.md`, compute the plan escalation score:
+After writing `plan.md`, compute escalation:
 
 ```bash
 harness escalation-score compute --phase plan --deliverables N --estimated-files N [--security] [--schema] [--api] [--review-score X] --json
 ```
 
-**Score >= {{ gate_full_review_min }} → FULL REVIEW**: 5 roles as below.
-**Score {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE REVIEW**: Architect + Engineer only (2 roles).
-**Score < {{ gate_summary_confirm_min }} → FAST PASS**: Skip multi-role review. Save a fast-pass eval:
+**Score >= {{ gate_full_review_min }} → FULL**: all 5 roles, strict synthesis. **Score {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE**: all 5 roles, lenient synthesis (accept WARN as advisory). **Score < {{ gate_summary_confirm_min }} → FAST**: skip review, save fast-pass eval:
 ```bash
 harness save-eval --kind plan --task task-NNN --verdict PASS --score {{ pass_threshold }} --body "Plan auto-approved (FAST, escalation score N)"
 ```
 
-### Dispatch (FULL mode)
+### Dispatch (FULL/LITE)
 
-Launch **all 5 reviewers in parallel** via the Task tool, each with `mode: plan-review`.
-Send a SINGLE message containing all 5 Task tool calls.
+Launch **all 5 reviewers in parallel** via Task tool. Both FULL and LITE dispatch all 5 — subagents run in parallel so reducing roles saves no time but loses coverage. LITE differs only in synthesis strictness.
 
-For **LITE mode**, dispatch only Architect (#1) and Engineer (#3) from the table below:
-
-| # | Subagent | Recommended model | Required context | Optional context |
-|---|----------|------------------|-----------------|-----------------|
-| 1 | `harness-architect` | {% if role_models_architect %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, architecture docs (`ARCHITECTURE.md`/ADR) | source dir overview |
-| 2 | `harness-product-owner` | {% if role_models_product_owner %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, `.harness-flow/vision.md` | roadmap/backlog summary |
-| 3 | `harness-engineer` | {% if role_models_engineer %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, source directory structure overview | — |
-| 4 | `harness-qa` | {% if role_models_qa %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, test directory listing, `ci_command: {{ ci_command }}` | — |
-| 5 | `harness-project-manager` | {% if role_models_project_manager %}do not specify (inherit parent model){% else %}`model: "fast"`{% endif %} | plan, deliverable count, file impact count | roadmap/backlog/stop-rule summary |
-
-**Model control**: The Task tool `model` parameter only accepts `"fast"` or omission (inherit
-parent model). When `[native.role_models]` is configured for a role, the generated agent
-definition includes a `model:` field as an additional IDE-level signal; in this case, omit
-the Task `model` parameter to let the agent definition take effect. When unconfigured,
-pass `model: "fast"` for cost-efficient dispatch.
-
-**Context minimization**: When building each subagent's Task prompt, **include only the
-"When reviewing plans (mode: plan-review)" paragraph** from the agent template as role instructions.
-Do NOT embed "When reviewing code" paragraphs — those are for code-eval mode only.
+| # | Subagent | Model | Required context |
+|---|----------|-------|-----------------|
+| 1 | `harness-architect` | {% if role_models_architect %}inherit{% else %}`"fast"`{% endif %} | plan, architecture docs |
+| 2 | `harness-product-owner` | {% if role_models_product_owner %}inherit{% else %}`"fast"`{% endif %} | plan, vision.md |
+| 3 | `harness-engineer` | {% if role_models_engineer %}inherit{% else %}`"fast"`{% endif %} | plan, source dir structure |
+| 4 | `harness-qa` | {% if role_models_qa %}inherit{% else %}`"fast"`{% endif %} | plan, test dirs, `ci_command: {{ ci_command }}` |
+| 5 | `harness-project-manager` | {% if role_models_project_manager %}inherit{% else %}`"fast"`{% endif %} | plan, deliverable/file counts |
 
 Each prompt must include:
 - `response_language: {{ artifact_lang }}`
 {% if memverse_enabled == "true" %}
 - `memverse_domain: {{ memverse_domain }}`
 {% endif %}
-- The "Required context" listed above for that role
+- Required context per role (see table)
 - When the workflow includes long-horizon direction governance:
-  - give PO `roadmap_backlog_path` or an equivalent summary
-  - give PM `roadmap_backlog_path`, `stop_conditions`, or an equivalent summary
-  - if that context does not exist, keep the shared section's default single-round
-    semantics and do NOT force loop assumptions
+  - give PO `roadmap_backlog_path` or equivalent summary
+  - give PM `roadmap_backlog_path`, `stop_conditions` or equivalent
+  - if that context does not exist, keep single-round semantics and do NOT force loop assumptions
 
-**Task prompt composition (protocol vs facts)**
+**Task prompt composition (protocol vs facts)**: Subagent behavior MUST come only from the agent template "plan-review" section. Attach only what the table allows. Do not broadcast the same long document to all five Tasks.
 
-- **Fixed protocol:** Subagent behavior MUST come **only** from the agent template section **"When reviewing plans (mode: plan-review)"** (or non-English equivalent). Do not paraphrase or rewrite role duties inside the Task body.
-- **Facts for this run:** Attach only what the table allows for that role — path pointers, short listings, `ci_command`, bounded excerpts. Prefer file paths over pasting entire documents when the role only needs to locate them.
-- **Forbidden (broadcasting):** Do not attach the **same** optional long-form bundle (e.g. full roadmap, full architecture appendix) to **all five** Task prompts. If only PO/PM need roadmap/stop-rule context, omit it for Architect/Engineer/QA unless the table says otherwise.
-- **Forbidden (wrong artifact):** Do not include **full git diff** or unrelated code dumps in plan-review Tasks — this mode is plan-only.
+### Synthesis (inline summary — full protocol in reference file)
 
-**Degradation ladder** (if Task tool calls fail):
-- **5/5 respond:** Full synthesis as described below
-- **3-4/5 respond:** Proceed with available reviews, note missing perspectives
-- **1-2/5 respond:** Log warning, fall through to single-agent review
-- **0/5 respond:** Fall back to single generalPurpose subagent review
-
-### Synthesis
-
-After all responses arrive:
-
-1. **Normalize and cluster findings** — Normalize wording (strip boilerplate); group items that share the **same root cause** into one cluster; record which roles contributed to each cluster (feeds `[HIGH CONFIDENCE]` without double-counting).
-2. **Merge findings** — Build one unified list from clusters (one canonical entry per cluster, preserve role lineage / tags).
-3. **Filter out-of-scope findings** using the role→responsibility map:
-   | Role | Owns | Must NOT report |
-   |------|------|----------------|
-   | Architect | Design, modules, deps, security design | Code quality, tests, delivery, user value |
-   | Product Owner | User value, requirements, AC, UX edge cases | Code quality, architecture, tests, delivery |
-   | Engineer | Code quality, DRY, patterns, performance, errors | Architecture decisions, user value, delivery, test strategy |
-   | QA | Tests, coverage, CI, regression, boundaries | Code quality, architecture, user value, delivery |
-   | Project Manager | Scope, delivery, decomposition, commit structure | Code quality, architecture, tests, user value |
-
-   For each finding, check if the reporting role owns that category:
-   - **In-scope**: keep as-is
-   - **Out-of-scope + CRITICAL**: re-tag as `[CROSS-ROLE]` and keep
-   - **Out-of-scope + WARN/INFO**: mark `[OUT-OF-SCOPE]` and exclude from scoring
-4. **Cross-validate:** If 2+ roles flag the same issue (or the same cluster) → mark `[HIGH CONFIDENCE]`
-5. **Direction/governance synthesis:** Keep role-specific recommendations separate:
-   - Product Owner → `Value recommendation`
-   - Project Manager → `Delivery recommendation`
-   - Do NOT collapse them into one generic direction field
-6. **Resolve conflicts:** If roles contradict each other, present both perspectives
-   and mark as `[TASTE DECISION]` for the review gate
-7. **Compute aggregate score using CLI:**
-   ```bash
-   echo '{"roles": [{"role": "architect", "score": N, "findings": [...]}, ...]}' | harness review-score compute --kind plan --json
-   ```
-   The CLI returns `{dimensions, aggregate, calibrated, verdict, has_critical}`.
-   Use the CLI verdict directly — it applies calibration and threshold checks.
+1. **Normalize and cluster findings** by root cause; record contributing roles.
+2. **Merge** — one canonical entry per cluster, preserve role tags.
+3. **Filter out-of-scope findings**: each role has a responsibility boundary. In-scope: keep. Out-of-scope + CRITICAL: re-tag `[CROSS-ROLE]`. Out-of-scope + WARN/INFO: mark `[OUT-OF-SCOPE]`, exclude from scoring. Roles Must NOT report outside their domain.
+4. **Cross-validate**: 2+ roles on same issue → `[HIGH CONFIDENCE]`.
+5. **Direction synthesis**: PO → `Value recommendation`, PM → `Delivery recommendation`. Do NOT collapse them into one generic direction field.
+6. **Conflicts**: present both, mark `[TASTE DECISION]`.
+7. **Compute aggregate review score**: `echo '...' | harness review-score compute --kind plan --json`. Use CLI verdict — it applies calibration. Report Aggregate score.
 
 ### Re-Plan Loop (max 2 iterations)
 
-If verdict is `PLAN_NEEDS_REVISION`:
+If verdict is `PLAN_NEEDS_REVISION`: fix CRITICAL+WARN, re-dispatch, convergence guard after 2 rounds.
 
-1. Fix all CRITICAL and WARN findings in the plan file
-2. Re-dispatch the full multi-role review (same parallel pattern)
-3. If same issues recur (convergence guard) → accept and note as `## Unresolved Concerns`
-4. After 2 iterations → proceed to review gate with current state
+**MUST read** `.cursor/skills/harness/harness-plan/plan-review-protocol.md` for full synthesis rules, degradation ladder, and re-plan loop protocol.
 
-Persist the final synthesis as `## Plan Review Summary` in the plan file.
-
-**Save the plan evaluation using the CLI** (mandatory for round audit trail):
-
-```bash
-harness save-eval --kind plan --task task-NNN --verdict PASS --score 8.5 --body "$(cat <<'PLAN_EVAL_EOF'
-# Plan Evaluation — Round N
-
-## Findings
-[merged plan-review findings]
-
-## Verdict: PASS | ITERATE
-PLAN_EVAL_EOF
-)"
-```
-
-This creates `plan-eval-rN.md` with auto-incremented round number shared with
-code-eval artifacts.
+Save eval: `harness save-eval --kind plan --task task-NNN --verdict PASS --score X --body "..."` (creates `plan-eval-rN.md`).

@@ -41,11 +41,9 @@ harness barrier register --task TASK_ID --id scope-drift --phase ship
 记录：`SHIP_GATE: FULL (score N) — 派遣完整多角色评审`
 
 **评分 {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE（轻量评审）**
-仅派遣 **2 个角色审查者**：**Engineer** 和 **QA**。
-这两个角色是代码质量和回归安全最直接的守护者。
-本轮跳过 Architect、Product Owner 和 Project Manager。
-使用下方相同的代码评审派遣格式，但仅针对选定的 2 个角色。
-记录：`SHIP_GATE: LITE (score N) — 派遣 Engineer + QA 评审`
+派遣全部 **5 个角色审查者**（与 FULL 相同）。子代理并行运行——减少角色不省时间，只丢质量。
+LITE 与 FULL 的区别仅在合成阶段：WARN 级发现仅作为建议（不阻塞），修复循环上限 1 次。
+记录：`SHIP_GATE: LITE (score N) — 派遣全部 5 角色，宽松合成`
 
 **评分 < {{ gate_summary_confirm_min }} → FAST（快速通过）**
 完全跳过多角色代码评审。CI 测试和 `harness gate`（机器级检查）仍然执行 —
@@ -74,8 +72,8 @@ FAST_EVAL_EOF
 
 ### 与现有步骤的交互
 
-- **FULL**：正常进入代码评审部分（全部 5 个角色）。
-- **LITE**：使用代码评审部分，但仅派遣 Engineer + QA。合成步骤应注明仅派遣了 2 个角色并相应调整预期。
-- **FAST**：完全跳过代码评审部分。直接跳到步骤 3.9（捕获学习成果）或步骤 4（范围漂移检测）。
+- **FULL**：全部 5 角色代码评审，严格合成。
+- **LITE**：同样 5 角色派遣；宽松合成（WARN 作为建议，修复循环上限 1 次）。
+- **FAST**：完全跳过代码评审。直接跳到步骤 3.9 或步骤 4。
 - **`harness gate`（步骤 5.9）** 无论强度级别都无条件运行。
-- **Memverse 学习捕获（步骤 3.9）**：LITE 模式下仅有 Engineer 和 QA 的学习成果可用。FAST 模式下不捕获角色特定的学习成果。
+- **Memverse 学习捕获（步骤 3.9）**：FULL 和 LITE 模式下全部 5 角色贡献学习成果。FAST 模式不捕获。

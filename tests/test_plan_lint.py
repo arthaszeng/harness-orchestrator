@@ -14,46 +14,16 @@ runner = CliRunner()
 VALID_PLAN = """\
 # Spec
 
-## Analysis
-Technical analysis here.
-
-## Approach
-Implementation approach here.
-
-## Impact
-Impact description.
-
-## Risks
-Risk list.
-
----
-
-# Contract
-
-## Deliverables
-- [ ] **D1: First deliverable**
-  - AC: something
-
-## Acceptance Criteria
-- All tests pass
-
-## Out of Scope
-- Nothing extra
-"""
-
-VALID_PLAN_WITH_DESIGN_PRINCIPLES = """\
-# Spec
-
 ## System Design Thinking
 
 ### Core Challenges
-Async reliability.
+Async reliability is the core challenge.
 
 ### Architectural Constraints
-- Testability
+- Testability: injectable time functions
 
 ### Design Pitfalls
-- Hardcoded sleep
+- Hardcoded sleep calls
 
 ## Analysis
 Technical analysis here.
@@ -86,6 +56,36 @@ Risk list.
 - Nothing extra
 """
 
+PLAN_WITHOUT_DESIGN_SECTIONS = """\
+# Spec
+
+## Analysis
+Technical analysis here.
+
+## Approach
+Implementation approach here.
+
+## Impact
+Impact description.
+
+## Risks
+Risk list.
+
+---
+
+# Contract
+
+## Deliverables
+- [ ] **D1: First deliverable**
+  - AC: something
+
+## Acceptance Criteria
+- All tests pass
+
+## Out of Scope
+- Nothing extra
+"""
+
 MINIMAL_PLAN = "# Just some text"
 
 
@@ -97,6 +97,8 @@ class TestLintPlan:
         assert result.valid is True
         assert result.has_spec is True
         assert result.has_contract is True
+        assert result.has_design_thinking is True
+        assert result.has_design_principles is True
         assert result.deliverable_count >= 1
 
     def test_missing_file(self, tmp_path):
@@ -150,39 +152,31 @@ class TestLintPlan:
         result = lint_plan(p)
         assert result.estimated_files == 40
 
-    def test_valid_plan_warns_no_design_principles(self, tmp_path):
+    def test_missing_design_thinking_is_error(self, tmp_path):
         p = tmp_path / "plan.md"
-        p.write_text(VALID_PLAN)
+        p.write_text(PLAN_WITHOUT_DESIGN_SECTIONS)
         result = lint_plan(p)
-        assert result.valid is True
+        assert result.valid is False
+        assert result.has_design_thinking is False
+        assert any(e.code == "NO_DESIGN_THINKING" for e in result.errors)
+
+    def test_missing_design_principles_is_error(self, tmp_path):
+        p = tmp_path / "plan.md"
+        p.write_text(PLAN_WITHOUT_DESIGN_SECTIONS)
+        result = lint_plan(p)
+        assert result.valid is False
         assert result.has_design_principles is False
-        assert any(w.code == "NO_DESIGN_PRINCIPLES" for w in result.warnings)
+        assert any(e.code == "NO_DESIGN_PRINCIPLES" for e in result.errors)
 
-    def test_plan_with_design_principles_no_warning(self, tmp_path):
-        p = tmp_path / "plan.md"
-        p.write_text(VALID_PLAN_WITH_DESIGN_PRINCIPLES)
-        result = lint_plan(p)
-        assert result.valid is True
-        assert result.has_design_principles is True
-        assert not any(w.code == "NO_DESIGN_PRINCIPLES" for w in result.warnings)
-
-    def test_design_principles_in_to_dict(self, tmp_path):
-        p = tmp_path / "plan.md"
-        p.write_text(VALID_PLAN_WITH_DESIGN_PRINCIPLES)
-        result = lint_plan(p)
-        d = result.to_dict()
-        assert d["has_design_principles"] is True
-        assert "warnings" not in d or not any(
-            w["code"] == "NO_DESIGN_PRINCIPLES" for w in d.get("warnings", [])
-        )
-
-    def test_warnings_in_to_dict(self, tmp_path):
+    def test_valid_plan_has_design_sections(self, tmp_path):
         p = tmp_path / "plan.md"
         p.write_text(VALID_PLAN)
         result = lint_plan(p)
         d = result.to_dict()
-        assert "warnings" in d
-        assert any(w["code"] == "NO_DESIGN_PRINCIPLES" for w in d["warnings"])
+        assert d["has_design_thinking"] is True
+        assert d["has_design_principles"] is True
+        assert not any(e["code"] == "NO_DESIGN_THINKING" for e in d["errors"])
+        assert not any(e["code"] == "NO_DESIGN_PRINCIPLES" for e in d["errors"])
 
 
 class TestPlanLintCLI:
@@ -237,6 +231,7 @@ class TestPlanLintCLI:
         data = json.loads(result.stdout)
         required_keys = {
             "valid", "errors", "has_spec", "has_contract",
-            "has_design_principles", "deliverable_count", "estimated_files", "plan_mode",
+            "has_design_thinking", "has_design_principles",
+            "deliverable_count", "estimated_files", "plan_mode",
         }
         assert required_keys.issubset(set(data.keys()))

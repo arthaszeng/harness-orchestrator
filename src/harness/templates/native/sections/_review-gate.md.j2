@@ -1,51 +1,27 @@
 ## Review Gate — {{ plan_review_gate }}
 {% if plan_review_gate == "human" %}
 
-**STOP.** Present the complete plan and review report to the user.
-
-Display:
-1. The full plan (spec + contract)
-2. Plan review summary (scores, aggregate, findings)
-3. Any unresolved reviewer concerns
-
-Wait for user response:
-- **approve** → continue to implementation
-- **edit: [feedback]** → return to planning phase, re-generate with feedback
-- **reject** → terminate the workflow
+**STOP.** Present full plan + review summary to user. Wait for: **approve** / **edit: [feedback]** / **reject**.
 {% elif plan_review_gate == "auto" %}
 
-**Reuse the escalation level** already computed in the Plan Review step above (the `harness escalation-score compute` call that determined FAST/LITE/FULL dispatch). Do NOT re-compute — the level does not change between plan review and this gate.
+**Reuse the escalation level** from Plan Review (do not recompute).
 
 **This entry point's default interaction depth: {{ interaction_depth | default("low") }}**
-(If Phase 0 selected a different path, use that path's depth instead — see Phase 0 review gate notes.)
 
 ### Review Intensity Routing
 
 **Level = FULL (score >= {{ gate_full_review_min }}) → FULL REVIEW**
-Present the complete plan + review summary. Wait for:
+Present the complete plan + review summary with aggregate review score and Aggregate dimensions. Wait for:
 - **approve** → continue
 - **edit: [feedback]** → re-plan
 - **reject** → terminate
 
 **Level = LITE (score {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }}) → SUMMARY CONFIRM**
-Show a concise summary:
-```
-PLAN SUMMARY
-═══════════════════════════════════════════
-  Task:          task-NNN
-  Deliverables:  N items
-  Files:         ~N estimated
-  Risk flags:    [list or "none"]
-  Escalation:    score N / level LITE
-  Aggregate:     X/10
-═══════════════════════════════════════════
-Continue? [approve / edit / reject]
-```
+Show a concise summary (task, deliverables, files, risk flags, escalation score, aggregate score). Wait for approve/edit/reject.
 
 **Level = FAST (score < {{ gate_summary_confirm_min }}) → AUTO PROCEED**
 Log: `"Plan auto-approved (escalation score N, level FAST, aggregate review score X/10)"` and continue.
-Record the plan-review gate snapshot in `workflow-state.json` when that task-level
-state file exists.
+Record the gate snapshot in `workflow-state.json`.
 {% else %}
 Plan is auto-approved after plan review completes. Continue immediately.
 {% endif %}

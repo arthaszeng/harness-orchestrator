@@ -1,0 +1,61 @@
+# Plan Review — Full Synthesis Protocol
+
+Read this when dispatching FULL or LITE plan reviews. FAST reviews skip this entirely.
+
+## Dispatch Rules
+
+**Context minimization**: Each subagent prompt includes ONLY the "When reviewing plans (mode: plan-review)" paragraph from the agent template. Do NOT embed "When reviewing code" paragraphs.
+
+Each prompt must include:
+- `response_language: {{ artifact_lang }}`
+{% if memverse_enabled == "true" %}
+- `memverse_domain: {{ memverse_domain }}`
+{% endif %}
+- Required context per role (see table in main template)
+
+**Task prompt composition:**
+- **Fixed protocol:** Subagent behavior MUST come only from the agent template "plan-review" section. Do not rewrite role duties in the Task body.
+- **Facts for this run:** Only attach what the table allows — path pointers, short listings, `ci_command`, bounded excerpts.
+- **Forbidden (broadcasting):** Do not paste the same long document into all five Tasks.
+- **Forbidden (wrong artifact):** No git diffs or code dumps in plan-review Tasks.
+
+**Model control**: Pass `model: "fast"` unless `[native.role_models]` is configured for a role (then omit to inherit).
+
+**Degradation ladder:**
+- 5/5 respond → full synthesis
+- 3-4/5 → proceed with available, note missing
+- 1-2/5 → single-agent review
+- 0/5 → single generalPurpose subagent
+
+## Synthesis
+
+1. **Normalize and cluster** — group findings by root cause; track role contributions per cluster.
+2. **Merge** — one canonical entry per cluster, preserve role tags.
+3. **Filter out-of-scope** using role→responsibility map:
+
+   | Role | Owns | Must NOT report |
+   |------|------|----------------|
+   | Architect | Design, modules, deps, security design | Code quality, tests, delivery, user value |
+   | Product Owner | User value, requirements, AC, UX edges | Code quality, architecture, tests, delivery |
+   | Engineer | Code quality, DRY, patterns, performance | Architecture decisions, user value, delivery |
+   | QA | Tests, coverage, CI, regression, boundaries | Code quality, architecture, user value |
+   | Project Manager | Scope, delivery, decomposition, commits | Code quality, architecture, tests, user value |
+
+   - In-scope: keep. Out-of-scope + CRITICAL: re-tag `[CROSS-ROLE]`. Out-of-scope + WARN/INFO: mark `[OUT-OF-SCOPE]`, exclude from scoring.
+
+4. **Cross-validate**: 2+ roles flag same issue → `[HIGH CONFIDENCE]`
+5. **Direction synthesis**: PO → `Value recommendation`, PM → `Delivery recommendation` (keep separate).
+6. **Conflicts**: present both perspectives, mark `[TASTE DECISION]`.
+7. **Score**: `echo '...' | harness review-score compute --kind plan --json` — use CLI verdict directly.
+
+## Re-Plan Loop (max 2 iterations)
+
+If verdict is `PLAN_NEEDS_REVISION`:
+1. Fix CRITICAL and WARN findings
+2. Re-dispatch full review
+3. Same issues recur → note as `## Unresolved Concerns`
+4. After 2 iterations → proceed to gate
+
+Persist final synthesis as `## Plan Review Summary` in plan.md.
+
+Save eval: `harness save-eval --kind plan --task task-NNN --verdict PASS --score X --body "..."` (creates `plan-eval-rN.md`).

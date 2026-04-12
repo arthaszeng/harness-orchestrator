@@ -1,26 +1,14 @@
-## Error Recovery Matrix
+## Error Recovery
 
-Note: test failure triage (pre-existing vs in-branch) is handled in Step 4 above.
-This matrix covers non-test errors.
+| Error | Recovery |
+|-------|---------|
+| CI lint/type failure | Auto-fix, commit, re-run |
+| Git conflict | Report to user |
+| Scope creep (diff outside contract) | Revert, re-read contract |
+| Import/permission error | Fix deps or report |
 
-| Error Type | Signal | Recovery Action |
-|-----------|--------|----------------|
-| CI failure (lint) | linter errors in output | Auto-fix if linter supports it, commit, re-run |
-| CI failure (type) | type checker errors | Fix type annotations, re-run |
-| Git conflict | merge conflict markers | Report to user, do not attempt resolution |
-| Scope creep | diff touches files outside contract | Revert uncommitted changes, re-read contract |
-| Import error | ModuleNotFoundError or similar | Check if dependency is missing, add to requirements |
-| Permission error | PermissionError or EACCES | Report to user, do not retry |
-| Agent timeout | no output for extended period | Cancel and retry with simpler prompt |
+Same error after 2 retries → log to `build-notes.md`, proceed to next deliverable.
 
-If the same error type persists after 2 retries of the same fix strategy,
-write the finding to `.harness-flow/tasks/<task-id>/build-notes.md` and proceed to the next deliverable.
+### Recovery after interruption
 
-## Recovery after interruption
-
-If your output was truncated or the session was interrupted:
-1. Read `harness session read --task <task-id>` for current state
-2. Read `harness handoff read --task <task-id>` for stage context
-3. Resume from the exact step recorded — do not recap or apologize
-4. If remaining work is large, break it into smaller steps
-5. Do not re-run steps that already succeeded (check git log)
+`harness session read --task <task-id>` + `harness handoff read --task <task-id>` → resume from exact step. Do not recap or apologize.

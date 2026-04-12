@@ -42,11 +42,10 @@ This is the standard behavior — proceed to the code review dispatch section be
 Log: `SHIP_GATE: FULL (score N) — dispatching full multi-role review`
 
 **Score {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE REVIEW**
-Dispatch only **2 role reviewers**: **Engineer** and **QA**.
-These two roles are the most direct guardians of code quality and regression safety.
-Skip Architect, Product Owner, and Project Manager for this review round.
-Use the same code review dispatch format below, but only for the 2 selected roles.
-Log: `SHIP_GATE: LITE (score N) — dispatching Engineer + QA review`
+Dispatch all **5 role reviewers** (same as FULL). Subagents run in parallel — reducing roles
+saves no time but loses review coverage. LITE differs from FULL only in synthesis strictness:
+WARN-level findings are advisory (not blocking), and the re-plan/re-fix loop is capped at 1 iteration.
+Log: `SHIP_GATE: LITE (score N) — dispatching all 5 roles, lenient synthesis`
 
 **Score < {{ gate_summary_confirm_min }} → FAST PASS**
 Skip multi-role code review entirely. CI tests and `harness gate` (machine-level checks)
@@ -75,11 +74,8 @@ Log: `SHIP_GATE: FAST (score N) — skipping multi-role review, CI + gate only`
 
 ### Interaction with Existing Steps
 
-- **FULL**: Proceed to the code review section normally (all 5 roles).
-- **LITE**: Use the code review section but dispatch only Engineer + QA. The synthesis
-  step should note that only 2 roles were dispatched and adjust expectations accordingly.
-- **FAST**: Skip the code review section entirely. Jump to Step 3.9 (Capture Learnings)
-  or Step 4 (Scope Drift Detection) as appropriate.
+- **FULL**: Proceed to code review with all 5 roles, strict synthesis.
+- **LITE**: Same 5-role dispatch; lenient synthesis (WARN advisory, 1-iteration fix cap).
+- **FAST**: Skip code review entirely. Jump to Step 3.9 or Step 4 as appropriate.
 - **`harness gate` (Step 5.9)** runs unconditionally regardless of intensity level.
-- **Memverse learning capture (Step 3.9)**: In LITE mode, only Engineer and QA learnings
-  are available. In FAST mode, no role-specific learnings are captured.
+- **Memverse learning capture (Step 3.9)**: All 5 roles contribute in FULL and LITE. FAST mode captures no role-specific learnings.

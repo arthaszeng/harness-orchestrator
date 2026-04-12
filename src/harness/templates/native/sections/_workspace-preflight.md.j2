@@ -6,114 +6,19 @@
 ## Workspace Pre-flight
 
 {% if preflight_mode == "entry" %}
-Before any planning or exploration, ensure the workspace is ready for a new task.
-
-### 0. Worktree Bootstrap
-
-If `.harness-flow` directory does **not** exist in the current working directory, you may be in a linked git worktree that has not been set up yet.
-
-```bash
-harness worktree-setup
-```
-
-This creates symlinks to the main worktree's `.harness-flow`, `.cursor/skills/harness`, `.cursor/agents`, and `.cursor/rules`.
-If the command is not available, create the symlinks manually:
-```bash
-MAIN=$(git rev-parse --git-common-dir | xargs dirname)
-ln -sfn "$MAIN/.harness-flow" .harness-flow
-mkdir -p .cursor/skills
-ln -sfn "$MAIN/.cursor/skills/harness" .cursor/skills/harness
-ln -sfn "$MAIN/.cursor/agents" .cursor/agents
-ln -sfn "$MAIN/.cursor/rules" .cursor/rules
-```
-
-If `.harness-flow` already exists, skip this step.
-
-Preferred structured preflight:
+Before any planning or exploration, ensure the workspace is ready.
 
 ```bash
 harness git-preflight --json
 ```
 
-When this command is unavailable or returns non-actionable diagnostics, fall back to the manual checks below.
+Use the JSON output to determine: clean workspace, current branch, task key match. Then:
+- **On `{{ branch_prefix }}/` branch with matching task**: align with trunk (`git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}`), skip to next phase.
+- **On `{{ branch_prefix }}/` branch with different task**: ABORT — guide user to switch.
+- **On `{{ trunk_branch }}`** or other: `git checkout {{ trunk_branch }} && git pull origin {{ trunk_branch }}`, then create feature branch: `harness task next-id --json` → `git checkout -b {{ branch_prefix }}/task-NNN-<short-desc>`.
+- **Dirty workspace**: ABORT — guide user to stash/commit/discard.
 
-### 1. Clean Check
-
-```bash
-git status --porcelain
-```
-
-If the output is **non-empty**, **ABORT** immediately:
-- List the dirty files
-- Guide the user: "工作区有未提交的变更，请先处理再运行 harness workflow："
-  - `git stash -u` to stash everything (including untracked)
-  - `git commit` to commit current work
-  - `git checkout -- .` to discard changes
-- Do NOT proceed. Do NOT auto-stash.
-
-### 2. Branch Check
-
-```bash
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-```
-
-- If `$CURRENT_BRANCH` starts with `{{ branch_prefix }}/`:
-  Get the current branch's task key from `harness git-preflight --json` → `context.branch_task_key`.
-  Compare it with your **target task key** (the task id the user explicitly gave, or the next task-NNN number you will determine in step 4).
-
-  - **Task key matches** (resuming the same task):
-    Inform the user: "当前已在 feature branch `$CURRENT_BRANCH`，继续在此分支工作。"
-    **Align with trunk before continuing:**
-    ```bash
-    git fetch origin {{ trunk_branch }} && git rebase origin/{{ trunk_branch }}
-    ```
-    If rebase conflicts: try auto-resolve mechanical cases (e.g. version file ordering); if complex, `git rebase --abort` and ABORT.
-    **Skip steps 3–4.** Proceed to the next phase.
-
-  - **Task key differs** (branch belongs to another task/agent):
-    **Do NOT continue on this branch.** Guide the user to switch branches or start a fresh session:
-    1. Guide the user: "当前分支属于另一个任务。请手动切换到正确的分支，或在新的独立工作目录中启动 agent。"
-    2. **ABORT** — do not proceed on a branch belonging to a different task.
-
-  - **Task key is empty** (extraction failed, e.g. non-standard branch name `{{ branch_prefix }}/foo-bar`):
-    Treat as **resuming** (same path as matching task key).
-
-- If `$CURRENT_BRANCH` is `HEAD` (detached): **ABORT** — "当前处于 detached HEAD 状态，请先 `git checkout {{ trunk_branch }}`。"
-- Otherwise: continue to step 3.
-
-### 3. Trunk Alignment
-
-```bash
-git checkout {{ trunk_branch }}
-git pull origin {{ trunk_branch }}
-```
-
-If `git pull` fails (network error, conflict, or `{{ trunk_branch }}` doesn't exist):
-**ABORT** — show the error output and guide: "无法更新 `{{ trunk_branch }}`，请手动解决后重新运行。"
-
-### 4. Create Feature Branch
-
-1. Determine the next task number:
-   ```bash
-   harness task next-id
-   ```
-   This outputs the next available `task-NNN` identifier (e.g. `task-054`).
-   Use `harness task next-id --json` for structured output: `{"next_id": "task-054", "max_existing": 53}`.
-
-   Fallback (if CLI unavailable):
-   ```bash
-   mkdir -p .harness-flow/tasks
-   ls .harness-flow/tasks/ | grep -oP 'task-\K\d+' | sort -n | tail -1
-   ```
-   If no tasks exist, start with `001`. Otherwise increment the max by 1, zero-padded to 3 digits.
-
-2. Extract a short description from the user's requirement (max 4 hyphenated lowercase keywords).
-
-3. Create the branch:
-   ```bash
-   git checkout -b {{ branch_prefix }}/task-NNN-<short-desc>
-   ```
-   If the branch already exists: **ABORT** — "分支 `{{ branch_prefix }}/task-NNN-<short-desc>` 已存在，请确认是否要 resume 该任务或选择其他名称。"
+If the CLI fails or `.harness-flow` is missing, **read** `.cursor/skills/harness/harness-plan/plan-preflight-protocol.md` for the full fallback protocol.
 
 {% elif preflight_mode == "ship" %}
 Before shipping, ensure the base branch is up to date.

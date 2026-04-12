@@ -63,30 +63,33 @@ not become parallel gate sources.
 
 Before writing the Analysis, search for historical failure patterns and then use those results to ground your design thinking.
 
-**Step 1 — Search for prior failures relevant to this task:**
+**Step 0 — Experience Retrieval** (ground your design in real data, not assumptions):
 
-```bash
-harness search-failures --query "<keywords describing this task's domain>" --limit 10
-```
+1. Search project failure patterns:
+   ```bash
+   harness search-failures --query "<keywords describing this task's domain>" --limit 10
+   ```
 {% if memverse_enabled == "true" %}
-
-Also query Memverse for broader cross-project patterns:
-
-```
-CallMcpTool(
-  server="user-Memverse",
-  toolName="search_memory",
-  arguments={
-    "query": "<keywords describing this task's domain>",
-    "domains": "{{ memverse_domain }}",
-    "metadata_filter": "{\"type\": \"failure-pattern\"}",
-    "limit": 10
-  }
-)
-```
+2. Search cross-project design lessons via Memverse:
+   ```
+   CallMcpTool(server="user-Memverse", toolName="search_memory",
+     arguments={"query": "<domain keywords>", "domains": "{{ memverse_domain }}", "limit": 10})
+   ```
 {% endif %}
+3. Understand recent evolution of the affected area:
+   ```bash
+   git log --oneline -20
+   ```
+   For key files in scope: `git log --oneline --follow -10 <file>`.
 
-**Step 2 — Answer these three questions, incorporating any failure patterns found above:**
+**Step 1 — Experience-Driven Design Decisions**:
+
+For each relevant result from Step 0, answer: **"How does this experience affect my design choices for this task?"**
+- If a failure pattern is directly relevant → reference it in Architectural Constraints and explain how to avoid it.
+- If a design lesson applies → incorporate it in Approach.
+- If no relevant experience found → state "this is a new domain" and increase vigilance for design pitfalls.
+
+**Step 2 — Answer these three questions, grounded in Step 0/1:**
 
 ### Core Challenges
 What are the first-principles challenges for this type of system? Not "what features to build" but "why is this type of system hard to get right".
@@ -110,7 +113,11 @@ If failure patterns describe past mistakes, list those as concrete pitfalls rath
 (Technical analysis of the requirement — what problem is being solved, why it matters. Reference the Design Thinking conclusions above.)
 
 ## Approach
-(Implementation approach, key decisions, alternatives considered and why rejected. Explain how the architectural constraints above are satisfied.)
+(Implementation approach, key decisions. Explain how the architectural constraints above are satisfied.)
+
+### Alternatives Considered
+(List at least 1 rejected alternative with rationale. This forces thinking about multiple directions before committing.
+Format: **Alternative**: description → **Rejected because**: specific reason.)
 
 ## Impact
 (Files affected, blast radius, dependencies)
@@ -124,11 +131,23 @@ If failure patterns describe past mistakes, list those as concrete pitfalls rath
 
 ## Design Principles
 (Distill 3-5 concrete design principles from System Design Thinking. The Builder must follow these.
-Each principle must be verifiable — confirmable through code review or tests.)
+Each principle must be verifiable — confirmable through code review or tests.
+Each principle MUST link to at least one Acceptance Criteria via `→ AC:` reference.)
 
-- [ ] DP1: (e.g., sleep/time functions injected via parameter, no direct time.sleep calls)
-- [ ] DP2: (e.g., each delivery uses delivery_id as idempotency lock, duplicate requests return immediately)
+- [ ] DP1: (e.g., sleep/time functions injected via parameter) → AC: no direct time.sleep in src/
+- [ ] DP2: (e.g., idempotency lock via delivery_id) → AC: duplicate calls return same result
 - ...
+
+## Key Interfaces
+(Define the core function/class signatures BEFORE listing deliverables. This forces thinking about
+boundaries and contracts before implementation details.)
+
+```
+# Example:
+def process(input: Input, *, config: Config | None = None) -> Result: ...
+class Widget(Protocol):
+    def render(self, ctx: Context) -> str: ...
+```
 
 ## Deliverables
 - [ ] Deliverable 1: description + acceptance criteria
@@ -148,7 +167,13 @@ Each principle must be verifiable — confirmable through code review or tests.)
 | # | Phase | Decision | Classification | Principle | Rationale | Rejected Alternative |
 |---|-------|----------|---------------|-----------|-----------|---------------------|
 | 1 | Approach | ... | Mechanical/Taste | #N | ... | ... |
+
+## Retrospective Anchors
+- What past experience most influenced this plan?
+- What is the biggest unknown that no prior experience covers?
+- What should we watch for during build that might invalidate this design?
 ```
 
-**Quality bar**: Every deliverable MUST have acceptance criteria. Vague deliverables
-like "improve the code" are not acceptable — make them specific and testable.
+**Quality bar**: Every deliverable MUST have acceptance criteria. Vague deliverables like "improve the code" are not acceptable — make them specific and testable.
+
+**Design depth bar**: The plan MUST include Alternatives Considered, Key Interfaces, and Retrospective Anchors. `harness plan-lint` enforces System Design Thinking and Design Principles as hard errors.

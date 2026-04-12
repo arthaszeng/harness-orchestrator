@@ -8,8 +8,8 @@
 harness escalation-score compute --phase plan --deliverables N --estimated-files N [--security] [--schema] [--api] [--review-score X] --json
 ```
 
-**评分 >= {{ gate_full_review_min }} → FULL**：全部角色完整评审。
-**评分 {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE**：仅 Architect + Engineer（2 角色）。
+**评分 >= {{ gate_full_review_min }} → FULL**：全部 5 角色，严格合成。
+**评分 {{ gate_summary_confirm_min }}–{{ (gate_full_review_min | int) - 1 }} → LITE**：全部 5 角色，宽松合成（WARN 级发现仅作为建议，不阻塞）。
 **评分 < {{ gate_summary_confirm_min }} → FAST**：跳过多角色评审，直接保存快速通过的 eval：
 ```bash
 harness save-eval --kind plan --task task-NNN --verdict PASS --score {{ pass_threshold }} --body "Plan auto-approved (FAST, escalation score N)"
@@ -20,7 +20,7 @@ harness save-eval --kind plan --task task-NNN --verdict PASS --score {{ pass_thr
 通过 Task 工具**并行启动所有 5 个审查者**，每个使用 `mode: plan-review`。
 发送一条包含所有 5 个 Task 工具调用的消息。
 
-**LITE 模式**下，仅从下表派遣 Architect (#1) 和 Engineer (#3)：
+**FULL 和 LITE 均派遣全部 5 个角色**（并行子代理不增加时间，减少角色只损失质量）。LITE 仅在合成阶段放宽：WARN 级发现作为建议、重新规划循环上限 1 次。
 
 | # | 子代理 | 推荐模型 | 必需 Context | 可选 Context |
 |---|--------|---------|-------------|-------------|

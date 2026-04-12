@@ -42,6 +42,7 @@ class PlanLintResult:
     warnings: list[PlanLintWarning] = field(default_factory=list)
     has_spec: bool = False
     has_contract: bool = False
+    has_design_thinking: bool = False
     has_design_principles: bool = False
     deliverable_count: int = 0
     estimated_files: int | None = None
@@ -54,6 +55,7 @@ class PlanLintResult:
             "plan_mode": self.plan_mode,
             "has_spec": self.has_spec,
             "has_contract": self.has_contract,
+            "has_design_thinking": self.has_design_thinking,
             "has_design_principles": self.has_design_principles,
             "deliverable_count": self.deliverable_count,
             "estimated_files": self.estimated_files,
@@ -100,6 +102,7 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
     has_spec = "spec" in heading_titles
     has_contract = "contract" in heading_titles
 
+    has_design_thinking = bool(heading_titles & DESIGN_THINKING_HEADINGS)
     has_design_principles = bool(heading_titles & DESIGN_PRINCIPLES_HEADINGS)
 
     if not has_spec:
@@ -122,10 +125,16 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
                 message=f"missing Contract sub-section: {req}",
             ))
 
+    if not has_design_thinking:
+        errors.append(PlanLintError(
+            code="NO_DESIGN_THINKING",
+            message="missing 'System Design Thinking' section in Spec — required for design depth",
+        ))
+
     if not has_design_principles:
-        warnings.append(PlanLintWarning(
+        errors.append(PlanLintError(
             code="NO_DESIGN_PRINCIPLES",
-            message="missing 'Design Principles' section in Contract — consider adding design constraints for the Builder",
+            message="missing 'Design Principles' section in Contract — required for verifiable design constraints",
         ))
 
     deliverables = _DELIVERABLE_RE.findall(content)
@@ -151,6 +160,7 @@ def lint_plan(plan_path: Path) -> PlanLintResult:
         warnings=warnings,
         has_spec=has_spec,
         has_contract=has_contract,
+        has_design_thinking=has_design_thinking,
         has_design_principles=has_design_principles,
         deliverable_count=deliverable_count,
         estimated_files=estimated_files_val,
