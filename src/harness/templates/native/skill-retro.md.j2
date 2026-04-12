@@ -235,7 +235,55 @@ Save the retro data to `.harness-flow/retros/{YYYY-MM-DD}.json`:
 
 ---
 
-## Step 13: Narrative Summary
+## Step 13: Extract Failure Patterns
+
+Scan task directories from the retro window for unrecorded failure patterns.
+
+### 13.1 — Find tasks in window
+
+```bash
+# List agent/ branches merged in the window
+git log --since="{{ retro_window_days }} days ago" --merges --format="%s" \
+  | grep -oP 'agent/task-\d+' | sort -u
+```
+
+For each task identified, check `.harness-flow/tasks/<task-id>/` for eval and build artifacts.
+
+### 13.2 — Scan artifacts for failures
+
+Read these files (if they exist) for each task:
+- `code-eval-rN.md` — look for CRITICAL/WARN findings with root cause
+- `plan-eval-rN.md` — look for PLAN_NEEDS_REVISION findings
+- `build-rN.md` — look for test failures, CI failures, or error patterns
+
+Extract failures that have **both** a root cause and a fix/resolution.
+Skip vague findings without actionable detail.
+
+### 13.3 — Deduplicate and record
+
+For each extracted failure:
+
+1. Check if already recorded:
+   ```bash
+   harness search-failures --query "<failure summary keywords>" --limit 3
+   ```
+2. If no match found, record it:
+   ```bash
+   harness save-failure \
+     --task <task-id> \
+     --phase <build|eval|ship> \
+     --category <ci-failure|test-failure|eval-iterate|design-flaw> \
+     --summary "<concise failure description>" \
+     --root-cause "<why it happened>" \
+     --fix "<what resolved it>"
+   ```
+
+**Quality gate**: Only record patterns where root cause AND fix are both known.
+Aim for 0–5 high-quality patterns per retro, not exhaustive coverage.
+
+---
+
+## Step 14: Narrative Summary
 
 End with a human-readable narrative:
 

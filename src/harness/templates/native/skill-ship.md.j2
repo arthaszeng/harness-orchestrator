@@ -142,6 +142,19 @@ harness gate --task TASK_ID
 
 ---
 
+## Step 5.95: Extract Failure Patterns
+
+If this task had ITERATE rounds, test failures, or CI errors that were fixed, scan task artifacts (`code-eval-rN.md`, `build-rN.md`) and record patterns with known root cause + fix. Zero failures → skip.
+
+For each failure: `harness search-failures --query "<keywords>" --limit 3` to deduplicate, then:
+```bash
+harness save-failure --task TASK_ID --phase <phase> --category <category> \
+  --summary "<description>" --root-cause "<cause>" --fix "<resolution>"
+```
+Target 0–3 high-quality patterns per ship.
+
+---
+
 ## Step 6: Commit (bisectable)
 
 {% if review_gate == 'advisory' %}After eval (advisory).{% else %}After PASS.{% endif %} Group infra → logic+tests; `feat|fix|refactor|test|docs|chore`; `git add <files> && git commit -m "<type>(scope): msg"`.
