@@ -37,6 +37,8 @@ echo '{"task_id":"TASK_ID","current_phase":"ship","current_step":"N","current_st
 {% if memverse_enabled == "true" %}
 Memverse: `search_memory` with project + five `*-learning` domains (same query shape as eval).
 {% endif %}
+**Trust:** `harness trust --json` — if samples ≥ 5 and `apply_trust_threshold` off, suggest enabling.
+
 **Eval Readiness Reminder** — Todo checklist must include **EVAL — MANDATORY** (Step 3.8) before commit.
 
 ---
@@ -144,14 +146,7 @@ harness gate --task TASK_ID
 
 ## Step 5.95: Extract Failure Patterns
 
-If this task had ITERATE rounds, test failures, or CI errors that were fixed, scan task artifacts (`code-eval-rN.md`, `build-rN.md`) and record patterns with known root cause + fix. Zero failures → skip.
-
-For each failure: `harness search-failures --query "<keywords>" --limit 3` to deduplicate, then:
-```bash
-harness save-failure --task TASK_ID --phase <phase> --category <category> \
-  --summary "<description>" --root-cause "<cause>" --fix "<resolution>"
-```
-Target 0–3 high-quality patterns per ship.
+If this task had failures that were fixed, scan `code-eval-rN.md`/`build-rN.md`, deduplicate via `harness search-failures`, then `harness save-failure --task TASK_ID --phase <p> --category <c> --summary "..." --root-cause "..." --fix "..."`. Target 0–3 patterns. Zero failures → skip.
 
 ---
 
@@ -205,13 +200,13 @@ git push -u origin HEAD
 
 ## Step 8.75: Ship metrics
 
-`harness save-ship-metrics --task TASK_ID ...` (or append `.harness-flow/ship-metrics.jsonl`). Final `harness gate --task TASK_ID` if persisting workflow state.
+`harness save-ship-metrics --task TASK_ID ...`. Final `harness gate --task TASK_ID` if persisting workflow state.
 
 ---
 
 ## Step 9: PR landing
 
-If `gh` unavailable: skip; remind user. Else: loop ≤3 — `harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`; pass + no conflict → success; conflict → rebase + `git push --force-with-lease`; fail → `harness ci-logs`, fix, `{{ ci_command }}`, commit, push; pending → backoff (cap ~15m). **STOP** on infra-only, needs-human, exhausted rounds, or unresolvable conflict. Success: update `workflow-state.json`, emit merge-ready summary.
+No `gh` → skip. Else loop ≤3: `harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`; pass → success; conflict → rebase + `git push --force-with-lease`; fail → fix+push; pending → backoff (cap ~15m). **STOP** on infra-only, needs-human, exhausted, unresolvable. Success: update `workflow-state.json`, merge-ready summary, then `harness record-outcome --task TASK_ID`.
 
 ---
 

@@ -37,6 +37,8 @@ echo '{"task_id":"TASK_ID","current_phase":"ship","current_step":"N","current_st
 {% if memverse_enabled == "true" %}
 Memverse：对项目域与五个 `*-learning` 域执行 `search_memory`（查询形状同 eval）。
 {% endif %}
+**信任：** `harness trust --json` — 若样本 ≥ 5 且 `apply_trust_threshold` 未开启，建议启用。
+
 **评审就绪提醒** — Todo 清单须含 **EVAL — 强制**（步骤 3.8）再提交。
 
 ---
@@ -144,14 +146,7 @@ harness gate --task TASK_ID
 
 ## 步骤 5.95：提取失败模式
 
-若本次任务经历了 ITERATE 轮次、测试失败或 CI 错误且已修复，扫描任务产物（`code-eval-rN.md`、`build-rN.md`），记录有已知根因 + 修复的模式。零失败 → 跳过。
-
-对每个失败：`harness search-failures --query "<关键词>" --limit 3` 去重后：
-```bash
-harness save-failure --task TASK_ID --phase <阶段> --category <类别> \
-  --summary "<描述>" --root-cause "<根因>" --fix "<修复>"
-```
-目标每次 ship 0-3 个高质量模式。
+若本次有已修复的失败，扫描 `code-eval-rN.md`/`build-rN.md`，`harness search-failures` 去重后 `harness save-failure --task TASK_ID --phase <阶段> --category <类别> --summary "..." --root-cause "..." --fix "..."`。目标 0-3 个模式。零失败 → 跳过。
 
 ---
 
@@ -211,7 +206,7 @@ git push -u origin HEAD
 
 ## 步骤 9：PR 着陆
 
-无 `gh` → 跳过并提示人工。否则轮询 ≤3 次：`harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`；通过且无冲突 → 成功；冲突 → rebase + `git push --force-with-lease`；失败 → `harness ci-logs`、修复、`{{ ci_command }}`、提交、推送；pending → 退避（总上限约 15m）。**停止**条件：纯基础设施、需人工、轮次用尽、冲突无解。成功：更新 `workflow-state.json`，输出 merge-ready 摘要。
+无 `gh` → 跳过并提示人工。否则轮询 ≤3 次：`harness pr-status --branch "$(git rev-parse --abbrev-ref HEAD)" --json`；通过且无冲突 → 成功；冲突 → rebase + `git push --force-with-lease`；失败 → `harness ci-logs`、修复、`{{ ci_command }}`、提交、推送；pending → 退避（总上限约 15m）。**停止**条件：纯基础设施、需人工、轮次用尽、冲突无解。成功：更新 `workflow-state.json`，输出 merge-ready 摘要，然后 `harness record-outcome --task TASK_ID`（采集 CI/revert 用于校准）。
 
 ---
 
