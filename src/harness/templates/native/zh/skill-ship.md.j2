@@ -142,6 +142,19 @@ harness gate --task TASK_ID
 
 ---
 
+## 步骤 5.95：提取失败模式
+
+若本次任务经历了 ITERATE 轮次、测试失败或 CI 错误且已修复，扫描任务产物（`code-eval-rN.md`、`build-rN.md`），记录有已知根因 + 修复的模式。零失败 → 跳过。
+
+对每个失败：`harness search-failures --query "<关键词>" --limit 3` 去重后：
+```bash
+harness save-failure --task TASK_ID --phase <阶段> --category <类别> \
+  --summary "<描述>" --root-cause "<根因>" --fix "<修复>"
+```
+目标每次 ship 0-3 个高质量模式。
+
+---
+
 ## 步骤 6：提交（可二分）
 
 {% if review_gate == 'advisory' %}评审完成后（advisory）。{% else %}PASS 后。{% endif %} 分组：基础设施 → 逻辑+测试；`feat|fix|refactor|test|docs|chore`；`git add <files> && git commit -m "<type>(scope): msg"`。
