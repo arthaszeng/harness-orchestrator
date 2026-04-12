@@ -445,3 +445,174 @@ class TestPredictionSidecar:
         outcome = load_review_outcome(tmp_path)
         assert outcome is not None
         assert outcome.prediction.dimension_scores["Architect"] == 8.0
+
+
+# ---------------------------------------------------------------------------
+# D2: has_revert in prediction accuracy
+# ---------------------------------------------------------------------------
+
+
+class TestAccuracyWithRevert:
+    def test_pass_with_revert_counts_as_wrong(self):
+        outcomes = [
+            _make_outcome(task_id="task-001", verdict="PASS", ci_passed=True, has_revert=True),
+            _make_outcome(task_id="task-002", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-003", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-004", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-005", verdict="PASS", ci_passed=True, has_revert=False),
+        ]
+        report = generate_calibration_report(outcomes)
+        assert report.prediction_accuracy == pytest.approx(4 / 5)
+
+    def test_iterate_with_revert_counts_as_correct(self):
+        outcomes = [
+            _make_outcome(task_id="task-001", verdict="ITERATE", ci_passed=True, has_revert=True),
+            _make_outcome(task_id="task-002", verdict="ITERATE", ci_passed=False, has_revert=False),
+            _make_outcome(task_id="task-003", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-004", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-005", verdict="PASS", ci_passed=True, has_revert=False),
+        ]
+        report = generate_calibration_report(outcomes)
+        # task-001: ITERATE vs negative (revert=True) → correct
+        # task-002: ITERATE vs negative (ci_passed=False) → correct
+        # task-003-005: PASS vs positive → correct
+        assert report.prediction_accuracy == pytest.approx(5 / 5)
+
+    def test_revert_none_treated_as_no_revert(self):
+        outcomes = [
+            _make_outcome(task_id="task-001", verdict="PASS", ci_passed=True, has_revert=None),
+            _make_outcome(task_id="task-002", verdict="PASS", ci_passed=True, has_revert=None),
+            _make_outcome(task_id="task-003", verdict="PASS", ci_passed=True, has_revert=None),
+            _make_outcome(task_id="task-004", verdict="PASS", ci_passed=True, has_revert=None),
+            _make_outcome(task_id="task-005", verdict="PASS", ci_passed=True, has_revert=None),
+        ]
+        report = generate_calibration_report(outcomes)
+        assert report.prediction_accuracy == 1.0
+
+    def test_ci_failed_plus_revert_still_negative(self):
+        outcomes = [
+            _make_outcome(task_id="task-001", verdict="PASS", ci_passed=False, has_revert=True),
+            _make_outcome(task_id="task-002", verdict="ITERATE", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-003", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-004", verdict="PASS", ci_passed=True, has_revert=False),
+            _make_outcome(task_id="task-005", verdict="PASS", ci_passed=True, has_revert=False),
+        ]
+        report = generate_calibration_report(outcomes)
+        # task-001: PASS vs negative (both ci_passed=False AND revert=True) → wrong
+        # task-002: ITERATE vs positive → wrong
+        # task-003-005: PASS vs positive → correct
+        assert report.prediction_accuracy == pytest.approx(3 / 5)
+
+
+# ---------------------------------------------------------------------------
+# D1: record-outcome CLI
+# ---------------------------------------------------------------------------
+
+
+class TestRecordOutcomeCLI:
+    @staticmethod
+    def _config_toml() -> str:
+        return (
+            '[project]\nname = "test"\n[ci]\ncommand = ""\n'
+            '[models]\ndefault = ""\n[workflow]\n[native]\n'
+            '[integrations.memverse]\nenabled = false\n'
+        )
+
+    def test_record_outcome_basic(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        from unittest.mock import MagicMock, patch
+
+        from typer.testing import CliRunner
+
+        import harness.commands.record_outcome_cmd as _mod  # noqa: F811
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        monkeypatch.chdir(tmp_path)
+        (agents_dir / "config.toml").write_text(self._config_toml(), encoding="utf-8")
+
+        mock_manager = MagicMock()
+        with patch.object(_mod, "_create_manager", return_value=mock_manager):
+            runner = CliRunner()
+            result = runner.invoke(app, ["record-outcome", "--task", "task-001"])
+
+        assert result.exit_code == 0, result.output
+        mock_manager.record_outcome.assert_called_once()
+
+    def test_record_outcome_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        import json as json_mod
+        from unittest.mock import MagicMock, patch
+
+        from typer.testing import CliRunner
+
+        import harness.commands.record_outcome_cmd as _mod
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        monkeypatch.chdir(tmp_path)
+        (agents_dir / "config.toml").write_text(self._config_toml(), encoding="utf-8")
+
+        save_review_outcome(task_dir, ReviewOutcome(
+            task_id="task-001",
+            prediction=ReviewPrediction(eval_aggregate=8.0, verdict="PASS"),
+            outcome=ReviewActualOutcome(ci_passed=True, has_revert=False),
+        ))
+
+        mock_manager = MagicMock()
+        with patch.object(_mod, "_create_manager", return_value=mock_manager):
+            runner = CliRunner()
+            result = runner.invoke(app, ["record-outcome", "--task", "task-001", "--json"])
+
+        assert result.exit_code == 0, result.output
+        parsed = json_mod.loads(result.output)
+        assert parsed["task_id"] == "task-001"
+
+    def test_record_outcome_with_pr(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        from unittest.mock import MagicMock, patch
+
+        from typer.testing import CliRunner
+
+        import harness.commands.record_outcome_cmd as _mod
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        monkeypatch.chdir(tmp_path)
+        (agents_dir / "config.toml").write_text(self._config_toml(), encoding="utf-8")
+
+        mock_manager = MagicMock()
+        with patch.object(_mod, "_create_manager", return_value=mock_manager):
+            runner = CliRunner()
+            result = runner.invoke(app, [
+                "record-outcome", "--task", "task-001", "--pr", "42",
+            ])
+
+        assert result.exit_code == 0, result.output
+        call_kwargs = mock_manager.record_outcome.call_args.kwargs
+        assert call_kwargs["pr_number"] == 42
+
+    def test_record_outcome_no_outcome_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        from unittest.mock import MagicMock, patch
+
+        from typer.testing import CliRunner
+
+        import harness.commands.record_outcome_cmd as _mod
+        from harness.cli import app
+
+        agents_dir = tmp_path / ".harness-flow"
+        task_dir = agents_dir / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        monkeypatch.chdir(tmp_path)
+        (agents_dir / "config.toml").write_text(self._config_toml(), encoding="utf-8")
+
+        mock_manager = MagicMock()
+        with patch.object(_mod, "_create_manager", return_value=mock_manager):
+            runner = CliRunner()
+            result = runner.invoke(app, ["record-outcome", "--task", "task-001", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert "no outcome file" in result.output.lower() or '"ok": false' in result.output

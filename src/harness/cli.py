@@ -302,6 +302,19 @@ def git_post_ship(
     )
 
 
+@app.command(name="record-outcome")
+def record_outcome(
+    task: str = typer.Option(..., "--task", "-t", help="Task ID (e.g. task-001)"),
+    pr: Optional[int] = typer.Option(None, "--pr", help="Pull request number"),
+    branch: str = typer.Option("", "--branch", "-b", help="Feature branch name for PR lookup"),
+    as_json: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Record actual outcome (CI status, revert detection) for review calibration."""
+    from harness.commands.record_outcome_cmd import run_record_outcome
+
+    run_record_outcome(task=task, pr=pr, branch=branch, as_json=as_json)
+
+
 @app.command(name="save-eval")
 def save_eval(
     kind: str = typer.Option(
