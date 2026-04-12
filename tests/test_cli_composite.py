@@ -67,11 +67,52 @@ class TestPreflightBundle:
         (task_dir / "workflow-state.json").write_text(
             json.dumps({"task_id": "task-001", "phase": "building"})
         )
+        (tmp_path / ".harness-flow" / "config.toml").write_text(
+            '[project]\nname = "t"\n\n[ci]\ncommand = "pytest"\n\n[workflow]\ntrunk_branch = "main"\n'
+        )
         result = runner.invoke(app, ["preflight-bundle", "--task", "task-001", "--phase", "build", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         assert data["ok"] is True
         assert "task_dir" in data
+        assert "context_budget_ok" in data
+        assert "file_count_ok" in data
+
+    def test_budget_exceeded_is_warning_not_error(self, tmp_path, monkeypatch):
+        """Token budget exceeded should produce a warning but ok remains True."""
+        monkeypatch.chdir(tmp_path)
+        harness = tmp_path / ".harness-flow"
+        harness.mkdir()
+        (harness / "config.toml").write_text(
+            '[project]\nname = "t"\n\n[ci]\ncommand = "pytest"\n\n'
+            "[workflow]\ntrunk_branch = \"main\"\ncontext_budget_tokens = 1000\n"
+        )
+        task_dir = harness / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        (task_dir / "plan.md").write_text("x" * 200_000)
+        result = runner.invoke(app, ["preflight-bundle", "--task", "task-001", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["context_budget_ok"] is False
+        assert data["ok"] is True
+        assert any("context budget" in w for w in data.get("warnings", []))
+
+    def test_file_count_exceeded_is_hard_error(self, tmp_path, monkeypatch):
+        """50+ files in task dir should fail preflight."""
+        monkeypatch.chdir(tmp_path)
+        harness = tmp_path / ".harness-flow"
+        harness.mkdir()
+        (harness / "config.toml").write_text(
+            '[project]\nname = "t"\n\n[ci]\ncommand = "pytest"\n\n[workflow]\ntrunk_branch = "main"\n'
+        )
+        task_dir = harness / "tasks" / "task-001"
+        task_dir.mkdir(parents=True)
+        for i in range(55):
+            (task_dir / f"artifact-{i:03d}.txt").write_text("x")
+        result = runner.invoke(app, ["preflight-bundle", "--task", "task-001", "--json"])
+        data = json.loads(result.stdout)
+        assert data["file_count_ok"] is False
+        assert data["ok"] is False
 
 
 class TestPlanCompletionAudit:

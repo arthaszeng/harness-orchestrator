@@ -45,11 +45,20 @@ def run_preflight_bundle(
     session_data = _read_session(task_dir)
     result["session"] = session_data
 
-    budget_ok = _check_context_budget(task_dir)
-    result["context_budget_ok"] = budget_ok
-    if not budget_ok:
+    budget_result = _check_context_budget(task_dir)
+    result["context_budget_ok"] = not budget_result.get("over_budget", False)
+    if budget_result.get("over_budget"):
+        result["warnings"] = result.get("warnings", [])
+        result["warnings"].append(
+            f"context budget exceeded: ~{budget_result['total_tokens']} tokens "
+            f"vs {budget_result['budget']} budget"
+        )
+
+    file_count_ok = _check_file_count(task_dir)
+    result["file_count_ok"] = file_count_ok
+    if not file_count_ok:
         result["ok"] = False
-        result["errors"].append("context budget exceeded")
+        result["errors"].append("task directory has 50+ artifact files")
 
     ws_path = task_dir / "workflow-state.json"
     if ws_path.exists():
@@ -102,7 +111,21 @@ def _read_session(task_dir: Path) -> dict[str, Any] | None:
         return None
 
 
-def _check_context_budget(task_dir: Path) -> bool:
-    """Lightweight context budget check — count artifact files."""
+def _check_context_budget(task_dir: Path) -> dict[str, object]:
+    """Token-based context budget check using core module."""
+    from harness.core.config import HarnessConfig
+    from harness.core.context_budget import check_budget
+
+    cfg = HarnessConfig.load(Path.cwd())
+    result = check_budget(task_dir, cfg.workflow.context_budget_tokens)
+    return {
+        "total_tokens": result.total_tokens,
+        "budget": result.budget,
+        "over_budget": result.over_budget,
+    }
+
+
+def _check_file_count(task_dir: Path, limit: int = 50) -> bool:
+    """Check that the task directory doesn't have too many artifact files."""
     artifact_count = sum(1 for f in task_dir.iterdir() if f.is_file())
-    return artifact_count < 50
+    return artifact_count < limit

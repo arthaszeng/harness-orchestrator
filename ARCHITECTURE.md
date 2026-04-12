@@ -111,7 +111,7 @@ Queries PyPI for newer versions, runs `**pip install --upgrade harness-flow`** w
 
 ### `preflight.py` (command)
 
-`harness preflight-bundle --task TASK_ID --phase build|ship --json` — 4-in-1 preflight combining task resolve, handoff read, session read, and context-budget check.
+`harness preflight-bundle --task TASK_ID --phase build|ship --json` — 5-in-1 preflight combining task resolve, handoff read, session read, token-based context-budget check (via `core/context_budget.py`), and artifact file-count cap. Budget exceeded is a **warning** (does not fail preflight); file count >= 50 is a **hard error**.
 
 ### `plan_audit.py` (command)
 
