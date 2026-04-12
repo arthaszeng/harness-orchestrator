@@ -182,11 +182,13 @@ def check_ship_readiness(
     *,
     review_gate_mode: str = "eng",
     trust_profile: "TrustProfile | None" = None,
+    effective_threshold: float | None = None,
 ) -> GateVerdict:
     """Run all ship-readiness checks against *task_dir*.
 
-    *trust_profile* is advisory only — it never changes pass/block semantics.
-    When provided, ``GateVerdict.trust_level`` is set for display purposes.
+    *trust_profile* is used for display; when *effective_threshold* is provided,
+    the eval aggregate score is compared against it (BLOCKED or WARNING depending
+    on *review_gate_mode*).
 
     Returns a :class:`GateVerdict` with per-item results.
     """
@@ -263,6 +265,32 @@ def check_ship_readiness(
             "eval_ship_eligible", CheckStatus.SKIPPED,
             "no verdict parsed",
         ))
+
+    # --- Score vs effective threshold (opt-in via apply_trust_threshold) ---
+
+    if effective_threshold is not None:
+        agg = parse_eval_aggregate_score(eval_content) if eval_content else None
+        if agg is not None:
+            if agg >= effective_threshold:
+                checks.append(CheckItem(
+                    "score_threshold", CheckStatus.PASS,
+                    f"score {agg:.1f} >= effective threshold {effective_threshold:.1f}",
+                ))
+            elif review_gate_mode == "advisory":
+                checks.append(CheckItem(
+                    "score_threshold", CheckStatus.WARNING,
+                    f"score {agg:.1f} < effective threshold {effective_threshold:.1f} (advisory — warning only)",
+                ))
+            else:
+                checks.append(CheckItem(
+                    "score_threshold", CheckStatus.BLOCKED,
+                    f"score {agg:.1f} < effective threshold {effective_threshold:.1f}",
+                ))
+        else:
+            checks.append(CheckItem(
+                "score_threshold", CheckStatus.SKIPPED,
+                "aggregate score not parseable — threshold check skipped",
+            ))
 
     # --- Soft checks ---
 

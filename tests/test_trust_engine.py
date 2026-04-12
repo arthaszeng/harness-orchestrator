@@ -10,9 +10,12 @@ from harness.core.review_calibration import (
     generate_calibration_report,
 )
 from harness.core.trust_engine import (
+    EFFECTIVE_THRESHOLD_MAX,
+    EFFECTIVE_THRESHOLD_MIN,
     TrustConfig,
     TrustLevel,
     TrustProfile,
+    compute_effective_threshold,
     compute_trust_profile,
     _count_paired,
 )
@@ -405,6 +408,61 @@ def test_config_custom_thresholds_affect_level():
     cfg_easy = TrustConfig(accuracy_high=0.75, min_samples_high=5)
     profile_easy = compute_trust_profile(report, outcomes, config=cfg_easy)
     assert profile_easy.level == TrustLevel.HIGH
+
+
+# ── compute_effective_threshold ───────────────────────────
+
+def test_effective_threshold_apply_false_returns_base():
+    profile = TrustProfile(level=TrustLevel.HIGH, threshold_adjustment=-0.5)
+    assert compute_effective_threshold(7.0, profile, apply=False) == 7.0
+
+
+def test_effective_threshold_profile_none_returns_base():
+    assert compute_effective_threshold(7.0, None, apply=True) == 7.0
+
+
+def test_effective_threshold_high_trust():
+    profile = TrustProfile(level=TrustLevel.HIGH, threshold_adjustment=-0.5)
+    assert compute_effective_threshold(7.0, profile, apply=True) == 6.5
+
+
+def test_effective_threshold_medium_trust():
+    profile = TrustProfile(level=TrustLevel.MEDIUM, threshold_adjustment=0.0)
+    assert compute_effective_threshold(7.0, profile, apply=True) == 7.0
+
+
+def test_effective_threshold_low_trust():
+    profile = TrustProfile(level=TrustLevel.LOW, threshold_adjustment=0.0)
+    assert compute_effective_threshold(7.0, profile, apply=True) == 7.0
+
+
+def test_effective_threshold_probation():
+    profile = TrustProfile(level=TrustLevel.PROBATION, threshold_adjustment=1.0)
+    assert compute_effective_threshold(7.0, profile, apply=True) == 8.0
+
+
+def test_effective_threshold_clamp_low():
+    profile = TrustProfile(threshold_adjustment=-5.0)
+    result = compute_effective_threshold(7.0, profile, apply=True)
+    assert result == EFFECTIVE_THRESHOLD_MIN
+
+
+def test_effective_threshold_clamp_high():
+    profile = TrustProfile(threshold_adjustment=5.0)
+    result = compute_effective_threshold(7.0, profile, apply=True)
+    assert result == EFFECTIVE_THRESHOLD_MAX
+
+
+def test_effective_threshold_exact_boundary_low():
+    profile = TrustProfile(threshold_adjustment=-2.0)
+    result = compute_effective_threshold(7.0, profile, apply=True)
+    assert result == 5.0  # exactly at min
+
+
+def test_effective_threshold_exact_boundary_high():
+    profile = TrustProfile(threshold_adjustment=3.0)
+    result = compute_effective_threshold(7.0, profile, apply=True)
+    assert result == 10.0  # exactly at max
 
 
 # ── GateVerdict backward compatibility ────────────────────

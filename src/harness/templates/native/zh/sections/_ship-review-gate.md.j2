@@ -50,6 +50,12 @@ harness barrier register --task TASK_ID --id scope-drift --phase ship
 **评分 < {{ gate_summary_confirm_min }} → FAST（快速通过）**
 完全跳过多角色代码评审。CI 测试和 `harness gate`（机器级检查）仍然执行 —
 这仅绕过 LLM 角色评审。
+
+**注意：** 当启用渐进式信任阈值（`apply_trust_threshold = true`）时，
+`harness gate` 会将 eval 分数与信任调整后的有效阈值比较
+（基准 {{ pass_threshold }} ± 信任调整量，clamp 到 [5.0, 10.0]）。
+使用 `harness trust` 查看当前信任等级和阈值调整量。
+
 写入一个最小的 eval 产物以便 `harness gate` 能找到：
 ```bash
 harness save-eval --kind code --task TASK_ID --verdict PASS --score {{ pass_threshold }} --body "$(cat <<'FAST_EVAL_EOF'

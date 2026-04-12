@@ -51,6 +51,12 @@ Log: `SHIP_GATE: LITE (score N) — dispatching Engineer + QA review`
 **Score < {{ gate_summary_confirm_min }} → FAST PASS**
 Skip multi-role code review entirely. CI tests and `harness gate` (machine-level checks)
 still apply — this only bypasses the LLM-based role reviews.
+
+**Note:** When progressive trust threshold is enabled (`apply_trust_threshold = true`),
+`harness gate` compares the eval score against the trust-adjusted effective threshold
+(base {{ pass_threshold }} ± trust adjustment, clamped to [5.0, 10.0]).
+Use `harness trust` to inspect the current trust level and threshold adjustment.
+
 Write a minimal eval artifact so `harness gate` can find it:
 ```bash
 harness save-eval --kind code --task TASK_ID --verdict PASS --score {{ pass_threshold }} --body "$(cat <<'FAST_EVAL_EOF'

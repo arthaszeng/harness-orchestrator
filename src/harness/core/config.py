@@ -162,6 +162,14 @@ class WorkflowConfig(BaseModel):
         ge=1000,
         description="Estimated token budget for task artifacts.",
     )
+    apply_trust_threshold: bool = Field(
+        default=False,
+        description=(
+            "When True, the ship gate effective pass threshold is adjusted "
+            "by the trust profile's threshold_adjustment. "
+            "When False (default), pass_threshold is used as-is."
+        ),
+    )
     trust: "TrustConfig" = Field(
         default_factory=lambda: _default_trust_config(),
         description="Progressive trust thresholds for review gate adjustment.",

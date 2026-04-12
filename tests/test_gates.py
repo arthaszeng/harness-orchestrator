@@ -575,3 +575,96 @@ class TestTaskIdValidation:
         from pydantic import ValidationError as PydanticValidationError
         with pytest.raises(PydanticValidationError):
             WorkflowState(task_id="../task-001")
+
+
+# ---------------------------------------------------------------------------
+# Score vs effective threshold checks
+# ---------------------------------------------------------------------------
+
+
+def _write_eval_with_score(
+    task_dir: Path,
+    *,
+    score: float,
+    verdict: str = "PASS",
+    round_num: int = 1,
+) -> Path:
+    content = (
+        f"# Code Evaluation — Round {round_num}\n\n"
+        f"**Average** | **{score:.1f}/10**\n\n"
+        f"## Verdict: {verdict}\n"
+    )
+    path = task_dir / f"code-eval-r{round_num}.md"
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+class TestScoreThresholdCheck:
+    def test_no_threshold_no_check(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=6.0)
+        verdict = check_ship_readiness(task_dir)
+        names = [c.name for c in verdict.checks]
+        assert "score_threshold" not in names
+
+    def test_score_above_threshold_passes(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=8.0)
+        verdict = check_ship_readiness(task_dir, effective_threshold=7.0)
+        check = next(c for c in verdict.checks if c.name == "score_threshold")
+        assert check.status == CheckStatus.PASS
+
+    def test_score_equal_threshold_passes(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=7.0)
+        verdict = check_ship_readiness(task_dir, effective_threshold=7.0)
+        check = next(c for c in verdict.checks if c.name == "score_threshold")
+        assert check.status == CheckStatus.PASS
+
+    def test_score_below_threshold_blocks_eng(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=6.5)
+        verdict = check_ship_readiness(
+            task_dir, review_gate_mode="eng", effective_threshold=7.0,
+        )
+        check = next(c for c in verdict.checks if c.name == "score_threshold")
+        assert check.status == CheckStatus.BLOCKED
+        assert not verdict.passed
+
+    def test_score_below_threshold_warns_advisory(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=6.5)
+        verdict = check_ship_readiness(
+            task_dir, review_gate_mode="advisory", effective_threshold=7.0,
+        )
+        check = next(c for c in verdict.checks if c.name == "score_threshold")
+        assert check.status == CheckStatus.WARNING
+
+    def test_score_unparseable_skips(self, tmp_path: Path):
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval(task_dir, content="# Eval\n\n## Verdict: PASS\n")
+        verdict = check_ship_readiness(task_dir, effective_threshold=7.0)
+        check = next(c for c in verdict.checks if c.name == "score_threshold")
+        assert check.status == CheckStatus.SKIPPED
+
+    def test_default_behavior_unchanged(self, tmp_path: Path):
+        """Regression: without effective_threshold, behavior is identical to pre-change."""
+        task_dir = tmp_path / "task-001"
+        task_dir.mkdir()
+        _write_plan(task_dir)
+        _write_eval_with_score(task_dir, score=5.0)
+        verdict = check_ship_readiness(task_dir)
+        names = [c.name for c in verdict.checks]
+        assert "score_threshold" not in names
