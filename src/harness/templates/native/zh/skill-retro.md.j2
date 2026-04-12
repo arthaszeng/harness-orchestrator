@@ -235,7 +235,55 @@ TREND vs LAST RETRO
 
 ---
 
-## 步骤 13：叙事总结
+## 步骤 13：提取失败模式
+
+扫描回顾窗口内的任务目录，查找未记录的失败模式。
+
+### 13.1 — 查找窗口内的任务
+
+```bash
+# 列出窗口内合并的 agent/ 分支
+git log --since="{{ retro_window_days }} days ago" --merges --format="%s" \
+  | grep -oP 'agent/task-\d+' | sort -u
+```
+
+对识别出的每个任务，检查 `.harness-flow/tasks/<task-id>/` 中的评审和构建产物。
+
+### 13.2 — 扫描产物中的失败
+
+读取以下文件（如存在）：
+- `code-eval-rN.md` — 查找有根因的 CRITICAL/WARN 发现
+- `plan-eval-rN.md` — 查找 PLAN_NEEDS_REVISION 发现
+- `build-rN.md` — 查找测试失败、CI 失败或错误模式
+
+提取**同时具有**根因和修复/解决方案的失败。
+跳过缺少可操作细节的模糊发现。
+
+### 13.3 — 去重并记录
+
+对每个提取的失败：
+
+1. 检查是否已记录：
+   ```bash
+   harness search-failures --query "<失败摘要关键词>" --limit 3
+   ```
+2. 如果未找到匹配，记录它：
+   ```bash
+   harness save-failure \
+     --task <task-id> \
+     --phase <build|eval|ship> \
+     --category <ci-failure|test-failure|eval-iterate|design-flaw> \
+     --summary "<简洁的失败描述>" \
+     --root-cause "<为什么发生>" \
+     --fix "<如何解决>"
+   ```
+
+**质量门槛**：仅记录根因和修复都已知的模式。
+目标是每次回顾 0-5 个高质量模式，而非穷举。
+
+---
+
+## 步骤 14：叙事总结
 
 以人类可读的叙事结束：
 
