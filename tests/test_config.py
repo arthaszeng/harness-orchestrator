@@ -160,3 +160,22 @@ class TestHarnessConfigError:
     def test_missing_config_uses_defaults(self, tmp_path: Path):
         cfg = HarnessConfig.load(tmp_path)
         assert cfg.workflow.max_iterations == 3
+
+
+# ── apply_trust_threshold config ──────────────────────────
+
+def test_apply_trust_threshold_default_false():
+    cfg = HarnessConfig()
+    assert cfg.workflow.apply_trust_threshold is False
+
+
+def test_apply_trust_threshold_from_toml(tmp_path: Path):
+    agents_dir = tmp_path / ".harness-flow"
+    agents_dir.mkdir()
+    (agents_dir / "config.toml").write_text(
+        '[project]\nname = "test"\n\n'
+        '[workflow]\napply_trust_threshold = true\n',
+        encoding="utf-8",
+    )
+    cfg = HarnessConfig.load(tmp_path)
+    assert cfg.workflow.apply_trust_threshold is True

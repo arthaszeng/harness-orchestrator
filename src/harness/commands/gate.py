@@ -50,13 +50,25 @@ def run_gate(*, task: Optional[str] = None) -> None:
         review_gate_mode = "eng"
 
     trust_profile = _compute_trust_for_gate(cfg)
+
+    eff_threshold = None
+    if cfg is not None and cfg.workflow.apply_trust_threshold:
+        from harness.core.trust_engine import compute_effective_threshold
+
+        eff_threshold = compute_effective_threshold(
+            cfg.workflow.pass_threshold,
+            trust_profile,
+            apply=True,
+        )
+
     verdict = check_ship_readiness(
         task_dir,
         review_gate_mode=review_gate_mode,
         trust_profile=trust_profile,
+        effective_threshold=eff_threshold,
     )
 
-    _render_verdict(console, task_dir, verdict)
+    _render_verdict(console, task_dir, verdict, effective_threshold=eff_threshold)
 
     try:
         write_gate_snapshot(task_dir, verdict)
@@ -101,7 +113,13 @@ def _gate_check_label(check_name: str) -> str:
     return label
 
 
-def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
+def _render_verdict(
+    console,
+    task_dir: Path,
+    verdict: GateVerdict,
+    *,
+    effective_threshold: float | None = None,
+) -> None:
     """Render the gate verdict using Rich."""
     from harness.i18n import t
 
@@ -140,11 +158,15 @@ def _render_verdict(console, task_dir: Path, verdict: GateVerdict) -> None:
         from harness.core.trust_engine import get_trust_level_meta
 
         meta = get_trust_level_meta(verdict.trust_level)
-        sign = "+" if meta.escalation_adjustment >= 0 else ""
-        console.print(
-            f"\n  [cyber.dim]Trust: {verdict.trust_level.value} — "
-            f"escalation adjustment {sign}{meta.escalation_adjustment} "
-            f"({meta.description})[/]"
+        esc_sign = "+" if meta.escalation_adjustment >= 0 else ""
+        thr_sign = "+" if meta.threshold_adjustment >= 0 else ""
+        trust_line = (
+            f"Trust: {verdict.trust_level.value} — "
+            f"escalation {esc_sign}{meta.escalation_adjustment}"
         )
+        if effective_threshold is not None:
+            trust_line += f", threshold {thr_sign}{meta.threshold_adjustment:.1f} → effective {effective_threshold:.1f}"
+        trust_line += f" ({meta.description})"
+        console.print(f"\n  [cyber.dim]{trust_line}[/]")
 
     console.print()

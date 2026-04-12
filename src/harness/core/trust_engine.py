@@ -3,8 +3,13 @@
 Pure-function module: no I/O, no side effects. All inputs (CalibrationReport,
 ReviewOutcome list, TrustConfig) are provided by the caller.
 
-Trust levels influence escalation score *advisory* only — they never change
-hard gate pass/block semantics.
+Trust levels influence two dimensions of the review pipeline:
+1. **Escalation score** (always active) — ``escalation_adjustment`` shifts
+   the review intensity (FAST / LITE / FULL).
+2. **Pass threshold** (opt-in via ``WorkflowConfig.apply_trust_threshold``) —
+   ``threshold_adjustment`` shifts the effective score threshold for the ship
+   gate.  When disabled (default), the threshold is the fixed
+   ``pass_threshold`` from config.
 """
 
 from __future__ import annotations
@@ -209,6 +214,29 @@ def compute_trust_profile(
         paired_samples=paired,
         recent_revert_count=recent_revert_count,
     )
+
+
+EFFECTIVE_THRESHOLD_MIN: float = 5.0
+EFFECTIVE_THRESHOLD_MAX: float = 10.0
+
+
+def compute_effective_threshold(
+    base_threshold: float,
+    trust_profile: TrustProfile | None = None,
+    *,
+    apply: bool = False,
+) -> float:
+    """Compute the effective pass threshold after trust adjustment.
+
+    When *apply* is False or *trust_profile* is None, returns *base_threshold*
+    unchanged — preserving backward-compatible behavior.
+
+    The result is clamped to [EFFECTIVE_THRESHOLD_MIN, EFFECTIVE_THRESHOLD_MAX].
+    """
+    if not apply or trust_profile is None:
+        return base_threshold
+    raw = base_threshold + trust_profile.threshold_adjustment
+    return max(EFFECTIVE_THRESHOLD_MIN, min(EFFECTIVE_THRESHOLD_MAX, raw))
 
 
 def _count_paired(outcomes: list[ReviewOutcome]) -> int:

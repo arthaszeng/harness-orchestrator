@@ -137,6 +137,8 @@ MESSAGES: dict[str, str] = {
     "gate.check.build_exists": "构建日志",
     "gate.check.eval_fresh": "评审是否仍有效",
     "gate.check.workflow_state_gate": "任务状态同步",
+    "gate.check.score_threshold": "分数 vs 有效阈值",
+    "gate.check.barriers_complete": "Barrier 完成状态",
     "gate.check_fallback": "检查项（{id}）",
     "gate.recovery.no_task": "说明：未能解析任务目录。建议：在项目根目录运行，确保存在 .harness-flow/tasks/task-NNN/，或使用 --task 指定。",
     "gate.recovery.blocked": "说明：有一项或多项发布就绪检查未通过。建议：修复测试、评审产物或 workflow 状态后，再次运行 `harness gate`。",

@@ -136,6 +136,8 @@ MESSAGES: dict[str, str] = {
     "gate.check.build_exists": "Build log",
     "gate.check.eval_fresh": "Review freshness",
     "gate.check.workflow_state_gate": "Task status sync",
+    "gate.check.score_threshold": "Score vs effective threshold",
+    "gate.check.barriers_complete": "Barrier completion",
     "gate.check_fallback": "Check ({id})",
     "gate.recovery.no_task": "What happened: gate could not resolve a task directory. Suggestion: run from project root with .harness-flow/tasks/task-NNN/, or pass --task.",
     "gate.recovery.blocked": "What happened: one or more ship-readiness checks failed. Suggestion: fix failing items (tests, eval artifacts, or workflow state), then run `harness gate` again.",
