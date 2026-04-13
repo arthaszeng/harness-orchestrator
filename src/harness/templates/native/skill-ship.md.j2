@@ -107,7 +107,7 @@ NOT DONE items → mention in PR body; non-blocking.
 ## Step 3.9: Capture Learnings
 
 {% if memverse_enabled == "true" %}
-After synthesis: write only durable `[LEARNING]` items (confidence ≥7), not logs (counts, PR#, hashes, scores). Register role domains once (parallel `manage_domain` calls), dedup via `search_memory`, `add_memories` with `[domain]` prefix + metadata; parallel writes; log `LEARNING_ADD` counters. Non-blocking.
+After synthesis: write only durable `[LEARNING]` items (confidence ≥7), not logs (counts, PR#, hashes, scores). If eval already captured learnings in this session, only add genuinely new findings from the ship phase — `search_memory` each item first to confirm it's not a duplicate. Register role domains once (parallel `manage_domain` calls), `add_memories` with `[domain]` prefix + metadata; parallel writes; log `LEARNING_ADD` counters. Non-blocking.
 {% else %}
 Skip — Memverse disabled.
 {% endif %}
@@ -152,6 +152,10 @@ harness save-failure --task TASK_ID --phase <phase> --category <category> \
   --summary "<description>" --root-cause "<cause>" --fix "<resolution>"
 ```
 Target 0–3 high-quality patterns per ship.
+{% if memverse_enabled == "true" %}
+
+If `harness save-failure` output includes a `memverse_sync` payload, **immediately** execute the corresponding `add_memories` call to persist the pattern in Memverse. Do not defer — session interruptions would lose the sync.
+{% endif %}
 
 ---
 

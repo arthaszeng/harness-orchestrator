@@ -9,7 +9,7 @@ harness search-failures --query "<relevant keywords>" --limit 10
 Review results for recurring issues that may affect this task.  If prior patterns suggest known pitfalls, factor them into your approach.
 
 {% if memverse_enabled == "true" %}
-**Memverse semantic search:** For broader cross-project pattern matching, also query Memverse:
+**Memverse semantic search:** For broader cross-project pattern matching, also query Memverse (project + five `*-learning` domains):
 
 ```
 CallMcpTool(
@@ -17,7 +17,7 @@ CallMcpTool(
   toolName="search_memory",
   arguments={
     "query": "<relevant keywords>",
-    "domains": "{{ memverse_domain }}",
+    "domain": "{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-owner-learning,{{ memverse_domain }}-project-manager-learning",
     "metadata_filter": "{\"type\": \"failure-pattern\"}",
     "limit": 10
   }

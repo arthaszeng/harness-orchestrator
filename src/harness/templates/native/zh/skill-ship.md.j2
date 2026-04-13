@@ -107,7 +107,7 @@ NOT DONE 项 → 写入 PR 正文；不阻塞。
 ## 步骤 3.9：捕获学习成果
 
 {% if memverse_enabled == "true" %}
-合成后：只写可长期复用的 `[LEARNING]`（置信度 ≥7），不写日志类（数量、PR#、hash、分数）。各角色域一次性并行 `manage_domain`；`search_memory` 去重；`add_memories` 带 `[domain]` 前缀与 metadata；并行写入；记 `LEARNING_ADD`。写入失败不阻塞门禁。
+合成后：只写可长期复用的 `[LEARNING]`（置信度 ≥7），不写日志类（数量、PR#、hash、分数）。若 eval 已在本会话中捕获学习成果，仅补充 ship 阶段真正新发现的内容——先 `search_memory` 逐条确认无重复。各角色域一次性并行 `manage_domain`；`add_memories` 带 `[domain]` 前缀与 metadata；并行写入；记 `LEARNING_ADD`。写入失败不阻塞门禁。
 {% else %}
 跳过 — Memverse 未启用。
 {% endif %}
@@ -152,6 +152,10 @@ harness save-failure --task TASK_ID --phase <阶段> --category <类别> \
   --summary "<描述>" --root-cause "<根因>" --fix "<修复>"
 ```
 目标每次 ship 0-3 个高质量模式。
+{% if memverse_enabled == "true" %}
+
+若 `harness save-failure` 输出包含 `memverse_sync` 载荷，**必须**立即执行对应的 `add_memories` 调用将模式持久化到 Memverse。不要延迟——会话中断会导致同步丢失。
+{% endif %}
 
 ---
 

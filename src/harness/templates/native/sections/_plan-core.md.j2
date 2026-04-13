@@ -70,10 +70,12 @@ Before writing the Analysis, search for historical failure patterns and then use
    harness search-failures --query "<keywords describing this task's domain>" --limit 10
    ```
 {% if memverse_enabled == "true" %}
-2. Search cross-project design lessons via Memverse:
+2. Search cross-project design lessons via Memverse (project + five `*-learning` domains):
    ```
    CallMcpTool(server="user-Memverse", toolName="search_memory",
-     arguments={"query": "<domain keywords>", "domains": "{{ memverse_domain }}", "limit": 10})
+     arguments={"query": "<domain keywords>",
+       "domain": "{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-owner-learning,{{ memverse_domain }}-project-manager-learning",
+       "limit": 10})
    ```
 {% endif %}
 3. Understand recent evolution of the affected area:

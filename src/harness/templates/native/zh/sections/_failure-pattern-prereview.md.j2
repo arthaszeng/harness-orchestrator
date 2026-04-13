@@ -9,7 +9,7 @@ harness search-failures --query "<相关关键词>" --limit 10
 审查结果中是否有可能影响本次任务的反复出现的问题。如果先验模式提示了已知陷阱，将其纳入你的方案。
 
 {% if memverse_enabled == "true" %}
-**Memverse 语义搜索：** 如需更广泛的跨项目模式匹配，同时查询 Memverse：
+**Memverse 语义搜索：** 如需更广泛的跨项目模式匹配，同时查询 Memverse（项目域 + 五个 `*-learning` 域）：
 
 ```
 CallMcpTool(
@@ -17,7 +17,7 @@ CallMcpTool(
   toolName="search_memory",
   arguments={
     "query": "<相关关键词>",
-    "domains": "{{ memverse_domain }}",
+    "domain": "{{ memverse_domain }},{{ memverse_domain }}-architect-learning,{{ memverse_domain }}-engineer-learning,{{ memverse_domain }}-qa-learning,{{ memverse_domain }}-product-owner-learning,{{ memverse_domain }}-project-manager-learning",
     "metadata_filter": "{\"type\": \"failure-pattern\"}",
     "limit": 10
   }
