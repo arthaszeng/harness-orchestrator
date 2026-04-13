@@ -144,7 +144,7 @@ Minimal constants only:
 
 - `**ALL_ROLES`** — empty `frozenset` (no routed roles in native-only mode).
 - `**NATIVE_REVIEW_ROLES`** — the five native review roles: `architect`, `product_owner`, `engineer`, `qa`, `project_manager`.
-- `**SCORING_DIMENSIONS**` — evaluation dimension labels (used by tests for validation).
+- `**SCORING_DIMENSIONS`** — evaluation dimension labels (used by tests for validation).
 - `**DEFAULT_RUNTIME**` — default runtime label (`"cursor"`) for registry/events/tracker.
 
 ### `state.py`
@@ -237,8 +237,8 @@ review intensities:
 
 | Level | Trigger                                                     | Behavior                                         |
 | ----- | ----------------------------------------------------------- | ------------------------------------------------ |
-| FULL  | score ≥ `gate_full_review_min` (default 5)                  | Full multi-role parallel code review              |
-| LITE  | score in `[gate_summary_confirm_min, gate_full_review_min)` | Engineer + QA only                               |
+| FULL  | score ≥ `gate_full_review_min` (default 5)                  | Full multi-role parallel code review             |
+| LITE  | score in `[gate_summary_confirm_min, gate_full_review_min)` | All 5 roles, lenient synthesis (WARN advisory)   |
 | FAST  | score < `gate_summary_confirm_min` (default 3)              | Skip multi-role review; CI + `harness gate` only |
 
 
@@ -363,7 +363,7 @@ Skills/agents/rules are regenerated according to `init --force` behavior.
 ## Templates (`src/harness/templates/`)
 
 - `**config.toml.j2`** — project config emitted by `init`.
-- `**native/**` — Jinja2 sources for skills, agents, rules, and shared **sections** (e.g. plan/review gates, trust boundary, CI verification).
+- `**native/`** — Jinja2 sources for skills, agents, rules, and shared **sections** (e.g. plan/review gates, trust boundary, CI verification).
 - `**vision.md.j2` / `vision.zh.md.j2`** — initial vision stubs.
 
 All user-visible harness **behavior** in the IDE is intended to flow from these templates plus `HarnessConfig`, so upgrades can refresh prompts without forking business logic across Python files.
