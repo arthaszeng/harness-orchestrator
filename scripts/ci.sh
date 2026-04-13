@@ -12,6 +12,10 @@ die()  { printf "${RED}[ci]${NC} %s\n" "$*" >&2; exit 1; }
 step "Lint with ruff"
 ruff check src/ tests/ || die "ruff check failed"
 
+# ── Format ──────────────────────────────────────────────────────────────────
+step "Check formatting with ruff"
+ruff format --check src/ tests/ || die "ruff format check failed"
+
 # ── Tests ───────────────────────────────────────────────────────────────────
 step "Run tests"
 python3 -m pytest tests/ -v --tb=short || die "pytest failed"

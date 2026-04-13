@@ -22,6 +22,10 @@
 ### Removed
 
 - **`.cursor/worktrees.json` generation**: `harness init` no longer generates this file. Cursor 3.0's agentic worktree setup does not reliably execute it; use `harness worktree-setup` instead.
+- `SessionState`, `TaskRecord`, `CompletedTask`, `SessionStats`, `StopContext`, `TaskArtifacts` models from `state.py`
+- `post_ship_pending.py` and `post_ship_watcher.py` modules
+- `update_progress()` function (progress.md generation)
+- Status dashboard stats panel and recent-result panel (data source removed)
 
 ### Changed
 
@@ -29,13 +33,6 @@
 - **Preflight templates** (en/zh) simplified: worktree detection step removed, steps renumbered 1–4.
 - **Ship templates** (en/zh) removed Step 8.25 (post-ship watcher auto-trigger).
 - `**harness init`** no longer blocks execution inside a linked worktree.
-
-### Removed
-
-- `SessionState`, `TaskRecord`, `CompletedTask`, `SessionStats`, `StopContext`, `TaskArtifacts` models from `state.py`
-- `post_ship_pending.py` and `post_ship_watcher.py` modules
-- `update_progress()` function (progress.md generation)
-- Status dashboard stats panel and recent-result panel (data source removed)
 
 ## 4.1.50
 
