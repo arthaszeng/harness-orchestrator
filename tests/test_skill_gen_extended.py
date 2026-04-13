@@ -7,6 +7,7 @@ import pytest
 
 from harness.core.config import HarnessConfig
 from harness.native.skill_gen import (
+    _REFERENCE_FILES,
     _build_full_context,
     _cleanup_legacy_paths,
     _detect_project_lang,
@@ -2142,6 +2143,18 @@ class TestLegacyCleanup:
 
         assert old_agents.exists(), ".cursor/agents/ should survive if non-harness files remain"
         assert (old_agents / "user-agent.md").exists()
+
+    def test_reference_files_cover_all_reference_templates(self):
+        """Every .j2 in native/references/ must be registered in _REFERENCE_FILES."""
+        templates_pkg = Path(__file__).resolve().parent.parent / "src" / "harness" / "templates" / "native"
+        ref_dir = templates_pkg / "references"
+        if not ref_dir.exists():
+            pytest.skip("references directory not found (installed from wheel)")
+
+        j2_files = {f.name for f in ref_dir.iterdir() if f.suffix == ".j2"}
+        registered = {src.split("/")[-1] for src, _, _, _ in _REFERENCE_FILES if src.startswith("references/")}
+        missing = j2_files - registered
+        assert not missing, f"Reference templates not registered in _REFERENCE_FILES: {missing}"
 
     def test_full_upgrade_path(self, tmp_path: Path):
         """Simulate upgrade: old layout → init --force → only new layout remains."""

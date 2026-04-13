@@ -89,6 +89,8 @@ _REFERENCE_FILES: list[tuple[str, str, str, str]] = [
     ("references/ship-test-triage.md.j2", "harness-ship", "ship-test-triage.md", "render"),
     ("references/ship-coverage-audit.md.j2", "harness-ship", "ship-coverage-audit.md", "render"),
     ("references/build-test-triage.md.j2", "harness-build", "build-test-triage.md", "render"),
+    ("references/plan-preflight-protocol.md.j2", "harness-plan", "plan-preflight-protocol.md", "render"),
+    ("references/plan-review-protocol.md.j2", "harness-plan", "plan-review-protocol.md", "render"),
 ]
 
 
