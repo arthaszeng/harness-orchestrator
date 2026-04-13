@@ -10,10 +10,8 @@ import pytest
 from harness.core.artifact_graph import (
     STANDARD_ARTIFACTS,
     ARTIFACT_BY_ID,
-    ArtifactDef,
     ArtifactInfo,
     ArtifactStatus,
-    TaskArtifactReport,
     compute_artifact_report,
     suggest_next_actions,
 )
