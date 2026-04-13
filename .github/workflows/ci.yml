@@ -1,9 +1,9 @@
 name: CI
 
+# DISABLED: GitHub Actions minutes exhausted — running CI locally via ./scripts/ci.sh
+# To re-enable: remove the `if: false` on the jobs below and restore original `on:` triggers
 on:
-  pull_request:
-    branches: [main]
-  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read

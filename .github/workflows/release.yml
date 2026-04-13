@@ -1,8 +1,8 @@
 name: CD — Release to PyPI
 
+# DISABLED: GitHub Actions minutes exhausted — running CD locally via ./scripts/release.sh
+# To re-enable: restore original `on:` triggers (push to main + workflow_dispatch with inputs)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       publish_only:
