@@ -218,17 +218,52 @@ Project settings live in `.harness-flow/config.toml`:
 **CLI reference**
 
 
-| Command                                                  | Description                                     |
-| -------------------------------------------------------- | ----------------------------------------------- |
-| `harness init [--name] [--ci] [-y] [--force]`            | Initialize project (interactive wizard)         |
-| `harness status`                                         | Show current task progress                      |
-| `harness gate [--task]`                                  | Check ship-readiness gates                      |
-| `harness update [--check] [--force]`                     | Self-update + config migration                  |
-| `harness git-preflight [--json]`                         | Preflight checks (clean tree, branch)            |
-| `harness save-eval --task <id> [--kind] [--verdict] ...` | Save evaluation results                         |
-| `harness save-build-log --task <id> [--body]`            | Save build log                                  |
-| `harness git-prepare-branch --task-key <key>`            | Create or resume task branch                    |
-| `harness git-sync-trunk [--json]`                        | Sync feature branch with trunk                  |
+| Command | Description |
+| --- | --- |
+| **Project setup** | |
+| `harness init [--name] [--ci] [-y] [--force]` | Initialize project (interactive wizard) |
+| `harness update [--check] [--force]` | Self-update + config migration |
+| `harness status` | Show current task progress |
+| `harness version` | Show version and runtime info |
+| **Git operations** | |
+| `harness git-preflight [--json]` | Preflight checks (clean tree, branch) |
+| `harness git-prepare-branch --task-key <key>` | Create or resume task branch |
+| `harness git-sync-trunk [--json]` | Sync feature branch with trunk |
+| `harness git-post-ship [--json]` | Post-ship cleanup after PR merge |
+| **Quality gates** | |
+| `harness gate [--task]` | Check ship-readiness gates |
+| `harness plan-lint --task <id> [--json]` | Validate plan.md structure |
+| `harness validate-artifacts --task <id> [--json]` | Report artifact dependency status |
+| `harness preflight-bundle --task <id> [--json]` | Run 4-in-1 preflight checks |
+| **Artifact persistence** | |
+| `harness save-eval --task <id> [--kind] [--verdict] ...` | Save evaluation results |
+| `harness save-build-log --task <id> [--body]` | Save build log |
+| `harness save-ship-metrics --task <id> [--body]` | Save ship metrics JSON |
+| `harness save-feedback-ledger --task <id> [--body]` | Save feedback ledger entry |
+| `harness save-intervention-audit --task <id> ...` | Save intervention audit event |
+| `harness save-failure --task <id> [--pattern] ...` | Record failure pattern |
+| **Review & calibration** | |
+| `harness escalation-score compute [--phase] ...` | Compute escalation score |
+| `harness review-score compute [--kind] [--json]` | Calibrate review score and verdict |
+| `harness calibrate [--task] [--json]` | Review calibration report |
+| `harness trust [--json]` | Progressive trust profile |
+| `harness record-outcome --task <id> ...` | Record actual CI/revert outcome |
+| **Workflow helpers** | |
+| `harness workflow next [--task] [--json]` | Workflow hints from task state |
+| `harness task next-id [--json]` | Next available task ID |
+| `harness search-failures --query <q> [--limit]` | Search failure patterns across tasks |
+| `harness context-budget --task <id> [--json]` | Estimate token usage vs budget |
+| `harness plan-completion-audit --task <id> [--json]` | Audit deliverable completion vs diff |
+| `harness diff-stat [--json]` | Branch diff statistics |
+| `harness ship-prepare --task <id> [--json]` | Pre-compute ship metadata |
+| **Cross-stage coordination** | |
+| `harness handoff read\|write [--task] ...` | Structured cross-stage handoff |
+| `harness session read\|write [--task] ...` | Intra-phase session context |
+| `harness barrier register\|complete\|check\|list ...` | Barrier management for async tasks |
+| **Infrastructure** | |
+| `harness worktree-setup` | Create symlinks in linked worktree |
+| `harness pr-status [--json]` | Query CI and merge status of a PR |
+| `harness ci-logs [--json]` | Retrieve logs from failed CI jobs |
 
 
 ---
